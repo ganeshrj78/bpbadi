@@ -280,31 +280,42 @@
                             {% elif status == 'TENTATIVE' %}bg-yellow-100 border-yellow-500 text-yellow-700
                             {% elif status == 'FILLIN' %}bg-blue-100 border-blue-500 text-blue-700
                             {% elif status == 'DROPOUT' %}bg-orange-100 border-orange-500 text-orange-700
+                            {% elif status == 'STANDBY' %}bg-teal-100 border-teal-500 text-teal-700
                             {% else %}bg-gray-100 border-gray-300 text-gray-500{% endif %}">
                             {% if session.voting_frozen %}
                             {% if status == 'YES' %}
                             <option value="YES" selected>Yes</option>
                             <option value="DROPOUT">Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'NO' or not status %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'TENTATIVE' %}
                             <option value="TENTATIVE" selected>Tentative</option>
                             <option value="DROPOUT">Drop-Out</option>
                             <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'DROPOUT' %}
                             <option value="YES">Yes</option>
                             <option value="DROPOUT" selected>Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'FILLIN' %}
                             <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="YES">Yes</option>
+                            <option value="NO">No</option>
+                            <option value="STANDBY" selected>Stand By</option>
                             {% endif %}
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
+                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
                             <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
@@ -408,31 +419,42 @@
                             {% elif status == 'TENTATIVE' %}bg-yellow-100 border-yellow-500 text-yellow-700
                             {% elif status == 'FILLIN' %}bg-blue-100 border-blue-500 text-blue-700
                             {% elif status == 'DROPOUT' %}bg-orange-100 border-orange-500 text-orange-700
+                            {% elif status == 'STANDBY' %}bg-teal-100 border-teal-500 text-teal-700
                             {% else %}bg-gray-100 border-gray-300 text-gray-500{% endif %}">
                             {% if session.voting_frozen %}
                             {% if status == 'YES' %}
                             <option value="YES" selected>Yes</option>
                             <option value="DROPOUT">Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'NO' or not status %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'TENTATIVE' %}
                             <option value="TENTATIVE" selected>Tentative</option>
                             <option value="DROPOUT">Drop-Out</option>
                             <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'DROPOUT' %}
                             <option value="YES">Yes</option>
                             <option value="DROPOUT" selected>Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'FILLIN' %}
                             <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="YES">Yes</option>
+                            <option value="NO">No</option>
+                            <option value="STANDBY" selected>Stand By</option>
                             {% endif %}
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
+                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
                             <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
@@ -536,31 +558,42 @@
                             {% elif status == 'TENTATIVE' %}bg-yellow-100 border-yellow-500 text-yellow-700
                             {% elif status == 'FILLIN' %}bg-blue-100 border-blue-500 text-blue-700
                             {% elif status == 'DROPOUT' %}bg-orange-100 border-orange-500 text-orange-700
+                            {% elif status == 'STANDBY' %}bg-teal-100 border-teal-500 text-teal-700
                             {% else %}bg-gray-100 border-gray-300 text-gray-500{% endif %}">
                             {% if session.voting_frozen %}
                             {% if status == 'YES' %}
                             <option value="YES" selected>Yes</option>
                             <option value="DROPOUT">Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'NO' or not status %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'TENTATIVE' %}
                             <option value="TENTATIVE" selected>Tentative</option>
                             <option value="DROPOUT">Drop-Out</option>
                             <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'DROPOUT' %}
                             <option value="YES">Yes</option>
                             <option value="DROPOUT" selected>Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif status == 'FILLIN' %}
                             <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="YES">Yes</option>
+                            <option value="NO">No</option>
+                            <option value="STANDBY" selected>Stand By</option>
                             {% endif %}
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
+                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
                             <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}

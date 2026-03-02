@@ -313,32 +313,44 @@
                             {% elif current_status == 'TENTATIVE' %}bg-yellow-100 border-yellow-300 text-yellow-700
                             {% elif current_status == 'DROPOUT' %}bg-red-100 border-red-300 text-red-700
                             {% elif current_status == 'FILLIN' %}bg-blue-100 border-blue-300 text-blue-700
+                            {% elif current_status == 'STANDBY' %}bg-teal-100 border-teal-300 text-teal-700
                             {% else %}bg-gray-100 border-gray-300 text-gray-600{% endif %}">
                             {% if session.voting_frozen %}
                             {% if current_status == 'YES' %}
                             <option value="YES" selected>Yes</option>
                             <option value="DROPOUT">Dropout</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif current_status == 'NO' %}
                             <option value="NO" selected>No</option>
                             <option value="FILLIN">Fill-in</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif current_status == 'TENTATIVE' %}
                             <option value="TENTATIVE" selected>Tentative</option>
                             <option value="DROPOUT">Dropout</option>
                             <option value="FILLIN">Fill-in</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif current_status == 'DROPOUT' %}
                             <option value="YES">Yes</option>
                             <option value="DROPOUT" selected>Dropout</option>
+                            <option value="STANDBY">Stand By</option>
                             {% elif current_status == 'FILLIN' %}
                             <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-in</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif current_status == 'STANDBY' %}
+                            <option value="YES">Yes</option>
+                            <option value="NO">No</option>
+                            <option value="STANDBY" selected>Stand By</option>
                             {% else %}
                             <option value="NO" selected>No</option>
                             <option value="FILLIN">Fill-in</option>
+                            <option value="STANDBY">Stand By</option>
                             {% endif %}
                             {% else %}
                             <option value="YES" {% if current_status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if current_status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if current_status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
+                            <option value="STANDBY" {% if current_status == 'STANDBY' %}selected{% endif %}>Stand By</option>
                             <option value="DROPOUT" {% if current_status == 'DROPOUT' %}selected{% endif %}>Dropout</option>
                             <option value="FILLIN" {% if current_status == 'FILLIN' %}selected{% endif %}>Fill-in</option>
                             {% endif %}

@@ -1681,7 +1681,7 @@ def batch_update_attendance():
         session_id = update.get('session_id')
         status = update.get('status')
 
-        if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'CLEAR']:
+        if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'STANDBY', 'CLEAR']:
             errors.append(f'Invalid status for session {session_id}, player {player_id}')
             continue
 
@@ -1696,12 +1696,13 @@ def batch_update_attendance():
         # When session is frozen, only allow specific transitions
         if sess.voting_frozen:
             allowed_transitions = {
-                'YES': ['DROPOUT'],
-                'NO': ['FILLIN'],
-                'TENTATIVE': ['DROPOUT', 'FILLIN'],
-                'DROPOUT': ['YES'],
-                'FILLIN': ['NO'],
-                None: ['FILLIN'],
+                'YES': ['DROPOUT', 'STANDBY'],
+                'NO': ['FILLIN', 'STANDBY'],
+                'TENTATIVE': ['DROPOUT', 'FILLIN', 'STANDBY'],
+                'DROPOUT': ['YES', 'STANDBY'],
+                'FILLIN': ['NO', 'STANDBY'],
+                'STANDBY': ['YES', 'NO'],
+                None: ['FILLIN', 'STANDBY'],
             }
             allowed = allowed_transitions.get(current_status, [])
             if status not in allowed and status != current_status:
@@ -1770,7 +1771,7 @@ def update_attendance():
     session_id = data.get('session_id')
     status = data.get('status')
 
-    if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'CLEAR']:
+    if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'STANDBY', 'CLEAR']:
         return jsonify({'error': 'Invalid status'}), 400
 
     sess = Session.query.get(session_id)
@@ -1783,12 +1784,13 @@ def update_attendance():
     # When session is frozen, only allow specific transitions
     if sess.voting_frozen:
         allowed_transitions = {
-            'YES': ['DROPOUT'],  # YES can only change to DROPOUT
-            'NO': ['FILLIN'],    # NO can only change to FILLIN
-            'TENTATIVE': ['DROPOUT', 'FILLIN'],  # TENTATIVE can change to either
-            'DROPOUT': ['YES'],  # DROPOUT can revert to YES
-            'FILLIN': ['NO'],    # FILLIN can revert to NO
-            None: ['FILLIN'],    # No status can change to FILLIN
+            'YES': ['DROPOUT', 'STANDBY'],
+            'NO': ['FILLIN', 'STANDBY'],
+            'TENTATIVE': ['DROPOUT', 'FILLIN', 'STANDBY'],
+            'DROPOUT': ['YES', 'STANDBY'],
+            'FILLIN': ['NO', 'STANDBY'],
+            'STANDBY': ['YES', 'NO'],
+            None: ['FILLIN', 'STANDBY'],
         }
 
         allowed = allowed_transitions.get(current_status, [])
