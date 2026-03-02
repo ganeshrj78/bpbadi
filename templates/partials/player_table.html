@@ -13,7 +13,7 @@
             </thead>
             <tbody class="divide-y divide-wimbledon-gold/10">
                 {% for player in player_list %}
-                <tr class="table-row-hover transition-all {% if not player.is_active %}opacity-50{% endif %}" x-data="{ showCategoryMenu: false }">
+                <tr class="table-row-hover transition-all {% if not player.is_active %}opacity-50{% endif %}" x-data="{ showCategoryMenu: false }" data-name="{{ player.name|lower }}">
                     <td class="px-6 py-4 whitespace-nowrap cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
                         <div class="flex items-center space-x-3">
                             {% if player.profile_photo %}
