@@ -648,24 +648,16 @@ function bulkSetAttendance(playerId, status) {
         return;
     }
 
-    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    fetch('/api/bulk-attendance-players', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfMeta ? csrfMeta.content : ''
-        },
-        body: JSON.stringify({ player_ids: [playerId], session_ids: sessionIds, status: status })
-    })
-    .then(r => {
-        if (!r.ok) throw new Error('Server error ' + r.status);
-        return r.json();
-    })
-    .then(d => {
-        if (d.success) location.reload();
-        else alert(d.error || 'Error updating attendance');
-    })
-    .catch(err => alert('Request failed: ' + err.message));
+    // Queue changes into the pending save bar — no immediate API call
+    sessionIds.forEach(sessionId => {
+        const select = document.querySelector(
+            `select.attendance-select[data-session-id="${sessionId}"][data-player-id="${playerId}"]`
+        );
+        if (select) {
+            select.value = status;
+            trackChange(select, sessionId, playerId);
+        }
+    });
 }
 
 // Track pending changes: Map of "sessionId-playerId" -> {sessionId, playerId, status, originalStatus}
