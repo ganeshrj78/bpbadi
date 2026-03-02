@@ -61,11 +61,23 @@
     </div>
 </div>
 
+<!-- Pending category save bar -->
+<div id="cat-save-bar" class="hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl border-2 border-wimbledon-purple px-6 py-3 flex items-center gap-4 z-50">
+    <span class="text-sm font-medium text-gray-700">
+        <span id="cat-change-count">0</span> unsaved category change(s)
+    </span>
+    <button onclick="saveCategoryChanges()" class="px-4 py-2 bg-wimbledon-green text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        Save
+    </button>
+    <button onclick="discardCategoryChanges()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-300 transition-all flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        Discard
+    </button>
+</div>
+
 {% if current_category == 'all' and not search_query %}
-<!-- Grouped View -->
-{% set regular_players = players|selectattr('category', 'equalto', 'regular')|list %}
-{% set adhoc_players = players|selectattr('category', 'equalto', 'adhoc')|list %}
-{% set kid_players = players|selectattr('category', 'equalto', 'kid')|list %}
+<!-- Grouped View: Regular (incl. Kids), Ad-hoc, Inactive -->
 
 <!-- Regular Players -->
 {% if regular_players %}
@@ -93,20 +105,20 @@
 </div>
 {% endif %}
 
-<!-- Kid Players -->
-{% if kid_players %}
+<!-- Inactive Players -->
+{% if inactive_players %}
 <div class="mb-8">
     <div class="flex items-center gap-3 mb-4">
-        <span class="px-4 py-2 gradient-gold text-wimbledon-purple-dark text-sm font-bold rounded-full shadow-sm">Kids</span>
-        <span class="text-gray-500 text-sm">{{ kid_players|length }} players</span>
+        <span class="px-4 py-2 bg-gray-400 text-white text-sm font-bold rounded-full shadow-sm">Inactive</span>
+        <span class="text-gray-500 text-sm">{{ inactive_players|length }} players</span>
     </div>
-    {% with player_list = kid_players %}
+    {% with player_list = inactive_players %}
     {% include "partials/player_table.html" %}
     {% endwith %}
 </div>
 {% endif %}
 
-{% if not regular_players and not adhoc_players and not kid_players %}
+{% if not regular_players and not adhoc_players and not inactive_players %}
 <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 p-12 text-center">
     <svg class="w-16 h-16 mx-auto text-wimbledon-purple/20 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
@@ -125,28 +137,48 @@
 
 {% block scripts %}
 <script>
-async function updateCategory(playerId, category) {
+const pendingCategoryChanges = {};
+
+const categoryStyles = {
+    regular: { classes: ['gradient-success', 'text-white'], label: 'regular' },
+    adhoc:   { classes: ['gradient-primary', 'text-white'], label: 'adhoc' },
+    kid:     { classes: ['gradient-gold', 'text-wimbledon-purple-dark'], label: 'kid' },
+};
+const allCategoryClasses = ['gradient-success', 'gradient-primary', 'gradient-gold', 'text-white', 'text-wimbledon-purple-dark'];
+
+function queueCategoryChange(playerId, category, badgeEl) {
+    pendingCategoryChanges[playerId] = category;
+
+    // Update badge visually
+    allCategoryClasses.forEach(c => badgeEl.classList.remove(c));
+    categoryStyles[category].classes.forEach(c => badgeEl.classList.add(c));
+    badgeEl.querySelector('span:first-child').textContent = categoryStyles[category].label;
+
+    // Update save bar
+    const count = Object.keys(pendingCategoryChanges).length;
+    document.getElementById('cat-change-count').textContent = count;
+    document.getElementById('cat-save-bar').classList.toggle('hidden', count === 0);
+}
+
+async function saveCategoryChanges() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    const entries = Object.entries(pendingCategoryChanges);
     try {
-        const response = await fetch(`/api/players/${playerId}/category`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ category: category })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            // Reload page to reflect changes in grouping
-            location.reload();
-        } else {
-            alert('Failed to update category');
-        }
-    } catch (error) {
-        console.error('Error updating category:', error);
-        alert('Failed to update category. Please try again.');
+        await Promise.all(entries.map(([playerId, category]) =>
+            fetch(`/api/players/${playerId}/category`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ category })
+            })
+        ));
+        location.reload();
+    } catch (err) {
+        alert('Failed to save changes: ' + err.message);
     }
+}
+
+function discardCategoryChanges() {
+    location.reload();
 }
 </script>
 {% endblock %}

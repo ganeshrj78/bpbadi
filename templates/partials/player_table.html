@@ -37,7 +37,7 @@
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap relative">
-                        <button @click.stop="showCategoryMenu = !showCategoryMenu"
+                        <button id="cat-badge-{{ player.id }}" @click.stop="showCategoryMenu = !showCategoryMenu"
                             class="px-3 py-1.5 inline-flex items-center gap-1 text-xs leading-5 font-bold rounded-full shadow-sm transition-all hover:scale-105
                             {% if player.category == 'regular' %}gradient-success text-white
                             {% elif player.category == 'adhoc' %}gradient-primary text-white
@@ -48,15 +48,15 @@
                         <!-- Category Dropdown -->
                         <div x-show="showCategoryMenu" @click.away="showCategoryMenu = false" x-cloak
                             class="absolute z-10 mt-1 w-32 bg-white rounded-lg shadow-lg border border-wimbledon-gold/20 py-1">
-                            <button onclick="updateCategory({{ player.id }}, 'regular'); return false;"
+                            <button onclick="queueCategoryChange({{ player.id }}, 'regular', document.getElementById('cat-badge-{{ player.id }}')); showCategoryMenu = false; return false;"
                                 class="w-full px-4 py-2 text-left text-sm hover:bg-wimbledon-cream flex items-center gap-2 {% if player.category == 'regular' %}font-bold text-wimbledon-green{% endif %}">
                                 <span class="w-2 h-2 rounded-full bg-wimbledon-green"></span> Regular
                             </button>
-                            <button onclick="updateCategory({{ player.id }}, 'adhoc'); return false;"
+                            <button onclick="queueCategoryChange({{ player.id }}, 'adhoc', document.getElementById('cat-badge-{{ player.id }}')); showCategoryMenu = false; return false;"
                                 class="w-full px-4 py-2 text-left text-sm hover:bg-wimbledon-cream flex items-center gap-2 {% if player.category == 'adhoc' %}font-bold text-wimbledon-purple{% endif %}">
                                 <span class="w-2 h-2 rounded-full bg-wimbledon-purple"></span> Ad-hoc
                             </button>
-                            <button onclick="updateCategory({{ player.id }}, 'kid'); return false;"
+                            <button onclick="queueCategoryChange({{ player.id }}, 'kid', document.getElementById('cat-badge-{{ player.id }}')); showCategoryMenu = false; return false;"
                                 class="w-full px-4 py-2 text-left text-sm hover:bg-wimbledon-cream flex items-center gap-2 {% if player.category == 'kid' %}font-bold text-yellow-600{% endif %}">
                                 <span class="w-2 h-2 rounded-full bg-wimbledon-gold"></span> Kid
                             </button>

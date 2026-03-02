@@ -775,7 +775,19 @@ def players():
         )
 
     player_list = query.order_by(Player.name).all()
-    return render_template('players.html', players=player_list, current_category=category, search_query=search_query)
+
+    # Pre-group for grouped view (all / no search)
+    regular_players = [p for p in player_list if p.is_active and p.category in ('regular', 'kid')]
+    adhoc_players   = [p for p in player_list if p.is_active and p.category == 'adhoc']
+    inactive_players = [p for p in player_list if not p.is_active]
+
+    return render_template('players.html',
+                           players=player_list,
+                           regular_players=regular_players,
+                           adhoc_players=adhoc_players,
+                           inactive_players=inactive_players,
+                           current_category=category,
+                           search_query=search_query)
 
 
 @app.route('/players/add', methods=['GET', 'POST'])
