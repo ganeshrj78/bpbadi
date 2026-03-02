@@ -1227,20 +1227,6 @@ def edit_session(id):
         sess.birdie_cost = float(request.form.get('birdie_cost', 0))
         sess.notes = request.form.get('notes')
 
-        # Update time configuration
-        sess.hours = float(request.form.get('hours', 3))
-        sess.start_time = request.form.get('start_time', '06:30')
-        sess.end_time = request.form.get('end_time', '09:30')
-
-        # Calculate court cost based on hours
-        if sess.hours == 2:
-            sess.court_cost = 75
-        elif sess.hours == 3.5:
-            sess.court_cost = 90
-        else:
-            sess.court_cost = 105
-
-        # Format times for court display
         def format_time(time_str):
             h, m = map(int, time_str.split(':'))
             period = 'AM' if h < 12 else 'PM'
@@ -1249,26 +1235,40 @@ def edit_session(id):
                 display_h = 12
             return f"{display_h}:{m:02d} {period}"
 
-        start_time_display = format_time(sess.start_time)
-        end_time_display = format_time(sess.end_time)
+        def compute_end_time(start_str, hours_float):
+            h, m = map(int, start_str.split(':'))
+            total = h * 60 + m + int(hours_float * 60)
+            eh = (total // 60) % 24
+            em = total % 60
+            return f"{eh:02d}:{em:02d}"
 
         court_count = int(request.form.get('court_count', 0))
 
         # Delete existing courts and recreate
         Court.query.filter_by(session_id=id).delete()
 
-        # Add courts
+        # Add courts with per-court duration
         for i in range(court_count):
             court_name = request.form.get(f'court_name_{i}', f'Court {i+1}')
             court_type = request.form.get(f'court_type_{i}', 'regular')
-            court_cost = float(request.form.get(f'court_cost_{i}', sess.court_cost))
+            court_cost = float(request.form.get(f'court_cost_{i}', 105))
+            court_hours = float(request.form.get(f'court_hours_{i}', 3))
+            court_start = request.form.get(f'court_start_time_{i}', '06:30')
+            court_end = compute_end_time(court_start, court_hours)
+
+            # Update session-level fields from first court (used as fallback when no courts exist)
+            if i == 0:
+                sess.hours = court_hours
+                sess.start_time = court_start
+                sess.end_time = court_end
+                sess.court_cost = 75 if court_hours == 2 else (90 if court_hours == 3.5 else 105)
 
             court = Court(
                 session_id=id,
                 name=court_name,
                 court_type=court_type,
-                start_time=start_time_display,
-                end_time=end_time_display,
+                start_time=format_time(court_start),
+                end_time=format_time(court_end),
                 cost=court_cost
             )
             db.session.add(court)
@@ -1387,6 +1387,74 @@ def bulk_delete_sessions():
     clear_session_cache()  # Invalidate cached monthly summary
     flash(f'{count} session(s) permanently deleted!', 'success')
     return redirect(url_for('sessions'))
+
+
+@app.route('/api/bulk-assign-courts', methods=['POST'])
+@csrf.exempt
+@admin_required
+def bulk_assign_courts():
+    data = request.get_json()
+    session_ids = data.get('session_ids', [])
+    courts_data = data.get('courts', [])
+    overwrite = data.get('overwrite', False)
+
+    if not session_ids:
+        return jsonify({'success': False, 'error': 'No sessions selected'})
+    if not courts_data:
+        return jsonify({'success': False, 'error': 'No courts defined'})
+
+    def format_time(time_str):
+        h, m = map(int, time_str.split(':'))
+        period = 'AM' if h < 12 else 'PM'
+        display_h = h if h <= 12 else h - 12
+        if display_h == 0:
+            display_h = 12
+        return f"{display_h}:{m:02d} {period}"
+
+    def compute_end_time(start_str, hours_float):
+        h, m = map(int, start_str.split(':'))
+        total = h * 60 + m + int(hours_float * 60)
+        eh = (total // 60) % 24
+        em = total % 60
+        return f"{eh:02d}:{em:02d}"
+
+    sessions = Session.query.filter(Session.id.in_(session_ids)).all()
+    updated = 0
+    skipped = 0
+
+    for sess in sessions:
+        if not overwrite and sess.courts.count() > 0:
+            skipped += 1
+            continue
+
+        Court.query.filter_by(session_id=sess.id).delete()
+
+        for i, court_data in enumerate(courts_data):
+            court_hours = float(court_data.get('hours', 3))
+            court_start = court_data.get('start_time', '06:30')
+            court_end = compute_end_time(court_start, court_hours)
+
+            if i == 0:
+                sess.hours = court_hours
+                sess.start_time = court_start
+                sess.end_time = court_end
+                sess.court_cost = 75 if court_hours == 2 else (90 if court_hours == 3.5 else 105)
+
+            court = Court(
+                session_id=sess.id,
+                name=court_data.get('name', f'Court {i + 1}'),
+                court_type=court_data.get('court_type', 'regular'),
+                cost=float(court_data.get('cost', 105)),
+                start_time=format_time(court_start),
+                end_time=format_time(court_end)
+            )
+            db.session.add(court)
+
+        updated += 1
+
+    db.session.commit()
+    clear_session_cache()
+    return jsonify({'success': True, 'updated': updated, 'skipped': skipped})
 
 
 @app.route('/sessions/bulk-freeze-voting', methods=['POST'])

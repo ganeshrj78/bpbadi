@@ -34,29 +34,6 @@
                     class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green focus:ring-4 focus:ring-wimbledon-green/20 transition-all">
             </div>
 
-            <!-- Time and Hours -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                    <label for="hours" class="block text-sm font-semibold text-gray-700 mb-2">Duration *</label>
-                    <select name="hours" id="hours" x-model="hours" @change="updateEndTime()"
-                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green focus:ring-4 focus:ring-wimbledon-green/20 transition-all bg-white">
-                        <option value="2">2 hours - $75/court</option>
-                        <option value="3">3 hours - $105/court</option>
-                        <option value="3.5">3.5 hours - $90/court</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="start_time" class="block text-sm font-semibold text-gray-700 mb-2">Start Time</label>
-                    <input type="time" name="start_time" id="start_time" x-model="startTime" @change="updateEndTime()"
-                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green focus:ring-4 focus:ring-wimbledon-green/20 transition-all">
-                </div>
-                <div>
-                    <label for="end_time" class="block text-sm font-semibold text-gray-700 mb-2">End Time</label>
-                    <input type="time" name="end_time" id="end_time" x-model="endTime" readonly
-                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 cursor-not-allowed">
-                </div>
-            </div>
-
             <!-- Birdie Cost -->
             <div>
                 <label for="birdie_cost" class="block text-sm font-semibold text-gray-700 mb-2">Birdie Cost per Player ($)</label>
@@ -103,7 +80,8 @@
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </div>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <!-- Row 1: Name, Type, Duration, Start Time, End Time -->
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Name</label>
                                     <input type="text" :name="'court_name_' + index" x-model="court.name" placeholder="Court 1"
@@ -118,13 +96,33 @@
                                     </select>
                                 </div>
                                 <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Duration (hrs)</label>
+                                    <input type="number" :name="'court_hours_' + index" x-model="court.hours"
+                                        @change="court.cost = courtRate(court.hours)"
+                                        step="0.5" min="0.5" placeholder="e.g. 2"
+                                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-wimbledon-green">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Start Time</label>
+                                    <input type="time" :name="'court_start_time_' + index" x-model="court.start_time"
+                                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-wimbledon-green">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">End Time</label>
+                                    <input type="time" :value="courtEndTime(court)" readonly
+                                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 cursor-not-allowed">
+                                </div>
+                            </div>
+                            <!-- Row 2: Cost + Apply Rate -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Cost ($)</label>
                                     <input type="number" :name="'court_cost_' + index" x-model="court.cost" step="0.01" min="0" required
                                         class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-wimbledon-green">
                                 </div>
                                 <div class="flex items-end">
-                                    <button type="button" @click="court.cost = courtCost" class="w-full px-3 py-2 text-xs bg-wimbledon-purple/10 text-wimbledon-purple rounded-lg hover:bg-wimbledon-purple/20 transition-all">
-                                        Apply Rate ($<span x-text="courtCost"></span>)
+                                    <button type="button" @click="court.cost = courtRate(court.hours)" class="w-full px-3 py-2 text-xs bg-wimbledon-purple/10 text-wimbledon-purple rounded-lg hover:bg-wimbledon-purple/20 transition-all">
+                                        Apply Rate ($<span x-text="courtRate(court.hours)"></span>)
                                     </button>
                                 </div>
                             </div>
@@ -222,13 +220,11 @@ function sessionForm() {
     return {
         {% if session %}
         // Edit mode - initialize with existing session data
-        hours: '{{ session.hours or "3" }}',
-        startTime: '{{ session.start_time or "06:30" }}',
-        endTime: '{{ session.end_time or "09:30" }}',
+        defaultStartTime: '{{ session.start_time or "06:30" }}',
         courts: [
             {% if session.courts.count() > 0 %}
                 {% for court in session.courts.all() %}
-                { name: '{{ court.name }}', court_type: '{{ court.court_type or "regular" }}', cost: {{ court.cost }} },
+                { name: '{{ court.name }}', court_type: '{{ court.court_type or "regular" }}', cost: {{ court.cost }}, hours: '{{ "2" if court.cost == 75 else ("3.5" if court.cost == 90 else "3") }}', start_time: '{{ session.start_time or "06:30" }}' },
                 {% endfor %}
             {% endif %}
         ],
@@ -238,25 +234,24 @@ function sessionForm() {
         {% endif %}
 
         {% if session %}
-        get courtCost() {
-            const h = parseFloat(this.hours);
+        courtRate(hours) {
+            const h = parseFloat(hours);
             if (h === 2) return 75;
-            if (h === 3) return 105;
             if (h === 3.5) return 90;
-            return 105; // default
+            return 105;
+        },
+
+        courtEndTime(court) {
+            if (!court.start_time) return '';
+            const [h, m] = court.start_time.split(':').map(Number);
+            const total = h * 60 + m + parseFloat(court.hours || 3) * 60;
+            const eh = Math.floor(total / 60) % 24;
+            const em = total % 60;
+            return String(eh).padStart(2, '0') + ':' + String(em).padStart(2, '0');
         },
 
         get totalCost() {
             return this.courts.reduce((sum, court) => sum + (parseFloat(court.cost) || 0), 0);
-        },
-
-        updateEndTime() {
-            if (!this.startTime) return;
-            const [hours, minutes] = this.startTime.split(':').map(Number);
-            const totalMinutes = hours * 60 + minutes + parseFloat(this.hours) * 60;
-            const endHours = Math.floor(totalMinutes / 60) % 24;
-            const endMinutes = totalMinutes % 60;
-            this.endTime = String(endHours).padStart(2, '0') + ':' + String(endMinutes).padStart(2, '0');
         },
         {% endif %}
 
@@ -275,16 +270,14 @@ function sessionForm() {
         {% if session %}
         addCourt() {
             const num = this.courts.length + 1;
-            this.courts.push({ name: 'Court ' + num, court_type: 'regular', cost: this.courtCost });
+            this.courts.push({ name: 'Court ' + num, court_type: 'regular', cost: 105, hours: '3', start_time: this.defaultStartTime });
         },
 
         removeCourt(index) {
             this.courts.splice(index, 1);
         },
 
-        init() {
-            this.updateEndTime();
-        }
+        init() {}
         {% endif %}
     }
 }
