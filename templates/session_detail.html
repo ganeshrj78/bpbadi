@@ -150,6 +150,14 @@
                 <div class="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Expected Collection</div>
                 <div class="text-2xl font-bold text-blue-700">${{ "%.2f"|format(session.get_total_collection()) }}</div>
             </div>
+            <!-- Credits -->
+            {% if session.credits %}
+            <div class="bg-green-50 rounded-xl p-4 border border-green-200">
+                <div class="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Credits</div>
+                <div class="text-2xl font-bold text-green-700">${{ "%.2f"|format(session.credits) }}</div>
+                <div class="text-xs text-green-600 mt-1">Usable toward future bookings</div>
+            </div>
+            {% endif %}
             <!-- Refunds -->
             <div class="bg-red-50 rounded-xl p-4 border border-red-200">
                 <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds Given</div>

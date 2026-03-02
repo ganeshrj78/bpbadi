@@ -179,10 +179,11 @@
                 <tr class="bg-wimbledon-cream/50 text-left">
                     <th class="px-6 py-3 font-semibold text-gray-600">Month</th>
                     <th class="px-4 py-3 font-semibold text-gray-600 text-center">Sessions</th>
-                    <th class="px-4 py-3 font-semibold text-gray-600 text-center">Attendees</th>
-                    <th class="px-4 py-3 font-semibold text-gray-600 text-right">Charged</th>
-                    <th class="px-4 py-3 font-semibold text-gray-600 text-right">Collected</th>
-                    <th class="px-4 py-3 font-semibold text-gray-600 text-right" title="Charged minus cash received in this month. Not the same as player balance owed.">Net (month)</th>
+                    <th class="px-4 py-3 font-semibold text-gray-600 text-right">Birdie</th>
+                    <th class="px-4 py-3 font-semibold text-gray-600 text-right">Total Charged</th>
+                    <th class="px-4 py-3 font-semibold text-gray-600 text-right">Payments In</th>
+                    <th class="px-4 py-3 font-semibold text-gray-600 text-right">Refunds Out</th>
+                    <th class="px-4 py-3 font-semibold text-gray-600 text-right">Credits</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-wimbledon-gold/10">
@@ -199,40 +200,27 @@
                         </div>
                     </td>
                     <td class="px-4 py-3 text-center">
-                        {% if row.sessions > 0 %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-wimbledon-green/10 text-wimbledon-green border border-wimbledon-green/20">
-                            {{ row.sessions }}
-                        </span>
-                        {% else %}
-                        <span class="text-gray-300">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-center text-gray-600">
-                        {% if row.attendees > 0 %}{{ row.attendees }}{% else %}<span class="text-gray-300">—</span>{% endif %}
-                    </td>
-                    <td class="px-4 py-3 text-right text-gray-700">
-                        {% if row.charges > 0 %}<span class="font-medium">${{ "%.2f"|format(row.charges) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-wimbledon-purple/10 text-wimbledon-purple font-bold text-xs">{{ row.sessions }}</span>
                     </td>
                     <td class="px-4 py-3 text-right">
-                        {% if row.collected > 0 %}
-                        <span class="text-wimbledon-green font-medium">${{ "%.2f"|format(row.collected) }}</span>
-                        {% else %}
-                        <span class="text-gray-300">—</span>
-                        {% endif %}
+                        {% if row.birdie > 0 %}<span class="text-yellow-700 font-medium">${{ "%.2f"|format(row.birdie) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-3 text-right">
-                        {% if row.outstanding > 0 %}
-                        <span class="text-wimbledon-purple font-semibold">${{ "%.2f"|format(row.outstanding) }}</span>
-                        {% elif row.outstanding < 0 %}
-                        <span class="text-wimbledon-green font-semibold">+${{ "%.2f"|format(row.outstanding * -1) }}</span>
-                        {% else %}
-                        <span class="text-gray-400">$0.00</span>
-                        {% endif %}
+                        {% if row.charges > 0 %}<span class="font-semibold text-wimbledon-purple">${{ "%.2f"|format(row.charges) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        {% if row.collected > 0 %}<span class="text-wimbledon-green font-semibold">${{ "%.2f"|format(row.collected) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        {% if row.refunds > 0 %}<span class="text-red-600 font-medium">-${{ "%.2f"|format(row.refunds) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        {% if row.credits > 0 %}<span class="text-blue-600 font-semibold">${{ "%.2f"|format(row.credits) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="px-6 py-8 text-center text-gray-400">No data available</td>
+                    <td colspan="7" class="px-6 py-8 text-center text-gray-400">No data available</td>
                 </tr>
                 {% endfor %}
             </tbody>

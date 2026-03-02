@@ -127,6 +127,10 @@ def admin_required(f):
 def get_cached_monthly_summary():
     """Calculate monthly summary with caching"""
     all_sessions = Session.query.order_by(Session.date.desc()).all()
+
+    # Build session_id -> month_key map for pending refund lookup
+    session_month_map = {sess.id: sess.date.strftime('%Y-%m') for sess in all_sessions}
+
     monthly_summary = {}
     for sess in all_sessions:
         key = sess.date.strftime('%Y-%m')
@@ -142,7 +146,10 @@ def get_cached_monthly_summary():
                 'adhoc_charges': 0,
                 'kid_charges': 0,
                 'total_refunds': 0,
-                'total_collection': 0
+                'total_collection': 0,
+                'payments_received': 0,
+                'pending_credits': 0,
+                'session_credits': 0,
             }
         monthly_summary[key]['sessions'].append(sess)
         monthly_summary[key]['total_sessions'] += 1
@@ -154,6 +161,19 @@ def get_cached_monthly_summary():
         monthly_summary[key]['kid_charges'] += sess.get_kid_player_charges()
         monthly_summary[key]['total_refunds'] += sess.get_total_refunds()
         monthly_summary[key]['total_collection'] += sess.get_total_collection()
+        monthly_summary[key]['session_credits'] += (sess.credits or 0)
+
+    # Actual payments received, grouped by payment month
+    for payment in Payment.query.all():
+        key = payment.date.strftime('%Y-%m')
+        if key in monthly_summary:
+            monthly_summary[key]['payments_received'] += payment.amount
+
+    # Pending dropout refunds = credits owed back to players, grouped by session month
+    for refund in DropoutRefund.query.filter_by(status='pending').all():
+        key = session_month_map.get(refund.session_id)
+        if key and key in monthly_summary:
+            monthly_summary[key]['pending_credits'] += refund.refund_amount
 
     for key in monthly_summary:
         monthly_summary[key]['is_fully_archived'] = (
@@ -401,6 +421,10 @@ def dashboard():
         ).all()
         m_collected = sum(p.amount for p in m_payments)
 
+        m_birdie = sum(sess.get_birdie_cost_total() for sess in m_sessions)
+        m_refunds = sum(sess.get_total_refunds() for sess in m_sessions)
+        m_session_credits = sum(sess.credits or 0 for sess in m_sessions)
+
         monthly_summary.append({
             'month': month_start.strftime('%b %Y'),
             'is_active': is_active_month,
@@ -409,6 +433,9 @@ def dashboard():
             'charges': round(m_charges, 2),
             'collected': round(m_collected, 2),
             'outstanding': round(m_charges - m_collected, 2),
+            'birdie': round(m_birdie, 2),
+            'refunds': round(m_refunds, 2),
+            'credits': round(m_session_credits, 2),
         })
 
     # Top cards: aggregate from active months (charges - collected for those months)
@@ -1225,6 +1252,7 @@ def edit_session(id):
     if request.method == 'POST':
         sess.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
         sess.birdie_cost = float(request.form.get('birdie_cost', 0))
+        sess.credits = float(request.form.get('credits', 0))
         sess.notes = request.form.get('notes')
 
         def format_time(time_str):

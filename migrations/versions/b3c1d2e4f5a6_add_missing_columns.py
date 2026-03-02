@@ -40,6 +40,8 @@ def upgrade():
         op.execute("ALTER TABLE sessions ADD COLUMN court_cost FLOAT DEFAULT 105")
     if 'voting_frozen' not in session_cols:
         op.execute("ALTER TABLE sessions ADD COLUMN voting_frozen BOOLEAN DEFAULT FALSE")
+    if 'credits' not in session_cols:
+        op.execute("ALTER TABLE sessions ADD COLUMN credits FLOAT DEFAULT 0")
     if 'is_archived' not in session_cols:
         op.execute("ALTER TABLE sessions ADD COLUMN is_archived BOOLEAN DEFAULT FALSE")
     if 'created_by' not in session_cols:

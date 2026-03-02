@@ -121,6 +121,7 @@ class Session(db.Model):
     start_time = db.Column(db.String(10), default='06:30')  # HH:MM format
     end_time = db.Column(db.String(10), default='09:30')  # HH:MM format
     court_cost = db.Column(db.Float, default=105)  # Default cost per court based on hours
+    credits = db.Column(db.Float, default=0)  # Credits issued for this session, usable toward future bookings
 
     # Audit fields
     created_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)
