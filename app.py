@@ -1134,6 +1134,33 @@ def sessions():
             'total_refunded': refund_data['refunded']
         }
 
+    # Sort each player group: participating first (any active session YES/FILLIN/etc.), then NP — both sub-groups sorted by name
+    def _is_participating(player_id):
+        for sess in active_sessions:
+            s = attendance_map.get(sess.id, {}).get(player_id, '')
+            if s and s != 'NO':
+                return True
+        return False
+
+    regular_players.sort(key=lambda p: (not _is_participating(p.id), p.name))
+    adhoc_players.sort(key=lambda p: (not _is_participating(p.id), p.name))
+    kid_players.sort(key=lambda p: (not _is_participating(p.id), p.name))
+
+    # Pre-compute per-player cost for active sessions using unified pool model (no extra DB calls)
+    active_session_costs = {}
+    for s in active_sessions:
+        sid = s.id
+        courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
+        total_court_cost = courts['regular'] + courts['adhoc']
+        counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
+        non_kid_count = counts['regular'] + counts['adhoc']
+        credits = s.credits or 0
+        if non_kid_count > 0:
+            per_player = round((total_court_cost + credits) / non_kid_count + s.birdie_cost, 2)
+        else:
+            per_player = s.birdie_cost or 0
+        active_session_costs[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
+
     return render_template('sessions.html',
                           active_sessions=active_sessions,
                           archived_groups=archived_sorted,
@@ -1143,7 +1170,8 @@ def sessions():
                           kid_players=kid_players,
                           attendance_map=attendance_map,
                           attendance_details=attendance_details,
-                          player_stats=player_stats)
+                          player_stats=player_stats,
+                          active_session_costs=active_session_costs)
 
 
 @app.route('/sessions/month/<month_key>')

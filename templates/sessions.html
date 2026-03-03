@@ -248,9 +248,18 @@
                         Regular Players ({{ regular_players|length }})
                     </td>
                 </tr>
+                {% set seen_np_reg = namespace(val=false) %}
                 {% for player in regular_players %}
                 {% set stats = player_stats[player.id] %}
                 {% set ns_np = namespace(all_no=true) %}{% for sess in active_sessions %}{% set _s = attendance_map.get(sess.id, {}).get(player.id, '') %}{% if _s and _s != 'NO' %}{% set ns_np.all_no = false %}{% endif %}{% endfor %}
+                {% if ns_np.all_no and active_sessions and not seen_np_reg.val %}
+                {% set seen_np_reg.val = true %}
+                <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
+                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
+                        Not Participating
+                    </td>
+                </tr>
+                {% endif %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
@@ -328,6 +337,16 @@
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
                         </select>
+                        {% set att_details_pay = attendance_details.get(session.id, {}).get(player.id, {}) %}
+                        {% if status in ['YES', 'FILLIN', 'DROPOUT'] %}
+                        {% set pstatus = att_details_pay.get('payment_status', 'unpaid') %}
+                        <button onclick="togglePaymentStatus({{ player.id }}, {{ session.id }}, this)"
+                            data-payment="{{ pstatus }}"
+                            class="mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border
+                            {% if pstatus == 'paid' %}bg-green-100 text-green-700 border-green-200{% else %}bg-red-100 text-red-700 border-red-200{% endif %}">
+                            {{ '✓ Paid' if pstatus == 'paid' else '✗ Unpaid' }}
+                        </button>
+                        {% endif %}
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -338,15 +357,19 @@
                             class="addl-charges-input w-16 px-1 py-0.5 text-xs text-right border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
-                        {% set birdie_total = namespace(total=0) %}
+                        {% set cost_total = namespace(total=0) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
-                                {% set birdie_total.total = birdie_total.total + session.birdie_cost %}
+                                {% if player.category == 'kid' %}
+                                    {% set cost_total.total = cost_total.total + active_session_costs[session.id]['kid'] %}
+                                {% else %}
+                                    {% set cost_total.total = cost_total.total + active_session_costs[session.id]['regular'] %}
+                                {% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% set total_amount = birdie_total.total + (player.additional_charges or 0) %}
-                        <span class="text-sm font-bold text-wimbledon-purple" data-player-total="{{ player.id }}" data-birdie="{{ birdie_total.total }}">
+                        {% set total_amount = cost_total.total + (player.additional_charges or 0) %}
+                        <span class="text-sm font-bold text-wimbledon-purple" data-player-total="{{ player.id }}" data-session-cost="{{ cost_total.total }}">
                             ${{ "%.2f"|format(total_amount) }}
                         </span>
                     </td>
@@ -363,9 +386,9 @@
                             {% endif %}
                         {% endfor %}
                         {% if has_unpaid.val %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Unpaid</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
                         {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Paid</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
                         {% endif %}
                         {% endif %}
                     </td>
@@ -387,9 +410,18 @@
                         Adhoc Players ({{ adhoc_players|length }})
                     </td>
                 </tr>
+                {% set seen_np_adhoc = namespace(val=false) %}
                 {% for player in adhoc_players %}
                 {% set stats = player_stats[player.id] %}
                 {% set ns_np = namespace(all_no=true) %}{% for sess in active_sessions %}{% set _s = attendance_map.get(sess.id, {}).get(player.id, '') %}{% if _s and _s != 'NO' %}{% set ns_np.all_no = false %}{% endif %}{% endfor %}
+                {% if ns_np.all_no and active_sessions and not seen_np_adhoc.val %}
+                {% set seen_np_adhoc.val = true %}
+                <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
+                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
+                        Not Participating
+                    </td>
+                </tr>
+                {% endif %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
@@ -467,6 +499,16 @@
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
                         </select>
+                        {% set att_details_pay = attendance_details.get(session.id, {}).get(player.id, {}) %}
+                        {% if status in ['YES', 'FILLIN', 'DROPOUT'] %}
+                        {% set pstatus = att_details_pay.get('payment_status', 'unpaid') %}
+                        <button onclick="togglePaymentStatus({{ player.id }}, {{ session.id }}, this)"
+                            data-payment="{{ pstatus }}"
+                            class="mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border
+                            {% if pstatus == 'paid' %}bg-green-100 text-green-700 border-green-200{% else %}bg-red-100 text-red-700 border-red-200{% endif %}">
+                            {{ '✓ Paid' if pstatus == 'paid' else '✗ Unpaid' }}
+                        </button>
+                        {% endif %}
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -477,15 +519,19 @@
                             class="addl-charges-input w-16 px-1 py-0.5 text-xs text-right border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
-                        {% set birdie_total = namespace(total=0) %}
+                        {% set cost_total = namespace(total=0) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
-                                {% set birdie_total.total = birdie_total.total + session.birdie_cost %}
+                                {% if player.category == 'kid' %}
+                                    {% set cost_total.total = cost_total.total + active_session_costs[session.id]['kid'] %}
+                                {% else %}
+                                    {% set cost_total.total = cost_total.total + active_session_costs[session.id]['regular'] %}
+                                {% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% set total_amount = birdie_total.total + (player.additional_charges or 0) %}
-                        <span class="text-sm font-bold text-wimbledon-purple" data-player-total="{{ player.id }}" data-birdie="{{ birdie_total.total }}">
+                        {% set total_amount = cost_total.total + (player.additional_charges or 0) %}
+                        <span class="text-sm font-bold text-wimbledon-purple" data-player-total="{{ player.id }}" data-session-cost="{{ cost_total.total }}">
                             ${{ "%.2f"|format(total_amount) }}
                         </span>
                     </td>
@@ -502,9 +548,9 @@
                             {% endif %}
                         {% endfor %}
                         {% if has_unpaid.val %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Unpaid</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
                         {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Paid</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
                         {% endif %}
                         {% endif %}
                     </td>
@@ -526,9 +572,18 @@
                         Kids ({{ kid_players|length }})
                     </td>
                 </tr>
+                {% set seen_np_kid = namespace(val=false) %}
                 {% for player in kid_players %}
                 {% set stats = player_stats[player.id] %}
                 {% set ns_np = namespace(all_no=true) %}{% for sess in active_sessions %}{% set _s = attendance_map.get(sess.id, {}).get(player.id, '') %}{% if _s and _s != 'NO' %}{% set ns_np.all_no = false %}{% endif %}{% endfor %}
+                {% if ns_np.all_no and active_sessions and not seen_np_kid.val %}
+                {% set seen_np_kid.val = true %}
+                <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
+                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
+                        Not Participating
+                    </td>
+                </tr>
+                {% endif %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
@@ -606,6 +661,16 @@
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
                         </select>
+                        {% set att_details_pay = attendance_details.get(session.id, {}).get(player.id, {}) %}
+                        {% if status in ['YES', 'FILLIN', 'DROPOUT'] %}
+                        {% set pstatus = att_details_pay.get('payment_status', 'unpaid') %}
+                        <button onclick="togglePaymentStatus({{ player.id }}, {{ session.id }}, this)"
+                            data-payment="{{ pstatus }}"
+                            class="mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border
+                            {% if pstatus == 'paid' %}bg-green-100 text-green-700 border-green-200{% else %}bg-red-100 text-red-700 border-red-200{% endif %}">
+                            {{ '✓ Paid' if pstatus == 'paid' else '✗ Unpaid' }}
+                        </button>
+                        {% endif %}
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -616,15 +681,19 @@
                             class="addl-charges-input w-16 px-1 py-0.5 text-xs text-right border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
-                        {% set birdie_total = namespace(total=0) %}
+                        {% set cost_total = namespace(total=0) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
-                                {% set birdie_total.total = birdie_total.total + session.birdie_cost %}
+                                {% if player.category == 'kid' %}
+                                    {% set cost_total.total = cost_total.total + active_session_costs[session.id]['kid'] %}
+                                {% else %}
+                                    {% set cost_total.total = cost_total.total + active_session_costs[session.id]['regular'] %}
+                                {% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% set total_amount = birdie_total.total + (player.additional_charges or 0) %}
-                        <span class="text-sm font-bold text-wimbledon-purple" data-player-total="{{ player.id }}" data-birdie="{{ birdie_total.total }}">
+                        {% set total_amount = cost_total.total + (player.additional_charges or 0) %}
+                        <span class="text-sm font-bold text-wimbledon-purple" data-player-total="{{ player.id }}" data-session-cost="{{ cost_total.total }}">
                             ${{ "%.2f"|format(total_amount) }}
                         </span>
                     </td>
@@ -641,9 +710,9 @@
                             {% endif %}
                         {% endfor %}
                         {% if has_unpaid.val %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Unpaid</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
                         {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Paid</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
                         {% endif %}
                         {% endif %}
                     </td>
@@ -959,8 +1028,8 @@ function updatePlayerCharges(playerId, charges) {
             // Update the total display
             const totalSpan = document.querySelector(`[data-player-total="${playerId}"]`);
             if (totalSpan) {
-                const birdie = parseFloat(totalSpan.dataset.birdie) || 0;
-                const newTotal = birdie + chargesValue;
+                const sessionCost = parseFloat(totalSpan.dataset.sessionCost) || 0;
+                const newTotal = sessionCost + chargesValue;
                 totalSpan.textContent = '$' + newTotal.toFixed(2);
             }
         } else {
@@ -971,6 +1040,49 @@ function updatePlayerCharges(playerId, charges) {
         console.error('Error:', error);
         alert('Failed to update additional charges');
     });
+}
+
+// Toggle payment status for a player in a specific session
+async function togglePaymentStatus(playerId, sessionId, el) {
+    const currentStatus = el.dataset.payment;
+    const newStatus = currentStatus === 'paid' ? 'unpaid' : 'paid';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    try {
+        const resp = await fetch('/api/attendance/payment-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ player_id: playerId, session_id: sessionId, payment_status: newStatus })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            el.dataset.payment = newStatus;
+            if (newStatus === 'paid') {
+                el.className = 'mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border bg-green-100 text-green-700 border-green-200';
+                el.textContent = '✓ Paid';
+            } else {
+                el.className = 'mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border bg-red-100 text-red-700 border-red-200';
+                el.textContent = '✗ Unpaid';
+            }
+            // Update overall status badge for this player row
+            const allPayBtns = document.querySelectorAll(`button[data-payment][onclick*="togglePaymentStatus(${playerId},"]`);
+            const anyUnpaid = Array.from(allPayBtns).some(btn => btn.dataset.payment === 'unpaid');
+            const statusBadge = document.querySelector(`[data-player-status="${playerId}"]`);
+            if (statusBadge) {
+                if (anyUnpaid) {
+                    statusBadge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700';
+                    statusBadge.textContent = 'Unpaid';
+                } else {
+                    statusBadge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700';
+                    statusBadge.textContent = 'Paid';
+                }
+            }
+        } else {
+            alert('Failed to update payment status');
+        }
+    } catch (err) {
+        alert('Failed to update payment status');
+    }
 }
 
 // Update player comments
