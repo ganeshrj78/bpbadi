@@ -128,7 +128,7 @@
         </h2>
     </div>
     <div class="p-6">
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <!-- Regular Courts -->
             <div class="bg-green-50 rounded-xl p-4 border border-green-200">
                 <div class="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Regular Courts</div>
@@ -151,19 +151,27 @@
                 <div class="text-2xl font-bold text-blue-700">${{ "%.2f"|format(session.get_total_collection()) }}</div>
             </div>
             <!-- Credits -->
-            {% if session.credits %}
             <div class="bg-green-50 rounded-xl p-4 border border-green-200">
                 <div class="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Credits</div>
-                <div class="text-2xl font-bold text-green-700">${{ "%.2f"|format(session.credits) }}</div>
+                <div class="text-2xl font-bold text-green-700">${{ "%.2f"|format(session.credits or 0) }}</div>
                 <div class="text-xs text-green-600 mt-1">Usable toward future bookings</div>
             </div>
-            {% endif %}
             <!-- Refunds -->
             <div class="bg-red-50 rounded-xl p-4 border border-red-200">
                 <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds Given</div>
                 <div class="text-2xl font-bold text-red-700">${{ "%.2f"|format(session.get_total_refunds()) }}</div>
-                {% if session.dropout_refunds|selectattr('status', 'equalto', 'processed')|list|length > 0 %}
-                <div class="text-xs text-red-600 mt-1">{{ session.dropout_refunds|selectattr('status', 'equalto', 'processed')|list|length }} refund(s)</div>
+                {% set processed_refunds = session.dropout_refunds|selectattr('status', 'equalto', 'processed')|list %}
+                {% if processed_refunds %}
+                <div class="mt-2 space-y-1 border-t border-red-200 pt-2">
+                    {% for r in processed_refunds %}
+                    <div class="text-xs text-red-600 flex justify-between gap-2">
+                        <span class="font-medium truncate">{{ r.player.name }}</span>
+                        <span class="whitespace-nowrap">${{ "%.2f"|format(r.refund_amount) }} · {{ (r.processed_date or r.created_at).strftime('%b %d') if (r.processed_date or r.created_at) else '—' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-xs text-red-400 mt-1">No refunds processed</div>
                 {% endif %}
             </div>
             <!-- Net Collection -->
@@ -224,8 +232,8 @@
 </div>
 {% endif %}
 
-<!-- Attendance Grid -->
-<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden">
+<!-- Attendance & Payments -->
+<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden" x-data="bulkPayment()">
     <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -233,31 +241,37 @@
                     <svg class="w-5 h-5 mr-2 text-wimbledon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
                     </svg>
-                    Attendance
+                    Attendance &amp; Payments
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Use the dropdown to set attendance status</p>
+                <p class="text-sm text-gray-500 mt-1">Showing participating players only</p>
             </div>
-            <div class="flex flex-wrap items-center gap-3 text-xs">
-                <span class="flex items-center gap-1 px-2 py-1 bg-green-100 rounded-full">
-                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
-                    <span class="text-green-700">Yes</span>
-                </span>
-                <span class="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
-                    <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
-                    <span class="text-gray-600">No / Not Participating</span>
-                </span>
-                <span class="flex items-center gap-1 px-2 py-1 bg-yellow-100 rounded-full">
-                    <span class="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                    <span class="text-yellow-700">Tentative</span>
-                </span>
-                <span class="flex items-center gap-1 px-2 py-1 bg-red-100 rounded-full">
-                    <span class="w-2 h-2 bg-red-500 rounded-full"></span>
-                    <span class="text-red-700">Dropout</span>
-                </span>
-                <span class="flex items-center gap-1 px-2 py-1 bg-blue-100 rounded-full">
-                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                    <span class="text-blue-700">Fill-in</span>
-                </span>
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="flex items-center gap-1 px-2 py-1 bg-green-100 rounded-full"><span class="w-2 h-2 bg-green-500 rounded-full"></span><span class="text-green-700">Yes</span></span>
+                    <span class="flex items-center gap-1 px-2 py-1 bg-blue-100 rounded-full"><span class="w-2 h-2 bg-blue-500 rounded-full"></span><span class="text-blue-700">Fill-in</span></span>
+                    <span class="flex items-center gap-1 px-2 py-1 bg-teal-100 rounded-full"><span class="w-2 h-2 bg-teal-500 rounded-full"></span><span class="text-teal-700">Stand By</span></span>
+                    <span class="flex items-center gap-1 px-2 py-1 bg-red-100 rounded-full"><span class="w-2 h-2 bg-red-500 rounded-full"></span><span class="text-red-700">Dropout</span></span>
+                </div>
+                <div class="flex items-center gap-2 border-l border-gray-200 pl-3">
+                    <select x-model="method" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green bg-white">
+                        <option value="Zelle">Zelle</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Venmo">Venmo</option>
+                        <option value="Refund">Refund</option>
+                    </select>
+                    <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                        <input type="checkbox" :checked="allSelected" @change="toggleAll($event.target.checked)" class="rounded border-gray-300 text-wimbledon-green cursor-pointer w-4 h-4">
+                        <span>All</span>
+                    </label>
+                    <button @click="recordPayments()" :disabled="loading || selectedCount === 0"
+                        class="px-3 py-1.5 bg-wimbledon-green text-white rounded-lg text-xs font-medium hover:bg-wimbledon-green/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5">
+                        <svg x-show="loading" class="animate-spin w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span x-text="loading ? 'Saving...' : 'Record (' + selectedCount + ')'"></span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -265,12 +279,14 @@
         <table class="min-w-full">
             <thead>
                 <tr class="bg-wimbledon-cream border-b border-wimbledon-gold/20">
+                    <th class="px-3 py-3 w-8"></th>
                     <th class="px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Player</th>
                     <th class="px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Category</th>
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Session Cost</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Additional Cost</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Extra</th>
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Payment</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Amount</th>
                     <th class="px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Comments</th>
                 </tr>
             </thead>
@@ -279,28 +295,34 @@
                 {% if player.is_active %}
                 {% set att = attendance_records.get(player.id) %}
                 {% set current_status = attendance_map.get(player.id, 'NO') %}
-                <tr class="hover:bg-wimbledon-cream/50 transition-all">
-                    <td class="px-4 py-4 whitespace-nowrap">
+                {% if current_status in ['YES', 'FILLIN', 'STANDBY', 'DROPOUT'] %}
+                {% set owed = player_session_costs.get(player.id, 0) %}
+                {% set payment_status = att.payment_status if att else 'unpaid' %}
+                {% set is_billable = current_status in ['YES', 'FILLIN', 'DROPOUT'] %}
+                <tr class="hover:bg-wimbledon-cream/50 transition-all {% if is_billable %}{% else %}bg-teal-50/30{% endif %}">
+                    <td class="px-3 py-3 text-center">
+                        {% if is_billable %}
+                        <input type="checkbox" x-model="selected[{{ player.id }}]" class="rounded border-gray-300 text-wimbledon-green w-4 h-4 cursor-pointer">
+                        {% else %}
+                        <span class="text-gray-300 text-xs">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
                         <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-3 group">
                             {% if player.profile_photo %}
-                            <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-10 h-10 rounded-full object-cover border-2 border-wimbledon-gold/30 shadow-md">
+                            <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-9 h-9 rounded-full object-cover border-2 border-wimbledon-gold/30 shadow-md">
                             {% else %}
-                            <div class="w-10 h-10 gradient-primary rounded-full flex items-center justify-center text-white font-bold shadow-md border border-wimbledon-gold/30">
-                                {{ player.name[0].upper() }}
-                            </div>
+                            <div class="w-9 h-9 gradient-primary rounded-full flex items-center justify-center text-white font-bold shadow-md border border-wimbledon-gold/30">{{ player.name[0].upper() }}</div>
                             {% endif %}
                             <div>
                                 <span class="font-semibold text-gray-800 group-hover:text-wimbledon-purple transition-colors">{{ player.name }}</span>
-                                {% if player.is_admin %}
-                                <span class="ml-2 text-xs text-wimbledon-purple font-medium">Admin</span>
-                                {% endif %}
+                                {% if player.is_admin %}<span class="ml-1 text-xs text-wimbledon-purple font-medium">Admin</span>{% endif %}
                             </div>
                         </a>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap">
+                    <td class="px-4 py-3 whitespace-nowrap">
                         {% set player_category = category_map.get(player.id, player.category) %}
-                        <select
-                            onchange="updateCategory({{ player.id }}, {{ session.id }}, this.value, this)"
+                        <select onchange="updateCategory({{ player.id }}, {{ session.id }}, this.value, this)"
                             class="px-3 py-1.5 text-xs leading-5 font-bold rounded-full shadow-sm border-2 cursor-pointer transition-all
                             {% if player_category == 'regular' %}bg-green-100 border-green-300 text-green-700
                             {% elif player_category == 'adhoc' %}bg-purple-100 border-purple-300 text-purple-700
@@ -310,15 +332,10 @@
                             <option value="kid" {% if player_category == 'kid' %}selected{% endif %}>Kid</option>
                         </select>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center">
-                        {% if current_status == 'NO' %}
-                        <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Participating</span>
-                        {% endif %}
-                        <select
-                            onchange="updateAttendance({{ player.id }}, {{ session.id }}, this.value, this)"
-                            class="{% if current_status == 'NO' %}mt-1 {% endif %}px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all
+                    <td class="px-4 py-3 whitespace-nowrap text-center">
+                        <select onchange="updateAttendance({{ player.id }}, {{ session.id }}, this.value, this)"
+                            class="px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all
                             {% if current_status == 'YES' %}bg-green-100 border-green-300 text-green-700
-                            {% elif current_status == 'TENTATIVE' %}bg-yellow-100 border-yellow-300 text-yellow-700
                             {% elif current_status == 'DROPOUT' %}bg-red-100 border-red-300 text-red-700
                             {% elif current_status == 'FILLIN' %}bg-blue-100 border-blue-300 text-blue-700
                             {% elif current_status == 'STANDBY' %}bg-teal-100 border-teal-300 text-teal-700
@@ -327,15 +344,6 @@
                             {% if current_status == 'YES' %}
                             <option value="YES" selected>Yes</option>
                             <option value="DROPOUT">Dropout</option>
-                            <option value="STANDBY">Stand By</option>
-                            {% elif current_status == 'NO' %}
-                            <option value="NO" selected>No</option>
-                            <option value="FILLIN">Fill-in</option>
-                            <option value="STANDBY">Stand By</option>
-                            {% elif current_status == 'TENTATIVE' %}
-                            <option value="TENTATIVE" selected>Tentative</option>
-                            <option value="DROPOUT">Dropout</option>
-                            <option value="FILLIN">Fill-in</option>
                             <option value="STANDBY">Stand By</option>
                             {% elif current_status == 'DROPOUT' %}
                             <option value="YES">Yes</option>
@@ -350,143 +358,60 @@
                             <option value="NO">No</option>
                             <option value="STANDBY" selected>Stand By</option>
                             {% else %}
-                            <option value="NO" selected>No</option>
+                            <option value="NO">No</option>
                             <option value="FILLIN">Fill-in</option>
                             <option value="STANDBY">Stand By</option>
                             {% endif %}
                             {% else %}
                             <option value="YES" {% if current_status == 'YES' %}selected{% endif %}>Yes</option>
-                            <option value="NO" {% if current_status == 'NO' %}selected{% endif %}>No</option>
-                            <option value="TENTATIVE" {% if current_status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
+                            <option value="NO">No</option>
+                            <option value="TENTATIVE">Tentative</option>
                             <option value="STANDBY" {% if current_status == 'STANDBY' %}selected{% endif %}>Stand By</option>
                             <option value="DROPOUT" {% if current_status == 'DROPOUT' %}selected{% endif %}>Dropout</option>
                             <option value="FILLIN" {% if current_status == 'FILLIN' %}selected{% endif %}>Fill-in</option>
                             {% endif %}
                         </select>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right">
-                        {% if current_status in ['YES', 'DROPOUT', 'FILLIN'] %}
-                        <span class="text-sm font-bold text-gray-700">${{ "%.2f"|format(session.birdie_cost) }}</span>
+                    <td class="px-4 py-3 whitespace-nowrap text-right">
+                        {% if is_billable %}
+                        <span class="text-sm font-bold text-gray-700">${{ "%.2f"|format(owed) }}</span>
                         {% else %}
-                        <span class="text-sm text-gray-400">-</span>
+                        <span class="text-sm text-gray-400">—</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right">
+                    <td class="px-4 py-3 whitespace-nowrap text-right">
                         <input type="number" step="0.01" min="0"
                             value="{{ att.additional_cost if att and att.additional_cost else 0 }}"
                             onchange="updateAdditionalCost({{ player.id }}, {{ session.id }}, this.value)"
                             class="w-20 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center">
-                        {% set payment_status = att.payment_status if att else 'unpaid' %}
-                        <select
-                            onchange="updatePaymentStatus({{ player.id }}, {{ session.id }}, this.value, this)"
+                    <td class="px-4 py-3 whitespace-nowrap text-center">
+                        {% if is_billable %}
+                        <select onchange="updatePaymentStatus({{ player.id }}, {{ session.id }}, this.value, this)"
                             class="px-3 py-1.5 text-xs font-bold rounded-full border-2 cursor-pointer transition-all
                             {% if payment_status == 'paid' %}bg-green-100 border-green-300 text-green-700
                             {% else %}bg-red-100 border-red-300 text-red-700{% endif %}">
                             <option value="unpaid" {% if payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
                             <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>Paid</option>
                         </select>
+                        {% else %}
+                        <span class="text-gray-400 text-xs">—</span>
+                        {% endif %}
                     </td>
-                    <td class="px-4 py-4">
+                    <td class="px-4 py-3 whitespace-nowrap text-right">
+                        {% if is_billable %}
+                        <input type="number" step="0.01" min="0" x-model="amounts[{{ player.id }}]"
+                            class="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                        {% else %}
+                        <span class="text-gray-400 text-xs">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
                         <input type="text"
                             value="{{ att.comments if att and att.comments else '' }}"
                             onchange="updateComments({{ player.id }}, {{ session.id }}, this.value)"
                             placeholder="Add comment..."
-                            class="w-full min-w-[150px] px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
-                    </td>
-                </tr>
-                {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-{% set ns = namespace(has_participants=false) %}
-{% for player in players %}{% if player.is_active and attendance_map.get(player.id, 'NO') in ['YES', 'DROPOUT', 'FILLIN'] %}{% set ns.has_participants = true %}{% endif %}{% endfor %}
-
-{% if ns.has_participants %}
-<!-- Bulk Payment Section -->
-<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 mt-6 overflow-hidden" x-data="bulkPayment()">
-    <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-green/10 to-white">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-wimbledon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-                Record Session Payments
-            </h2>
-            <div class="flex flex-wrap items-center gap-3">
-                <select x-model="method" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green bg-white">
-                    <option value="Zelle">Zelle</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Venmo">Venmo</option>
-                    <option value="Refund">Refund</option>
-                </select>
-                <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                    <input type="checkbox" :checked="allSelected" @change="toggleAll($event.target.checked)" class="rounded border-gray-300 text-wimbledon-green cursor-pointer w-4 h-4">
-                    <span>Select All</span>
-                </label>
-                <button @click="recordPayments()" :disabled="loading || selectedCount === 0"
-                    class="px-4 py-2 bg-wimbledon-green text-white rounded-lg text-sm font-medium hover:bg-wimbledon-green/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2">
-                    <svg x-show="loading" class="animate-spin w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    <span x-text="loading ? 'Recording...' : 'Record Payments (' + selectedCount + ')'"></span>
-                </button>
-            </div>
-        </div>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full">
-            <thead>
-                <tr class="bg-wimbledon-cream border-b border-wimbledon-gold/20">
-                    <th class="px-4 py-3 w-10"></th>
-                    <th class="px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Player</th>
-                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Session Cost</th>
-                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Paid?</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Amount to Record</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-wimbledon-gold/10">
-                {% for player in players %}
-                {% if player.is_active %}
-                {% set att = attendance_records.get(player.id) %}
-                {% set current_status = attendance_map.get(player.id, 'NO') %}
-                {% if current_status in ['YES', 'DROPOUT', 'FILLIN'] %}
-                {% set owed = player_session_costs.get(player.id, 0) %}
-                {% set payment_status = att.payment_status if att else 'unpaid' %}
-                <tr class="hover:bg-wimbledon-cream/50 transition-all" :class="{ 'opacity-60': !selected[{{ player.id }}] }">
-                    <td class="px-4 py-3 text-center">
-                        <input type="checkbox" x-model="selected[{{ player.id }}]" class="rounded border-gray-300 text-wimbledon-green w-4 h-4 cursor-pointer">
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap">
-                        <div class="flex items-center gap-3">
-                            {% if player.profile_photo %}
-                            <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
-                            {% else %}
-                            <div class="w-8 h-8 gradient-primary rounded-full flex items-center justify-center text-white text-xs font-bold">{{ player.name[0].upper() }}</div>
-                            {% endif %}
-                            <span class="font-medium text-gray-800">{{ player.name }}</span>
-                        </div>
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-center">
-                        <span class="px-2 py-1 text-xs font-bold rounded-full {% if current_status == 'YES' %}bg-green-100 text-green-700{% elif current_status == 'DROPOUT' %}bg-red-100 text-red-700{% else %}bg-blue-100 text-blue-700{% endif %}">
-                            {{ current_status }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right font-bold text-gray-700">${{ "%.2f"|format(owed) }}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-center">
-                        <span class="px-2 py-1 text-xs font-bold rounded-full {% if payment_status == 'paid' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
-                            {{ 'Paid' if payment_status == 'paid' else 'Unpaid' }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <input type="number" step="0.01" min="0" x-model="amounts[{{ player.id }}]"
-                            class="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                            class="w-full min-w-[130px] px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
                     </td>
                 </tr>
                 {% endif %}
@@ -496,7 +421,6 @@
         </table>
     </div>
 </div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
