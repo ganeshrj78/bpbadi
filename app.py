@@ -1315,7 +1315,20 @@ def session_detail(id):
             else:
                 player_session_costs[player.id] = 0
 
+    # Sort active players for display: YES/FILLIN/DROPOUT first, then STANDBY (waitlisted) — both sub-groups by name
+    def _display_priority(p):
+        s = attendance_map.get(p.id, 'NO')
+        if s in ['YES', 'FILLIN', 'DROPOUT']: return 0
+        if s == 'STANDBY': return 1
+        return 2
+
+    players_display = sorted(
+        [p for p in players if p.is_active and attendance_map.get(p.id, 'NO') in ['YES', 'FILLIN', 'STANDBY', 'DROPOUT']],
+        key=lambda p: (_display_priority(p), p.name)
+    )
+
     return render_template('session_detail.html', session=sess, players=players,
+                          players_display=players_display,
                           attendance_map=attendance_map, category_map=category_map,
                           attendance_records=attendance_records,
                           player_session_costs=player_session_costs)
