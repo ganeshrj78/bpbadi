@@ -45,7 +45,7 @@
                 {% for key, summary in monthly_summary %}
                 <tr class="{% if summary.is_fully_archived %}bg-gray-50{% else %}bg-white{% endif %} hover:bg-wimbledon-cream/30 transition-all">
                     <td class="px-4 py-3 whitespace-nowrap">
-                        <span class="font-semibold text-gray-800">{{ summary.label }}</span>
+                        <a href="{{ url_for('sessions_by_month', month_key=key) }}" class="font-semibold text-wimbledon-purple hover:underline">{{ summary.label }}</a>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
                         <span class="text-yellow-700 font-medium">${{ "%.2f"|format(summary.birdie_charges) }}</span>
@@ -63,7 +63,7 @@
                         <span class="text-red-600 font-medium">-${{ "%.2f"|format(summary.total_refunds) }}</span>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="font-bold text-wimbledon-purple">${{ "%.2f"|format(summary.total_collection - summary.total_refunds) }}</span>
+                        <span class="font-bold text-wimbledon-purple">${{ "%.2f"|format(summary.total_collection + summary.session_credits - summary.total_refunds) }}</span>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
                         {% if summary.session_credits > 0 %}<span class="text-blue-600 font-semibold">${{ "%.2f"|format(summary.session_credits) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}

@@ -191,7 +191,7 @@
                 <tr class="hover:bg-wimbledon-cream/30 transition-colors {% if not row.is_active %}opacity-60{% endif %}">
                     <td class="px-6 py-3">
                         <div class="flex items-center gap-2">
-                            <span class="text-gray-800 font-medium">{{ row.month }}</span>
+                            <a href="{{ url_for('sessions_by_month', month_key=row.month_key) }}" class="text-wimbledon-purple font-medium hover:underline">{{ row.month }}</a>
                             {% if row.is_active %}
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">Active</span>
                             {% else %}
@@ -206,7 +206,7 @@
                         {% if row.birdie > 0 %}<span class="text-yellow-700 font-medium">${{ "%.2f"|format(row.birdie) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-3 text-right">
-                        {% if row.charges > 0 %}<span class="font-semibold text-wimbledon-purple">${{ "%.2f"|format(row.charges) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
+                        {% set net_charged = row.charges + row.credits %}{% if net_charged > 0 %}<span class="font-semibold text-wimbledon-purple">${{ "%.2f"|format(net_charged) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-3 text-right">
                         {% if row.collected > 0 %}<span class="text-wimbledon-green font-semibold">${{ "%.2f"|format(row.collected) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}

@@ -177,7 +177,8 @@
             <!-- Net Collection -->
             <div class="bg-wimbledon-purple/10 rounded-xl p-4 border border-wimbledon-purple/30">
                 <div class="text-xs font-medium text-wimbledon-purple uppercase tracking-wide mb-1">Net Collection</div>
-                <div class="text-2xl font-bold text-wimbledon-purple">${{ "%.2f"|format(session.get_total_collection() - session.get_total_refunds()) }}</div>
+                <div class="text-2xl font-bold text-wimbledon-purple">${{ "%.2f"|format(session.get_total_collection() + (session.credits or 0) - session.get_total_refunds()) }}</div>
+                <div class="text-xs text-wimbledon-purple/70 mt-1">Court charges + credits − refunds</div>
             </div>
         </div>
     </div>

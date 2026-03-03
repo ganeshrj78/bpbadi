@@ -427,6 +427,7 @@ def dashboard():
 
         monthly_summary.append({
             'month': month_start.strftime('%b %Y'),
+            'month_key': month_start.strftime('%Y-%m'),
             'is_active': is_active_month,
             'sessions': len(m_sessions),
             'attendees': m_attendees,
@@ -1143,6 +1144,54 @@ def sessions():
                           attendance_map=attendance_map,
                           attendance_details=attendance_details,
                           player_stats=player_stats)
+
+
+@app.route('/sessions/month/<month_key>')
+@admin_required
+def sessions_by_month(month_key):
+    """Show all sessions for a given month (YYYY-MM) with per-session summary."""
+    try:
+        from datetime import datetime as dt
+        month_dt = dt.strptime(month_key, '%Y-%m')
+    except ValueError:
+        return redirect(url_for('sessions'))
+
+    month_label = month_dt.strftime('%B %Y')
+    year, month = month_dt.year, month_dt.month
+
+    month_sessions = Session.query.filter(
+        db.extract('year', Session.date) == year,
+        db.extract('month', Session.date) == month
+    ).order_by(Session.date.asc()).all()
+
+    session_stats = []
+    for sess in month_sessions:
+        start_time, end_time = sess.get_time_range()
+        session_stats.append({
+            'session': sess,
+            'start_time': start_time,
+            'end_time': end_time,
+            'attendees': sess.get_attendee_count(),
+            'total_cost': sess.get_total_cost(),
+            'collection': sess.get_total_collection(),
+            'refunds': sess.get_total_refunds(),
+            'birdie': sess.get_birdie_cost_total(),
+            'credits': sess.credits or 0,
+        })
+
+    totals = {
+        'sessions': len(month_sessions),
+        'collection': sum(s['collection'] for s in session_stats),
+        'refunds': sum(s['refunds'] for s in session_stats),
+        'birdie': sum(s['birdie'] for s in session_stats),
+        'credits': sum(s['credits'] for s in session_stats),
+    }
+
+    return render_template('month_sessions.html',
+                           month_label=month_label,
+                           month_key=month_key,
+                           session_stats=session_stats,
+                           totals=totals)
 
 
 @app.route('/sessions/add', methods=['GET', 'POST'])

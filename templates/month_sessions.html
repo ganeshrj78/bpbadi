@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}{{ month_label }} Sessions - BP Badminton{% endblock %}
+
+{% block content %}
+<!-- Back Link -->
+<div class="mb-6">
+    <a href="{{ url_for('sessions') }}" class="inline-flex items-center text-wimbledon-purple hover:text-wimbledon-purple-light font-medium transition-all">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        Back to Sessions
+    </a>
+</div>
+
+<!-- Page Header -->
+<div class="mb-8">
+    <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">{{ month_label }}</h1>
+    <p class="text-gray-500 mt-1">{{ totals.sessions }} session{{ 's' if totals.sessions != 1 else '' }} this month</p>
+</div>
+
+<!-- Month Totals -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Sessions</div>
+        <div class="text-3xl font-bold text-wimbledon-purple">{{ totals.sessions }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+        <div class="text-xs font-medium text-yellow-600 uppercase tracking-wide mb-1">Birdie</div>
+        <div class="text-3xl font-bold text-yellow-700">${{ "%.2f"|format(totals.birdie) }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+        <div class="text-xs font-medium text-wimbledon-purple uppercase tracking-wide mb-1">Total Charged</div>
+        <div class="text-3xl font-bold text-wimbledon-purple">${{ "%.2f"|format(totals.collection + totals.credits) }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+        <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds</div>
+        <div class="text-3xl font-bold text-red-600">-${{ "%.2f"|format(totals.refunds) }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+        <div class="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Credits</div>
+        <div class="text-3xl font-bold text-blue-600">${{ "%.2f"|format(totals.credits) }}</div>
+    </div>
+</div>
+
+<!-- Sessions List -->
+<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden">
+    <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white">
+        <h2 class="text-lg font-serif font-bold text-wimbledon-purple flex items-center">
+            <svg class="w-5 h-5 mr-2 text-wimbledon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            Sessions
+        </h2>
+    </div>
+    {% if session_stats %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full">
+            <thead>
+                <tr class="bg-wimbledon-cream/50 text-left">
+                    <th class="px-6 py-3 text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Date</th>
+                    <th class="px-4 py-3 text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Time</th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Courts</th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Attendees</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Birdie</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Total Charged</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Refunds</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Credits</th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-wimbledon-gold/10">
+                {% for s in session_stats %}
+                <tr class="hover:bg-wimbledon-cream/40 transition-colors cursor-pointer {% if s.session.is_archived %}opacity-60{% endif %}"
+                    onclick="window.location='{{ url_for('session_detail', id=s.session.id) }}'">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <a href="{{ url_for('session_detail', id=s.session.id) }}" class="flex items-center gap-3 group">
+                            <div class="w-12 h-12 gradient-primary rounded-xl flex flex-col items-center justify-center text-white shadow border border-wimbledon-gold/30 flex-shrink-0">
+                                <span class="text-lg font-bold leading-none">{{ s.session.date.strftime('%d') }}</span>
+                                <span class="text-[10px] uppercase opacity-80">{{ s.session.date.strftime('%a') }}</span>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-gray-800 group-hover:text-wimbledon-purple transition-colors">{{ s.session.date.strftime('%B %d, %Y') }}</div>
+                                {% if s.session.notes %}
+                                <div class="text-xs text-gray-400 truncate max-w-[200px]">{{ s.session.notes }}</div>
+                                {% endif %}
+                            </div>
+                        </a>
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {{ s.start_time }} – {{ s.end_time }}
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center">
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-wimbledon-purple/10 text-wimbledon-purple font-bold text-xs">
+                            {{ s.session.get_court_count() }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center">
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-bold text-xs">
+                            {{ s.attendees }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-yellow-700 font-medium">
+                        {% if s.birdie > 0 %}${{ "%.2f"|format(s.birdie) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-right font-semibold text-wimbledon-purple">
+                        ${{ "%.2f"|format(s.collection + s.credits) }}
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-red-600">
+                        {% if s.refunds > 0 %}-${{ "%.2f"|format(s.refunds) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-blue-600 font-medium">
+                        {% if s.credits > 0 %}${{ "%.2f"|format(s.credits) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center">
+                        {% if s.session.is_archived %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Archived</span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-6 py-12 text-center text-gray-400">No sessions found for {{ month_label }}.</div>
+    {% endif %}
+</div>
+{% endblock %}
