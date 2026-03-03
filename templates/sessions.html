@@ -190,6 +190,23 @@
                 Not Participating
             </button>
         </div>
+
+        <!-- Bulk Player Payment Actions -->
+        <div x-show="selectedPlayers.length > 0" x-cloak class="flex items-center gap-2 border-l border-gray-300 pl-4">
+            <span class="text-sm text-gray-600"><span x-text="selectedPlayers.length"></span> selected:</span>
+            <button @click="bulkMarkPayment('paid')"
+                class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-all flex items-center gap-1">
+                ✓ Mark Paid
+            </button>
+            <button @click="bulkMarkPayment('unpaid')"
+                class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all flex items-center gap-1">
+                ✗ Mark Unpaid
+            </button>
+            <button @click="selectedPlayers = []"
+                class="px-2 py-1.5 text-gray-500 rounded-lg text-sm hover:bg-gray-200 transition-all">
+                ✕
+            </button>
+        </div>
     </div>
     <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
         <table class="min-w-full">
@@ -264,6 +281,10 @@
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
+                            <input type="checkbox"
+                                :checked="selectedPlayers.includes({{ player.id }})"
+                                @change="$event.target.checked ? selectedPlayers.push({{ player.id }}) : selectedPlayers = selectedPlayers.filter(id => id !== {{ player.id }})"
+                                class="w-3.5 h-3.5 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple cursor-pointer flex-shrink-0">
                             <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-2 hover:text-wimbledon-purple">
                                 {% if player.profile_photo %}
                                 <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
@@ -337,16 +358,6 @@
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
                         </select>
-                        {% set att_details_pay = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                        {% if status in ['YES', 'FILLIN', 'DROPOUT'] %}
-                        {% set pstatus = att_details_pay.get('payment_status', 'unpaid') %}
-                        <button onclick="togglePaymentStatus({{ player.id }}, {{ session.id }}, this)"
-                            data-payment="{{ pstatus }}"
-                            class="mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border
-                            {% if pstatus == 'paid' %}bg-green-100 text-green-700 border-green-200{% else %}bg-red-100 text-red-700 border-red-200{% endif %}">
-                            {{ '✓ Paid' if pstatus == 'paid' else '✗ Unpaid' }}
-                        </button>
-                        {% endif %}
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -426,6 +437,10 @@
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
+                            <input type="checkbox"
+                                :checked="selectedPlayers.includes({{ player.id }})"
+                                @change="$event.target.checked ? selectedPlayers.push({{ player.id }}) : selectedPlayers = selectedPlayers.filter(id => id !== {{ player.id }})"
+                                class="w-3.5 h-3.5 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple cursor-pointer flex-shrink-0">
                             <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-2 hover:text-wimbledon-purple">
                                 {% if player.profile_photo %}
                                 <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
@@ -499,16 +514,6 @@
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
                         </select>
-                        {% set att_details_pay = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                        {% if status in ['YES', 'FILLIN', 'DROPOUT'] %}
-                        {% set pstatus = att_details_pay.get('payment_status', 'unpaid') %}
-                        <button onclick="togglePaymentStatus({{ player.id }}, {{ session.id }}, this)"
-                            data-payment="{{ pstatus }}"
-                            class="mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border
-                            {% if pstatus == 'paid' %}bg-green-100 text-green-700 border-green-200{% else %}bg-red-100 text-red-700 border-red-200{% endif %}">
-                            {{ '✓ Paid' if pstatus == 'paid' else '✗ Unpaid' }}
-                        </button>
-                        {% endif %}
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -588,6 +593,10 @@
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
+                            <input type="checkbox"
+                                :checked="selectedPlayers.includes({{ player.id }})"
+                                @change="$event.target.checked ? selectedPlayers.push({{ player.id }}) : selectedPlayers = selectedPlayers.filter(id => id !== {{ player.id }})"
+                                class="w-3.5 h-3.5 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple cursor-pointer flex-shrink-0">
                             <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-2 hover:text-wimbledon-purple">
                                 {% if player.profile_photo %}
                                 <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
@@ -661,16 +670,6 @@
                             <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
                             {% endif %}
                         </select>
-                        {% set att_details_pay = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                        {% if status in ['YES', 'FILLIN', 'DROPOUT'] %}
-                        {% set pstatus = att_details_pay.get('payment_status', 'unpaid') %}
-                        <button onclick="togglePaymentStatus({{ player.id }}, {{ session.id }}, this)"
-                            data-payment="{{ pstatus }}"
-                            class="mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border
-                            {% if pstatus == 'paid' %}bg-green-100 text-green-700 border-green-200{% else %}bg-red-100 text-red-700 border-red-200{% endif %}">
-                            {{ '✓ Paid' if pstatus == 'paid' else '✗ Unpaid' }}
-                        </button>
-                        {% endif %}
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -843,11 +842,45 @@
 function sessionsMatrix() {
     return {
         selectedSessions: [],
+        selectedPlayers: [],
         paymentFilter: 'all',
         searchQuery: '',
         showCourtsModal: false,
         bulkCourts: [{ name: 'Court 1', court_type: 'regular', cost: 105, hours: '3', start_time: '06:30' }],
         overwriteExisting: false,
+
+        async bulkMarkPayment(status) {
+            if (this.selectedPlayers.length === 0) return;
+            const activeSessionIds = [{% for s in active_sessions %}{{ s.id }},{% endfor %}];
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            try {
+                const resp = await fetch('/api/attendance/bulk-payment-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ player_ids: this.selectedPlayers, session_ids: activeSessionIds, payment_status: status })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    this.selectedPlayers.forEach(playerId => {
+                        const badge = document.querySelector(`[data-player-status="${playerId}"]`);
+                        if (badge) {
+                            if (status === 'paid') {
+                                badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700';
+                                badge.textContent = 'Paid';
+                            } else {
+                                badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700';
+                                badge.textContent = 'Unpaid';
+                            }
+                        }
+                    });
+                    this.selectedPlayers = [];
+                } else {
+                    alert(data.error || 'Failed to update payment status');
+                }
+            } catch (err) {
+                alert('Failed to update payment status');
+            }
+        },
 
         bulkCourtRate(hours) {
             const h = parseFloat(hours);
@@ -1040,49 +1073,6 @@ function updatePlayerCharges(playerId, charges) {
         console.error('Error:', error);
         alert('Failed to update additional charges');
     });
-}
-
-// Toggle payment status for a player in a specific session
-async function togglePaymentStatus(playerId, sessionId, el) {
-    const currentStatus = el.dataset.payment;
-    const newStatus = currentStatus === 'paid' ? 'unpaid' : 'paid';
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    try {
-        const resp = await fetch('/api/attendance/payment-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({ player_id: playerId, session_id: sessionId, payment_status: newStatus })
-        });
-        const data = await resp.json();
-        if (data.success) {
-            el.dataset.payment = newStatus;
-            if (newStatus === 'paid') {
-                el.className = 'mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border bg-green-100 text-green-700 border-green-200';
-                el.textContent = '✓ Paid';
-            } else {
-                el.className = 'mt-0.5 w-full text-[9px] font-bold rounded px-1 py-0.5 transition-all border bg-red-100 text-red-700 border-red-200';
-                el.textContent = '✗ Unpaid';
-            }
-            // Update overall status badge for this player row
-            const allPayBtns = document.querySelectorAll(`button[data-payment][onclick*="togglePaymentStatus(${playerId},"]`);
-            const anyUnpaid = Array.from(allPayBtns).some(btn => btn.dataset.payment === 'unpaid');
-            const statusBadge = document.querySelector(`[data-player-status="${playerId}"]`);
-            if (statusBadge) {
-                if (anyUnpaid) {
-                    statusBadge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700';
-                    statusBadge.textContent = 'Unpaid';
-                } else {
-                    statusBadge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700';
-                    statusBadge.textContent = 'Paid';
-                }
-            }
-        } else {
-            alert('Failed to update payment status');
-        }
-    } catch (err) {
-        alert('Failed to update payment status');
-    }
 }
 
 // Update player comments

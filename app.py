@@ -2079,6 +2079,32 @@ def update_attendance_additional_cost():
     return jsonify({'error': 'Attendance record not found'}), 404
 
 
+@app.route('/api/attendance/bulk-payment-status', methods=['POST'])
+@csrf.exempt
+@admin_required
+def bulk_update_payment_status():
+    data = request.get_json()
+    player_ids = data.get('player_ids', [])
+    session_ids = data.get('session_ids', [])
+    payment_status = data.get('payment_status')
+
+    if payment_status not in ['paid', 'unpaid']:
+        return jsonify({'error': 'Invalid payment status'}), 400
+    if not player_ids or not session_ids:
+        return jsonify({'error': 'player_ids and session_ids required'}), 400
+
+    records = Attendance.query.filter(
+        Attendance.player_id.in_(player_ids),
+        Attendance.session_id.in_(session_ids),
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
+    ).all()
+
+    for att in records:
+        att.payment_status = payment_status
+    db.session.commit()
+    return jsonify({'success': True, 'updated': len(records)})
+
+
 @app.route('/api/attendance/payment-status', methods=['POST'])
 @csrf.exempt
 @admin_required
