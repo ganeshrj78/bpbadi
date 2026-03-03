@@ -202,22 +202,16 @@ class Session(db.Model):
         return self.get_cost_per_regular_player()
 
     def get_cost_per_regular_player(self):
-        """Calculate cost per regular player: regular court cost / regular players + birdie"""
-        regular_count = self.get_regular_player_count()
-        if regular_count == 0:
+        """Cost per non-kid player: (all courts + credits) split equally across all non-kid players + birdie"""
+        non_kid_count = self.get_regular_player_count() + self.get_adhoc_player_count()
+        if non_kid_count == 0:
             return 0
-        regular_court_cost = self.get_regular_court_cost()
-        court_cost_per_player = regular_court_cost / regular_count
-        return round(court_cost_per_player + self.birdie_cost, 2)
+        total_shared = self.get_total_cost() + (self.credits or 0)
+        return round(total_shared / non_kid_count + self.birdie_cost, 2)
 
     def get_cost_per_adhoc_player(self):
-        """Calculate cost per adhoc player: adhoc court cost / adhoc players + birdie"""
-        adhoc_count = self.get_adhoc_player_count()
-        if adhoc_count == 0:
-            return 0
-        adhoc_court_cost = self.get_adhoc_court_cost()
-        court_cost_per_player = adhoc_court_cost / adhoc_count
-        return round(court_cost_per_player + self.birdie_cost, 2)
+        """Same as regular — all non-kid players share the full cost pool equally"""
+        return self.get_cost_per_regular_player()
 
     def get_cost_per_kid(self):
         """Kids pay flat $11 per session, no birdie cost"""

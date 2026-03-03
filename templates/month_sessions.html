@@ -29,7 +29,7 @@
     </div>
     <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
         <div class="text-xs font-medium text-wimbledon-purple uppercase tracking-wide mb-1">Total Charged</div>
-        <div class="text-3xl font-bold text-wimbledon-purple">${{ "%.2f"|format(totals.collection + totals.credits) }}</div>
+        <div class="text-3xl font-bold text-wimbledon-purple">${{ "%.2f"|format(totals.collection) }}</div>
     </div>
     <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
         <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds</div>
@@ -102,7 +102,7 @@
                         {% if s.birdie > 0 %}${{ "%.2f"|format(s.birdie) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-right font-semibold text-wimbledon-purple">
-                        ${{ "%.2f"|format(s.collection + s.credits) }}
+                        ${{ "%.2f"|format(s.collection) }}
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-red-600">
                         {% if s.refunds > 0 %}-${{ "%.2f"|format(s.refunds) }}{% else %}<span class="text-gray-300">—</span>{% endif %}

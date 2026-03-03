@@ -63,7 +63,7 @@
                         <span class="text-red-600 font-medium">-${{ "%.2f"|format(summary.total_refunds) }}</span>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="font-bold text-wimbledon-purple">${{ "%.2f"|format(summary.total_collection + summary.session_credits - summary.total_refunds) }}</span>
+                        <span class="font-bold text-wimbledon-purple">${{ "%.2f"|format(summary.total_collection - summary.total_refunds) }}</span>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
                         {% if summary.session_credits > 0 %}<span class="text-blue-600 font-semibold">${{ "%.2f"|format(summary.session_credits) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
