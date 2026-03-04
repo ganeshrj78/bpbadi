@@ -1199,6 +1199,7 @@ def sessions_by_month(month_key):
     session_stats = []
     for sess in month_sessions:
         start_time, end_time = sess.get_time_range()
+        courts = sess.courts.all()
         session_stats.append({
             'session': sess,
             'start_time': start_time,
@@ -1209,6 +1210,9 @@ def sessions_by_month(month_key):
             'refunds': sess.get_total_refunds(),
             'birdie': sess.get_birdie_cost_total(),
             'credits': sess.credits or 0,
+            'courts': [{'name': c.name, 'start_time': c.start_time,
+                        'end_time': c.end_time, 'cost': c.cost,
+                        'court_type': c.court_type} for c in courts],
         })
 
     totals = {

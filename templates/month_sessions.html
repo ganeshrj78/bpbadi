@@ -11,10 +11,34 @@
     </a>
 </div>
 
+<div x-data="monthSync()" x-init="init()">
+
 <!-- Page Header -->
-<div class="mb-8">
-    <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">{{ month_label }}</h1>
-    <p class="text-gray-500 mt-1">{{ totals.sessions }} session{{ 's' if totals.sessions != 1 else '' }} this month</p>
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div>
+        <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">{{ month_label }}</h1>
+        <p class="text-gray-500 mt-1">{{ totals.sessions }} session{{ 's' if totals.sessions != 1 else '' }} this month</p>
+    </div>
+    <button @click="fetchRF()" :disabled="rfState === 'loading'"
+        class="px-5 py-3 bg-white border-2 border-wimbledon-purple text-wimbledon-purple rounded-xl font-semibold hover:bg-wimbledon-cream transition-all inline-flex items-center gap-2 shadow-sm disabled:opacity-50">
+        <svg x-show="rfState === 'loading'" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <svg x-show="rfState !== 'loading'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        <span x-text="rfState === 'loading' ? 'Fetching Royal Facility...' : (rfState === 'done' ? '↻ Re-sync Royal Facility' : 'Sync Royal Facility')"></span>
+    </button>
+</div>
+
+<!-- RF fetch error -->
+<div x-show="rfError" x-cloak class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm" x-text="rfError"></div>
+
+<!-- RF fetch status -->
+<div x-show="rfState === 'done' && !rfError" x-cloak class="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-center gap-2">
+    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    <span>Royal Facility sync loaded — review differences below. Click Apply to update a session's courts.</span>
 </div>
 
 <!-- Month Totals -->
@@ -67,12 +91,14 @@
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-wimbledon-gold/10">
+            <tbody>
                 {% for s in session_stats %}
-                <tr class="hover:bg-wimbledon-cream/40 transition-colors cursor-pointer {% if s.session.is_archived %}opacity-60{% endif %}"
+                {% set date_iso = s.session.date.strftime('%Y-%m-%d') %}
+                <!-- Session row -->
+                <tr class="border-t border-wimbledon-gold/10 hover:bg-wimbledon-cream/40 transition-colors cursor-pointer {% if s.session.is_archived %}opacity-60{% endif %}"
                     onclick="window.location='{{ url_for('session_detail', id=s.session.id) }}'">
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <a href="{{ url_for('session_detail', id=s.session.id) }}" class="flex items-center gap-3 group">
+                        <a href="{{ url_for('session_detail', id=s.session.id) }}" class="flex items-center gap-3 group" onclick="event.stopPropagation()">
                             <div class="w-12 h-12 gradient-primary rounded-xl flex flex-col items-center justify-center text-white shadow border border-wimbledon-gold/30 flex-shrink-0">
                                 <span class="text-lg font-bold leading-none">{{ s.session.date.strftime('%d') }}</span>
                                 <span class="text-[10px] uppercase opacity-80">{{ s.session.date.strftime('%a') }}</span>
@@ -85,25 +111,19 @@
                             </div>
                         </a>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {{ s.start_time }} – {{ s.end_time }}
-                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{{ s.start_time }} – {{ s.end_time }}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">
                         <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-wimbledon-purple/10 text-wimbledon-purple font-bold text-xs">
                             {{ s.session.get_court_count() }}
                         </span>
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-bold text-xs">
-                            {{ s.attendees }}
-                        </span>
+                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-bold text-xs">{{ s.attendees }}</span>
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-yellow-700 font-medium">
                         {% if s.birdie > 0 %}${{ "%.2f"|format(s.birdie) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right font-semibold text-wimbledon-purple">
-                        ${{ "%.2f"|format(s.collection) }}
-                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-right font-semibold text-wimbledon-purple">${{ "%.2f"|format(s.collection) }}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-red-600">
                         {% if s.refunds > 0 %}-${{ "%.2f"|format(s.refunds) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
@@ -118,6 +138,95 @@
                         {% endif %}
                     </td>
                 </tr>
+
+                <!-- Royal Facility sync panel for this session (shown after fetch) -->
+                <template x-if="rfState === 'done' && rfByDate['{{ date_iso }}']">
+                    <tr class="border-t-0">
+                        <td colspan="9" class="px-0 py-0">
+                            <div class="mx-4 mb-3 rounded-xl border border-wimbledon-purple/20 bg-wimbledon-cream/30 overflow-hidden">
+                                <div class="px-4 py-2.5 bg-wimbledon-purple/5 border-b border-wimbledon-purple/10 flex items-center justify-between">
+                                    <span class="text-xs font-semibold text-wimbledon-purple uppercase tracking-wider flex items-center gap-1.5">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                        Royal Facility Courts
+                                    </span>
+                                    <span class="text-xs text-gray-500"
+                                        x-text="newCourtsForDate('{{ date_iso }}') + ' new · ' + syncedCourtsForDate('{{ date_iso }}') + ' already synced'">
+                                    </span>
+                                </div>
+                                <div class="p-3">
+                                    <!-- Local courts already in session -->
+                                    <div class="mb-2" x-show="localCourts['{{ date_iso }}'] && localCourts['{{ date_iso }}'].length > 0">
+                                        <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Currently in session</div>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <template x-for="lc in (localCourts['{{ date_iso }}'] || [])" :key="lc.name">
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 border border-green-200 rounded-full text-xs text-green-700">
+                                                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                                    <span x-text="lc.name"></span>
+                                                    <span class="text-green-500 opacity-70" x-text="lc.start_time + '–' + lc.end_time"></span>
+                                                    <span class="font-semibold" x-text="'$' + lc.cost.toFixed(2)"></span>
+                                                </span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <!-- RF courts for this date -->
+                                    <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">From Royal Facility</div>
+                                    <div class="flex flex-wrap gap-2 items-start">
+                                        <template x-for="(court, ci) in rfByDate['{{ date_iso }}'].courts" :key="ci">
+                                            <div :class="court.already_in_local ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-yellow-50 border-yellow-200'"
+                                                class="border rounded-xl p-2.5 text-xs min-w-[160px]">
+                                                <div class="font-semibold text-gray-800 mb-1" x-text="court.court_name"></div>
+                                                <div class="text-gray-500 text-[11px]" x-text="court.start_time + ' – ' + court.end_time + ' (' + court.duration_minutes + ' min)'"></div>
+                                                <div class="mt-2 flex items-center gap-2">
+                                                    <span x-show="court.already_in_local" class="text-gray-400 text-[10px] font-medium">Already synced</span>
+                                                    <template x-if="!court.already_in_local">
+                                                        <div class="flex items-center gap-1.5 w-full">
+                                                            <span class="text-[10px] text-gray-500">$</span>
+                                                            <input type="number" x-model.number="court.cost" step="0.01" min="0"
+                                                                class="w-full px-1.5 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green text-right"
+                                                                @click.stop>
+                                                            <select x-model="court.court_type"
+                                                                class="text-[10px] border border-gray-300 rounded px-1 py-0.5 focus:outline-none"
+                                                                @click.stop>
+                                                                <option value="regular">Reg</option>
+                                                                <option value="adhoc">Adhoc</option>
+                                                            </select>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <!-- Apply button -->
+                                    <div class="mt-3 flex items-center gap-3" x-show="newCourtsForDate('{{ date_iso }}') > 0">
+                                        <button @click.stop="applySession('{{ date_iso }}', {{ s.session.id }})"
+                                            :disabled="applying['{{ date_iso }}']"
+                                            class="px-4 py-1.5 bg-wimbledon-green text-white rounded-lg text-xs font-semibold hover:bg-wimbledon-green/90 disabled:opacity-50 transition-all flex items-center gap-1.5">
+                                            <svg x-show="applying['{{ date_iso }}']" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                            </svg>
+                                            <span x-text="applying['{{ date_iso }}'] ? 'Applying...' : 'Apply ' + newCourtsForDate('{{ date_iso }}') + ' Court(s)'"></span>
+                                        </button>
+                                        <span x-show="applyDone['{{ date_iso }}']" class="text-xs text-green-600 font-medium">✓ Applied</span>
+                                    </div>
+                                    <div x-show="newCourtsForDate('{{ date_iso }}') === 0 && rfState === 'done'" class="mt-2 text-xs text-gray-400 italic">
+                                        All Royal Facility courts already in this session.
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
+
+                <!-- No RF data for this date (after fetch) -->
+                <template x-if="rfState === 'done' && !rfByDate['{{ date_iso }}']">
+                    <tr class="border-t-0">
+                        <td colspan="9" class="px-4 pb-3">
+                            <div class="text-xs text-gray-400 italic px-2">No Royal Facility booking found for this date.</div>
+                        </td>
+                    </tr>
+                </template>
+
                 {% endfor %}
             </tbody>
         </table>
@@ -126,4 +235,134 @@
     <div class="px-6 py-12 text-center text-gray-400">No sessions found for {{ month_label }}.</div>
     {% endif %}
 </div>
+
+</div>{# end x-data #}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CSRF = document.querySelector('meta[name=csrf-token]').content;
+
+// Local courts per date injected from server
+const LOCAL_COURTS = {
+    {% for s in session_stats %}
+    '{{ s.session.date.strftime('%Y-%m-%d') }}': {{ s.courts | tojson }},
+    {% endfor %}
+};
+
+// All session dates in this month (for filtering RF results)
+const MONTH_DATES = new Set([
+    {% for s in session_stats %}'{{ s.session.date.strftime('%Y-%m-%d') }}',{% endfor %}
+]);
+
+function monthSync() {
+    return {
+        rfState: 'idle',   // idle | loading | done
+        rfByDate: {},      // { 'YYYY-MM-DD': { courts: [...] } }
+        rfError: null,
+        localCourts: LOCAL_COURTS,
+        applying: {},
+        applyDone: {},
+
+        init() {},
+
+        newCourtsForDate(dateStr) {
+            const rf = this.rfByDate[dateStr];
+            if (!rf) return 0;
+            return rf.courts.filter(c => !c.already_in_local).length;
+        },
+
+        syncedCourtsForDate(dateStr) {
+            const rf = this.rfByDate[dateStr];
+            if (!rf) return 0;
+            return rf.courts.filter(c => c.already_in_local).length;
+        },
+
+        async fetchRF() {
+            this.rfState = 'loading';
+            this.rfError = null;
+            this.rfByDate = {};
+            this.applyDone = {};
+            try {
+                const resp = await fetch('{{ url_for('api_ezfacility_fetch_bookings') }}', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': CSRF}
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    this.rfError = data.error;
+                    this.rfState = 'idle';
+                    return;
+                }
+                // Filter to only dates that have sessions this month
+                const byDate = {};
+                data.bookings.forEach(b => {
+                    if (MONTH_DATES.has(b.date)) {
+                        byDate[b.date] = {
+                            ...b,
+                            courts: b.courts.map(c => ({
+                                ...c,
+                                cost: c.suggested_cost,
+                                court_type: 'regular'
+                            }))
+                        };
+                    }
+                });
+                this.rfByDate = byDate;
+                this.rfState = 'done';
+            } catch (e) {
+                this.rfError = 'Network error — could not reach server.';
+                this.rfState = 'idle';
+            }
+        },
+
+        async applySession(dateStr, sessionId) {
+            this.applying[dateStr] = true;
+            const rf = this.rfByDate[dateStr];
+            if (!rf) return;
+            const newCourts = rf.courts.filter(c => !c.already_in_local);
+            if (!newCourts.length) return;
+
+            try {
+                const resp = await fetch('{{ url_for('api_ezfacility_sync') }}', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+                    body: JSON.stringify({
+                        bookings: [{
+                            date: dateStr,
+                            create_session: false,
+                            courts: newCourts.map(c => ({
+                                court_name: c.court_name,
+                                start_time: c.start_time,
+                                end_time: c.end_time,
+                                start_time_24: c.start_time_24,
+                                end_time_24: c.end_time_24,
+                                cost: c.cost,
+                                court_type: c.court_type
+                            }))
+                        }]
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    // Mark those courts as synced and update local display
+                    rf.courts.forEach(c => { c.already_in_local = true; });
+                    const localList = this.localCourts[dateStr] || [];
+                    newCourts.forEach(c => localList.push({
+                        name: c.court_name, start_time: c.start_time,
+                        end_time: c.end_time, cost: c.cost, court_type: c.court_type
+                    }));
+                    this.localCourts[dateStr] = localList;
+                    this.applyDone[dateStr] = true;
+                } else {
+                    alert('Error: ' + (data.error || 'Sync failed'));
+                }
+            } catch (e) {
+                alert('Network error during sync.');
+            }
+            this.applying[dateStr] = false;
+        }
+    };
+}
+</script>
 {% endblock %}
