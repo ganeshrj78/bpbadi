@@ -22,3 +22,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# EZFacility debug dumps (raw HTML from scraper, never commit)
+ezf_debug_*.html

@@ -9,10 +9,17 @@
         <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">Sessions</h1>
         <p class="text-gray-500 mt-1">Track court bookings and attendance</p>
     </div>
-    <a href="{{ url_for('add_session') }}" class="btn-success text-white px-6 py-3 rounded-xl font-semibold shadow-lg inline-flex items-center space-x-2 border border-wimbledon-gold/30">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-        <span>New Session</span>
-    </a>
+    <div class="flex items-center gap-3">
+        <a href="{{ url_for('ezfacility_sync_page') }}"
+            class="px-5 py-3 bg-white border-2 border-wimbledon-purple text-wimbledon-purple rounded-xl font-semibold hover:bg-wimbledon-cream transition-all inline-flex items-center gap-2 shadow-sm">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <span>Sync EZFacility</span>
+        </a>
+        <a href="{{ url_for('add_session') }}" class="btn-success text-white px-6 py-3 rounded-xl font-semibold shadow-lg inline-flex items-center space-x-2 border border-wimbledon-gold/30">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+            <span>New Session</span>
+        </a>
+    </div>
 </div>
 
 <!-- Monthly Summary -->

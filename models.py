@@ -1,8 +1,39 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+import base64
+import hashlib
+from cryptography.fernet import Fernet, InvalidToken
 
 db = SQLAlchemy()
+
+# ── Application-level column encryption ──────────────────────────────────────
+# The encryption key is derived at runtime from the app's SECRET_KEY.
+# Call init_encryption(app) once during app startup.
+
+_fernet = None
+
+
+def init_encryption(secret_key: str):
+    """Call once at app startup to initialise the column encryption cipher."""
+    global _fernet
+    key_bytes = hashlib.sha256(secret_key.encode()).digest()
+    _fernet = Fernet(base64.urlsafe_b64encode(key_bytes))
+
+
+def _encrypt(value: str) -> str:
+    if _fernet is None or not value:
+        return value or ''
+    return _fernet.encrypt(value.encode()).decode()
+
+
+def _decrypt(value: str) -> str:
+    if _fernet is None or not value:
+        return value or ''
+    try:
+        return _fernet.decrypt(value.encode()).decode()
+    except (InvalidToken, Exception):
+        return ''  # Return empty on decryption failure (wrong key or corrupt)
 
 
 class Player(db.Model):
@@ -531,3 +562,66 @@ class SiteSettings(db.Model):
             db.session.add(setting)
         db.session.commit()
         return setting
+
+
+class ExternalIntegration(db.Model):
+    """
+    Stores external service credentials with application-level column encryption.
+    All sensitive columns (url, username, password) are encrypted using Fernet
+    symmetric encryption before being written to the database.
+    The encryption key is derived from the app's SECRET_KEY at runtime.
+    """
+    __tablename__ = 'external_integrations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)  # e.g. 'ezfacility'
+    # Sensitive columns — values encrypted by _encrypt()/_decrypt() helpers
+    _url_enc      = db.Column('url',      db.Text, nullable=True)
+    _username_enc = db.Column('username', db.Text, nullable=True)
+    _password_enc = db.Column('password', db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # ── Encrypted property accessors ──────────────────────────────────────────
+
+    @property
+    def url(self) -> str:
+        return _decrypt(self._url_enc)
+
+    @url.setter
+    def url(self, value: str):
+        self._url_enc = _encrypt(value)
+
+    @property
+    def username(self) -> str:
+        return _decrypt(self._username_enc)
+
+    @username.setter
+    def username(self, value: str):
+        self._username_enc = _encrypt(value)
+
+    @property
+    def password(self) -> str:
+        return _decrypt(self._password_enc)
+
+    @password.setter
+    def password(self, value: str):
+        self._password_enc = _encrypt(value)
+
+    # ── Convenience class methods ─────────────────────────────────────────────
+
+    @classmethod
+    def get_or_create(cls, name: str) -> 'ExternalIntegration':
+        obj = cls.query.filter_by(name=name).first()
+        if not obj:
+            obj = cls(name=name)
+            db.session.add(obj)
+        return obj
+
+    @classmethod
+    def get_credentials(cls, name: str):
+        """Return (url, username, password) or (None, None, None) if not configured."""
+        obj = cls.query.filter_by(name=name).first()
+        if not obj:
+            return None, None, None
+        return obj.url, obj.username, obj.password

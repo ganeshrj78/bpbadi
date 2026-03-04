@@ -5,9 +5,10 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 import logging
+from collections import defaultdict
 from logging.handlers import RotatingFileHandler
 from config import Config
-from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings
+from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, init_encryption
 from sqlalchemy import func
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -93,6 +94,9 @@ def save_profile_photo(file):
 
 db.init_app(app)
 migrate = Migrate(app, db)
+
+# Initialise column encryption (key derived from SECRET_KEY — never stored)
+init_encryption(app.config['SECRET_KEY'])
 
 # Create tables
 with app.app_context():
@@ -2496,6 +2500,191 @@ def reset_admin_password():
         return redirect(url_for('dashboard'))
 
     return render_template('reset_admin_password.html')
+
+
+# ── EZFacility Integration ────────────────────────────────────────────────────
+
+try:
+    from ezfacility import fetch_bookings as ezf_fetch_bookings
+    EZF_AVAILABLE = True
+except ImportError:
+    EZF_AVAILABLE = False
+
+EZF_NAME = 'ezfacility'
+
+
+@app.route('/ezfacility/settings', methods=['GET', 'POST'])
+@admin_required
+def ezfacility_settings():
+    if request.method == 'POST':
+        url      = request.form.get('url', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        rec = ExternalIntegration.get_or_create(EZF_NAME)
+        if url:
+            rec.url = url
+        if username:
+            rec.username = username
+        if password:
+            rec.password = password
+        db.session.commit()
+
+        flash('EZFacility credentials saved (encrypted).', 'success')
+        return redirect(url_for('ezfacility_settings'))
+
+    rec = ExternalIntegration.query.filter_by(name=EZF_NAME).first()
+    stored_url      = rec.url      if rec else ''
+    stored_username = rec.username if rec else ''
+    has_credentials = bool(rec and rec.username and rec._password_enc)
+    return render_template('ezfacility_settings.html',
+                           has_credentials=has_credentials,
+                           stored_username=stored_username,
+                           stored_url=stored_url)
+
+
+@app.route('/ezfacility/sync')
+@admin_required
+def ezfacility_sync_page():
+    if not EZF_AVAILABLE:
+        flash('EZFacility module not installed. Run: pip install requests beautifulsoup4', 'error')
+        return redirect(url_for('sessions'))
+    _, username, password = ExternalIntegration.get_credentials(EZF_NAME)
+    if not username or not password:
+        flash('Configure EZFacility credentials first.', 'error')
+        return redirect(url_for('ezfacility_settings'))
+    return render_template('ezfacility_sync.html')
+
+
+@app.route('/api/ezfacility/fetch-bookings', methods=['POST'])
+@csrf.exempt
+@admin_required
+def api_ezfacility_fetch_bookings():
+    if not EZF_AVAILABLE:
+        return jsonify({'success': False, 'error': 'ezfacility module not installed'})
+
+    _, username, password = ExternalIntegration.get_credentials(EZF_NAME)
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'EZFacility credentials not configured. Go to Settings.'})
+
+    try:
+        # In debug mode, dump the raw HTML for selector inspection
+        dump_path = os.path.join(os.path.dirname(__file__), 'ezf_debug_schedule.html') if app.debug else None
+        bookings = ezf_fetch_bookings(username, password, debug_dump_path=dump_path)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)})
+    except Exception as e:
+        app.logger.error(f'EZFacility fetch error: {e}')
+        return jsonify({'success': False, 'error': f'Could not reach EZFacility: {e}'})
+
+    # Group bookings by date
+    bookings_by_date = defaultdict(list)
+    for b in bookings:
+        bookings_by_date[b['date'].isoformat()].append(b)
+
+    # Load matching local sessions
+    if bookings_by_date:
+        booking_dates = [date.fromisoformat(d) for d in bookings_by_date]
+        local_sessions = Session.query.filter(Session.date.in_(booking_dates)).all()
+    else:
+        local_sessions = []
+
+    local_by_date = {s.date.isoformat(): s for s in local_sessions}
+
+    result = []
+    for date_str, courts in sorted(bookings_by_date.items()):
+        local_sess = local_by_date.get(date_str)
+        local_courts = local_sess.courts.all() if local_sess else []
+        local_court_names = {c.name.lower() for c in local_courts}
+
+        result.append({
+            'date': date_str,
+            'local_session_id': local_sess.id if local_sess else None,
+            'local_court_count': len(local_courts),
+            'local_courts': [{'name': c.name, 'start_time': c.start_time, 'end_time': c.end_time, 'cost': c.cost}
+                             for c in local_courts],
+            'courts': [{
+                'court_name': b['court_name'],
+                'start_time': b['start_time'],
+                'end_time': b['end_time'],
+                'start_time_24': b['start_time_24'],
+                'end_time_24': b['end_time_24'],
+                'duration_minutes': b['duration_minutes'],
+                'suggested_cost': b['suggested_cost'],
+                'already_in_local': b['court_name'].lower() in local_court_names,
+            } for b in courts],
+        })
+
+    return jsonify({'success': True, 'bookings': result, 'total': len(bookings)})
+
+
+@app.route('/api/ezfacility/sync', methods=['POST'])
+@csrf.exempt
+@admin_required
+def api_ezfacility_sync():
+    data = request.get_json()
+    bookings = data.get('bookings', [])
+
+    created_sessions = 0
+    added_courts = 0
+    skipped = 0
+
+    players = Player.query.filter_by(is_active=True, is_approved=True).all()
+
+    for booking in bookings:
+        date_str = booking.get('date')
+        courts_data = booking.get('courts', [])
+        create_session_flag = booking.get('create_session', True)
+
+        if not date_str or not courts_data:
+            continue
+
+        session_date = date.fromisoformat(date_str)
+        local_sess = Session.query.filter_by(date=session_date).first()
+
+        if not local_sess:
+            if not create_session_flag:
+                skipped += 1
+                continue
+            local_sess = Session(
+                date=session_date,
+                birdie_cost=2.0,
+                notes='Created via EZFacility sync'
+            )
+            db.session.add(local_sess)
+            db.session.flush()
+            for player in players:
+                att = Attendance(
+                    player_id=player.id,
+                    session_id=local_sess.id,
+                    status='NO',
+                    category=player.category
+                )
+                db.session.add(att)
+            created_sessions += 1
+
+        existing_names = {c.name.lower() for c in local_sess.courts.all()}
+        for cd in courts_data:
+            name = cd.get('court_name', 'Court')
+            if name.lower() in existing_names:
+                continue
+            court = Court(
+                session_id=local_sess.id,
+                name=name,
+                start_time=cd.get('start_time_24') or cd.get('start_time', '06:30'),
+                end_time=cd.get('end_time_24') or cd.get('end_time', '09:30'),
+                cost=float(cd.get('cost', 105.0)),
+                court_type=cd.get('court_type', 'regular')
+            )
+            db.session.add(court)
+            added_courts += 1
+            existing_names.add(name.lower())
+
+    db.session.commit()
+    clear_session_cache()
+
+    return jsonify({'success': True, 'created_sessions': created_sessions,
+                    'added_courts': added_courts, 'skipped': skipped})
 
 
 # Rate limit error handler

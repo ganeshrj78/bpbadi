@@ -198,6 +198,12 @@
                                 <span>Guidelines</span>
                             </span>
                         </a>
+                        <a href="{{ url_for('ezfacility_settings') }}" class="px-4 py-2 rounded-lg font-medium transition-all {% if 'ezfacility' in request.endpoint %}bg-wimbledon-green shadow-md{% else %}hover:bg-white/10{% endif %}">
+                            <span class="flex items-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                <span>EZFacility</span>
+                            </span>
+                        </a>
                     </div>
                     {% else %}
                     <!-- Player Navigation -->
@@ -263,6 +269,10 @@
                 <a href="{{ url_for('guidelines') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg {% if request.endpoint == 'guidelines' %}bg-wimbledon-green{% else %}hover:bg-wimbledon-green/50{% endif %} transition-all">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <span>Guidelines</span>
+                </a>
+                <a href="{{ url_for('ezfacility_settings') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg {% if 'ezfacility' in request.endpoint %}bg-wimbledon-green{% else %}hover:bg-wimbledon-green/50{% endif %} transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <span>EZFacility</span>
                 </a>
                 {% else %}
                 <!-- Player Mobile Menu -->
