@@ -2114,6 +2114,26 @@ def bulk_update_payment_status():
 
     for att in records:
         att.payment_status = payment_status
+
+    # Optionally record payment entries when marking as paid
+    if payment_status == 'paid':
+        method = data.get('method')
+        payments = data.get('payments', [])  # [{player_id, amount}]
+        valid_methods = ['Zelle', 'Cash', 'Venmo', 'Refund']
+        if method in valid_methods and payments:
+            for p in payments:
+                pid = p.get('player_id')
+                amount = float(p.get('amount', 0))
+                if pid and amount > 0:
+                    payment = Payment(
+                        player_id=pid,
+                        amount=amount,
+                        method=method,
+                        notes='Bulk payment via sessions matrix',
+                        created_by=session.get('player_id') or 'admin'
+                    )
+                    db.session.add(payment)
+
     db.session.commit()
     return jsonify({'success': True, 'updated': len(records)})
 
