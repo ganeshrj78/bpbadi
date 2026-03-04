@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}EZFacility Settings - BP Badminton{% endblock %}
+{% block title %}Royal Facility Settings - BP Badminton{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto" x-data="{
@@ -25,7 +25,7 @@
             }
         } catch(e) {
             this.testOk = false;
-            this.testResult = 'Network error — could not reach EZFacility.';
+            this.testResult = 'Network error — could not reach Royal Facility.';
         }
         this.testing = false;
     }
@@ -41,8 +41,8 @@
 
 <!-- Page Header -->
 <div class="mb-8">
-    <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">EZFacility Settings</h1>
-    <p class="text-gray-500 mt-1">Configure court booking sync from EZFacility</p>
+    <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">Royal Facility Settings</h1>
+    <p class="text-gray-500 mt-1">Configure court booking sync from Royal Facility</p>
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -71,11 +71,11 @@
         {% endif %}
         <form method="POST" class="space-y-4">
             <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">EZFacility URL</label>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Royal Facility URL</label>
                 <input type="url" name="url" value="{{ stored_url }}" autocomplete="off"
                     placeholder="https://royalbadminton.ezfacility.com"
                     class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green transition-all text-sm">
-                <p class="text-xs text-gray-400 mt-1">The base URL of your EZFacility site (stored encrypted)</p>
+                <p class="text-xs text-gray-400 mt-1">The base URL of your Royal Facility site (stored encrypted)</p>
             </div>
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Username</label>
@@ -90,7 +90,7 @@
                     {% if has_credentials %}<span class="text-xs font-normal text-gray-400 ml-1">(leave blank to keep existing)</span>{% endif %}
                 </label>
                 <input type="password" name="password" autocomplete="new-password"
-                    placeholder="{% if has_credentials %}Leave blank to keep current password{% else %}Enter EZFacility password{% endif %}"
+                    placeholder="{% if has_credentials %}Leave blank to keep current password{% else %}Enter Royal Facility password{% endif %}"
                     class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green transition-all text-sm">
             </div>
             <div class="flex flex-wrap items-center gap-3 pt-2">

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Sync from EZFacility - BP Badminton{% endblock %}
+{% block title %}Sync from Royal Facility - BP Badminton{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto" x-data="ezfacilitySync()">
@@ -16,7 +16,7 @@
 <!-- Page Header -->
 <div class="flex items-start justify-between mb-8">
     <div>
-        <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">Sync from EZFacility</h1>
+        <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">Sync from Royal Facility</h1>
         <p class="text-gray-500 mt-1">Fetch court bookings and compare with local sessions</p>
     </div>
     <a href="{{ url_for('ezfacility_settings') }}" class="text-sm text-gray-400 hover:text-wimbledon-purple mt-2">⚙ Settings</a>
@@ -32,7 +32,7 @@
         </div>
         <h2 class="text-xl font-bold text-gray-800 mb-2">Fetch Court Bookings</h2>
         <p class="text-gray-500 mb-8 max-w-md mx-auto">
-            Fetches upcoming court reservations from EZFacility and compares them with sessions already in BP Badminton.
+            Fetches upcoming court reservations from Royal Facility and compares them with sessions already in BP Badminton.
             You can review differences and choose what to apply.
         </p>
         <button @click="fetchBookings()" :disabled="state === 'loading'"
@@ -44,7 +44,7 @@
             <svg x-show="state === 'idle'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>
-            <span x-text="state === 'loading' ? 'Fetching from EZFacility...' : 'Fetch Bookings'"></span>
+            <span x-text="state === 'loading' ? 'Fetching from Royal Facility...' : 'Fetch Bookings'"></span>
         </button>
         <div x-show="error" x-cloak class="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-left max-w-lg mx-auto" x-text="error"></div>
     </div>
@@ -83,7 +83,7 @@
     </div>
 
     <div x-show="bookings.length === 0" class="bg-white rounded-2xl shadow-lg p-10 text-center text-gray-500">
-        No upcoming bookings found in EZFacility.
+        No upcoming bookings found in Royal Facility.
     </div>
 
     <template x-for="(booking, bi) in bookings" :key="booking.date">
@@ -130,9 +130,9 @@
                 </div>
             </template>
 
-            <!-- EZFacility courts -->
+            <!-- Royal Facility courts -->
             <div class="p-4">
-                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">From EZFacility</div>
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">From Royal Facility</div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
