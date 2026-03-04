@@ -239,7 +239,10 @@ function sessionForm() {
         courts: [
             {% if session.courts.count() > 0 %}
                 {% for court in session.courts.all() %}
-                { name: '{{ court.name }}', court_type: '{{ court.court_type or "regular" }}', cost: {{ court.cost }}, hours: '{{ "2" if court.cost == 75 else ("3.5" if court.cost == 90 else "3") }}', start_time: '{{ session.start_time or "06:30" }}' },
+                {% set _st = court.start_time.split(':') %}
+                {% set _et = court.end_time.split(':') %}
+                {% set _hours = ((_et[0]|int * 60 + _et[1]|int) - (_st[0]|int * 60 + _st[1]|int)) / 60 %}
+                { name: '{{ court.name }}', court_type: '{{ court.court_type or "regular" }}', cost: {{ court.cost }}, hours: '{{ _hours }}', start_time: '{{ court.start_time or session.start_time or "06:30" }}' },
                 {% endfor %}
             {% endif %}
         ],
