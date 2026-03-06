@@ -1,7 +1,9 @@
 FROM python:3.11-slim
 
+# Chromium from Debian repos — lighter than full Chrome, no special repos needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
+    chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

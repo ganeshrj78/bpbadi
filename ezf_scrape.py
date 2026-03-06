@@ -38,23 +38,17 @@ def make_driver():
     opts.add_argument("--disable-extensions")
     opts.add_argument("--window-size=1400,900")
 
-    selenium_url  = os.environ.get("SELENIUM_URL", "").rstrip("/")
-    selenium_token = os.environ.get("SELENIUM_TOKEN", "")
-    if selenium_url:
-        # Remote WebDriver — Browserless.io or Selenium Grid
+    if os.environ.get("RENDER"):
+        # Render: use Debian's chromium package (lighter than full Chrome)
         opts.add_argument("--headless=new")
         opts.add_argument("--disable-gpu")
-        if selenium_token:
-            full_url = f"{selenium_url}?token={selenium_token}"
-        else:
-            full_url = selenium_url
-        print(f"Connecting to remote WebDriver: {selenium_url}", flush=True)
-        return webdriver.Remote(
-            command_executor=full_url,
-            options=opts
-        )
+        opts.add_argument("--disable-images")
+        opts.add_argument("--blink-settings=imagesEnabled=false")
+        opts.binary_location = "/usr/bin/chromium"
+        from selenium.webdriver.chrome.service import Service
+        return webdriver.Chrome(options=opts, service=Service("/usr/bin/chromedriver"))
 
-    # Local Chrome
+    # Local: use whatever Chrome is installed
     return webdriver.Chrome(options=opts)
 
 
