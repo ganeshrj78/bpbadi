@@ -374,7 +374,8 @@
                         </select>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-center">
-                        <select onchange="updateAttendance({{ player.id }}, {{ session.id }}, this.value, this)"
+                        <select data-prev="{{ current_status }}"
+                            onchange="handleStatusChange({{ player.id }}, {{ session.id }}, {{ player.name | tojson }}, this)"
                             class="px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all
                             {% if current_status == 'YES' %}bg-green-100 border-green-300 text-green-700
                             {% elif current_status == 'DROPOUT' %}bg-red-100 border-red-300 text-red-700
@@ -460,11 +461,68 @@
         </table>
     </div>
 </div>
+
+<!-- ── Dropout / Fill-in Modal ──────────────────────────────────────────────── -->
+<div id="dropout-modal" class="fixed inset-0 z-50 hidden items-center justify-center pt-10 pb-8 px-4">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="cancelDropout()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white rounded-t-2xl flex-shrink-0">
+            <h2 class="text-lg font-serif font-bold text-wimbledon-purple">Player Dropped Out</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Assign a fill-in and set the refund amount</p>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5">
+            <!-- Dropout player info -->
+            <div class="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <div>
+                    <div class="text-sm font-semibold text-red-700" id="modal-dropout-name"></div>
+                    <div class="text-xs text-red-500">Marked as Dropout</div>
+                </div>
+            </div>
+            <!-- Fill-in selection -->
+            <div>
+                <div class="text-sm font-semibold text-wimbledon-purple mb-2">Assign Fill-in</div>
+                <div id="standby-list" class="space-y-2"></div>
+            </div>
+            <!-- Refund amount -->
+            <div>
+                <label class="text-sm font-semibold text-wimbledon-purple block mb-1">
+                    Refund Amount for <span id="modal-dropout-name-2" class="text-red-600"></span>
+                </label>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500 font-medium">$</span>
+                    <input type="number" id="refund-amount" step="0.01" min="0"
+                        class="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-wimbledon-green">
+                    <span class="text-xs text-gray-400" id="refund-hint"></span>
+                </div>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-wimbledon-gold/20 bg-wimbledon-cream/30 rounded-b-2xl flex items-center justify-between flex-shrink-0">
+            <button onclick="cancelDropout()"
+                class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors">
+                Cancel
+            </button>
+            <button onclick="confirmDropout()"
+                class="px-5 py-2 bg-wimbledon-green text-white rounded-xl text-sm font-semibold hover:bg-wimbledon-green/90 transition-all">
+                Confirm
+            </button>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 const SESSION_ID = {{ session.id }};
+const STANDBY_PLAYERS = {{ standby_players | tojson }};
+const BIRDIE_COST = {{ session.birdie_cost or 0 }};
+const COST_PER_PLAYER = {{ session.get_cost_per_regular_player() | round(2) }};
+// Suggested refund = court cost portion (fill-in cost minus birdie)
+const SUGGESTED_REFUND = parseFloat(Math.max(0, COST_PER_PLAYER - BIRDIE_COST).toFixed(2));
 
 function bulkPayment() {
     const selected = {
@@ -521,6 +579,114 @@ function bulkPayment() {
     };
 }
 
+
+// ── Dropout modal state ───────────────────────────────────────────────────────
+let _dropout = { playerId: null, sessionId: null, playerName: null, selectEl: null };
+
+function handleStatusChange(playerId, sessionId, playerName, selectEl) {
+    const newStatus = selectEl.value;
+    if (newStatus === 'DROPOUT') {
+        _dropout = { playerId, sessionId, playerName, selectEl };
+        openDropoutModal();
+    } else {
+        selectEl.dataset.prev = newStatus;
+        updateAttendance(playerId, sessionId, newStatus, selectEl);
+    }
+}
+
+function openDropoutModal() {
+    // Populate player name
+    document.getElementById('modal-dropout-name').textContent = _dropout.playerName;
+    document.getElementById('modal-dropout-name-2').textContent = _dropout.playerName;
+
+    // Suggested refund
+    const refundInput = document.getElementById('refund-amount');
+    refundInput.value = SUGGESTED_REFUND.toFixed(2);
+    document.getElementById('refund-hint').textContent =
+        'Suggested: $' + SUGGESTED_REFUND.toFixed(2) + ' (court cost – birdie)';
+
+    // Build standby list
+    const list = document.getElementById('standby-list');
+    if (STANDBY_PLAYERS.length === 0) {
+        list.innerHTML = `<div class="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 italic">
+            No players on standby. Fill-in will be set to None.
+            <input type="hidden" name="fillin" value="none" id="fillin-none" checked>
+        </div>`;
+    } else {
+        list.innerHTML = [
+            `<label class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                <input type="radio" name="fillin" value="" checked class="accent-wimbledon-purple">
+                <span class="text-sm font-medium text-gray-700">None — no fill-in</span>
+            </label>`
+        ].concat(STANDBY_PLAYERS.map((p, i) => `
+            <label class="flex items-center gap-3 p-3 rounded-xl border border-wimbledon-purple/20 cursor-pointer hover:bg-wimbledon-cream/40 transition-colors">
+                <input type="radio" name="fillin" value="${p.id}" class="accent-wimbledon-purple">
+                <div class="flex-1">
+                    <div class="text-sm font-semibold text-gray-800">${p.name}</div>
+                    <div class="text-xs text-gray-500">Priority #${i + 1} · ${p.category}</div>
+                </div>
+                <span class="text-xs font-medium text-teal-600 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">Standby</span>
+            </label>`
+        )).join('');
+    }
+
+    const modal = document.getElementById('dropout-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function cancelDropout() {
+    // Revert the select to its previous value
+    if (_dropout.selectEl) {
+        _dropout.selectEl.value = _dropout.selectEl.dataset.prev || 'NO';
+        applySelectStyling(_dropout.selectEl, _dropout.selectEl.dataset.prev || 'NO');
+    }
+    document.getElementById('dropout-modal').classList.add('hidden');
+    document.getElementById('dropout-modal').classList.remove('flex');
+}
+
+function confirmDropout() {
+    const fillinRadio = document.querySelector('input[name="fillin"]:checked');
+    const fillinId = fillinRadio && fillinRadio.value ? parseInt(fillinRadio.value) : null;
+    const refundAmount = parseFloat(document.getElementById('refund-amount').value) || 0;
+
+    fetch('/api/attendance/process-dropout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            session_id: _dropout.sessionId,
+            dropout_player_id: _dropout.playerId,
+            fillin_player_id: fillinId,
+            refund_amount: refundAmount
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('dropout-modal').classList.add('hidden');
+            document.getElementById('dropout-modal').classList.remove('flex');
+            // Reload to reflect standby→fillin row changes
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to process dropout'));
+        }
+    })
+    .catch(() => {
+        alert('Network error');
+        cancelDropout();
+    });
+}
+
+function applySelectStyling(el, status) {
+    el.className = 'px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all ';
+    if (status === 'YES')         el.className += 'bg-green-100 border-green-300 text-green-700';
+    else if (status === 'TENTATIVE') el.className += 'bg-yellow-100 border-yellow-300 text-yellow-700';
+    else if (status === 'DROPOUT')   el.className += 'bg-red-100 border-red-300 text-red-700';
+    else if (status === 'FILLIN')    el.className += 'bg-blue-100 border-blue-300 text-blue-700';
+    else if (status === 'STANDBY')   el.className += 'bg-teal-100 border-teal-300 text-teal-700';
+    else                             el.className += 'bg-gray-100 border-gray-300 text-gray-600';
+}
+
 function updateAttendance(playerId, sessionId, status, selectElement) {
     fetch('/api/attendance', {
         method: 'POST',
@@ -537,18 +703,8 @@ function updateAttendance(playerId, sessionId, status, selectElement) {
     .then(data => {
         if (data.success) {
             // Update select styling based on new status
-            selectElement.className = 'px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all ';
-            if (status === 'YES') {
-                selectElement.className += 'bg-green-100 border-green-300 text-green-700';
-            } else if (status === 'TENTATIVE') {
-                selectElement.className += 'bg-yellow-100 border-yellow-300 text-yellow-700';
-            } else if (status === 'DROPOUT') {
-                selectElement.className += 'bg-red-100 border-red-300 text-red-700';
-            } else if (status === 'FILLIN') {
-                selectElement.className += 'bg-blue-100 border-blue-300 text-blue-700';
-            } else {
-                selectElement.className += 'bg-gray-100 border-gray-300 text-gray-600';
-            }
+            applySelectStyling(selectElement, status);
+            selectElement.dataset.prev = status;
 
             document.getElementById('attendee-count').textContent = data.attendee_count;
             document.getElementById('cost-per-player').textContent = '$' + data.cost_per_player.toFixed(2);

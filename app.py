@@ -1335,11 +1335,22 @@ def session_detail(id):
         key=lambda p: (_display_priority(p), p.name)
     )
 
+    # Standby players sorted by when they joined the waitlist (first = highest priority)
+    standby_atts = sorted(
+        [att for att in attendance_records.values() if att.status == 'STANDBY'],
+        key=lambda a: a.updated_at or a.created_at
+    )
+    standby_players = [
+        {'id': att.player_id, 'name': att.player.name, 'category': att.category}
+        for att in standby_atts if att.player
+    ]
+
     return render_template('session_detail.html', session=sess, players=players,
                           players_display=players_display,
                           attendance_map=attendance_map, category_map=category_map,
                           attendance_records=attendance_records,
-                          player_session_costs=player_session_costs)
+                          player_session_costs=player_session_costs,
+                          standby_players=standby_players)
 
 
 @app.route('/sessions/<int:id>/edit', methods=['GET', 'POST'])
@@ -2047,6 +2058,72 @@ def update_attendance():
         'success': True,
         'attendee_count': sess.get_attendee_count(),
         'cost_per_player': sess.get_cost_per_player()
+    })
+
+
+# Dropout + fill-in handler — atomically processes dropout, assigns fill-in, creates refund
+@app.route('/api/attendance/process-dropout', methods=['POST'])
+@csrf.exempt
+@admin_required
+def process_dropout():
+    data = request.get_json()
+    session_id       = data.get('session_id')
+    dropout_player_id = data.get('dropout_player_id')
+    fillin_player_id  = data.get('fillin_player_id')   # may be None
+    refund_amount    = float(data.get('refund_amount', 0))
+
+    sess = Session.query.get_or_404(session_id)
+
+    # ── Mark dropout ──────────────────────────────────────────────────────────
+    dropout_att = Attendance.query.filter_by(
+        player_id=dropout_player_id, session_id=session_id
+    ).first()
+    if not dropout_att:
+        return jsonify({'error': 'Player attendance not found'}), 404
+
+    dropout_att.status = 'DROPOUT'
+
+    # Create / update refund record
+    existing_refund = DropoutRefund.query.filter_by(
+        session_id=session_id, player_id=dropout_player_id
+    ).first()
+    if existing_refund:
+        existing_refund.refund_amount = refund_amount
+    else:
+        db.session.add(DropoutRefund(
+            player_id=dropout_player_id,
+            session_id=session_id,
+            refund_amount=refund_amount,
+            suggested_amount=refund_amount,
+            status='pending'
+        ))
+
+    # ── Assign fill-in (standby → fillin) ────────────────────────────────────
+    if fillin_player_id:
+        fillin_att = Attendance.query.filter_by(
+            player_id=fillin_player_id, session_id=session_id
+        ).first()
+        if fillin_att:
+            fillin_att.status = 'FILLIN'
+            fillin_att.payment_status = 'unpaid'
+        else:
+            fillin_player = Player.query.get(fillin_player_id)
+            db.session.add(Attendance(
+                player_id=fillin_player_id,
+                session_id=session_id,
+                status='FILLIN',
+                category=fillin_player.category if fillin_player else 'regular',
+                payment_status='unpaid'
+            ))
+
+    db.session.commit()
+    clear_session_cache()
+
+    return jsonify({
+        'success': True,
+        'attendee_count': sess.get_attendee_count(),
+        'cost_per_player': sess.get_cost_per_player(),
+        'fillin_assigned': bool(fillin_player_id)
     })
 
 
