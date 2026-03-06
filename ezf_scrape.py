@@ -46,56 +46,44 @@ def make_browser(playwright):
         return playwright.chromium.launch(headless=bool(os.environ.get("RENDER")))
 
 
-def login(page, username, password):
+def login(page, context, username, password):
+    cookie_str = os.environ.get("RF_COOKIE", "").strip()
+
+    if cookie_str:
+        # Inject saved session cookies — bypasses reCAPTCHA entirely
+        print(f"  Using saved session cookie ({len(cookie_str)} chars)", flush=True)
+        cookies = []
+        for part in cookie_str.split(';'):
+            part = part.strip()
+            if '=' in part:
+                name, _, value = part.partition('=')
+                cookies.append({'name': name.strip(), 'value': value.strip(),
+                                'domain': 'royalbadminton.ezfacility.com', 'path': '/'})
+        context.add_cookies(cookies)
+        page.goto(SCHEDULE_URL, timeout=30000)
+        page.wait_for_load_state('networkidle', timeout=15000)
+        if 'login' in page.url.lower():
+            print("  Session cookie expired — falling back to password login", flush=True)
+            cookie_str = None  # fall through to password login
+        else:
+            print(f"  Cookie login success → {page.url}", flush=True)
+            return
+
+    # Password login (reCAPTCHA may block this on production)
+    print(f"  Password login: username='{username[:3]}***'", flush=True)
     page.goto(LOGIN_URL, timeout=30000)
     page.wait_for_load_state('networkidle', timeout=15000)
-
-    # Debug: log all input fields found on the page
-    inputs = page.query_selector_all("input")
-    for inp in inputs:
-        print(f"  input: name={inp.get_attribute('name')} type={inp.get_attribute('type')} id={inp.get_attribute('id')}", flush=True)
-
-    print(f"  Credentials: username='{username[:3]}***' password={'set' if password else 'EMPTY'}", flush=True)
-
-    # Fill username — try multiple selectors
-    filled = False
-    for sel in ["input[name='UserName']", "input[name='username']", "input[name='Email']",
-                "input[type='email']", "input[id*='user' i]", "input[id*='email' i]"]:
-        try:
-            el = page.query_selector(sel)
-            if el:
-                el.fill(username)
-                filled = True
-                print(f"  Filled username with selector: {sel}", flush=True)
-                break
-        except Exception:
-            continue
-
-    if not filled:
-        print("  WARNING: Could not find username field", flush=True)
-
-    page.fill("input[type='password']", password)
-
-    # Click submit and wait for navigation
-    for sel in ["button[type='submit']", "input[type='submit']", "button:has-text('Login')",
-                "button:has-text('Sign in')", "button:has-text('Log in')"]:
-        try:
-            el = page.query_selector(sel)
-            if el:
-                print(f"  Clicking submit: {sel}", flush=True)
-                with page.expect_navigation(timeout=30000):
-                    el.click()
-                break
-        except Exception as e:
-            print(f"  Submit {sel} failed: {e}", flush=True)
-            continue
-
+    page.fill("input[name='Username']", username)
+    page.fill("input[name='Password']", password)
+    page.click("button[type='submit']")
+    page.wait_for_load_state('networkidle', timeout=30000)
     print(f"  After submit URL: {page.url}", flush=True)
+
     if LOGIN_URL in page.url:
-        print("  ERROR: Still on login page — credentials may be wrong or form not submitted correctly", flush=True)
+        print("  ERROR: Login failed — reCAPTCHA block or wrong credentials", flush=True)
         sys.exit(1)
 
-    print(f"Logged in successfully → {page.url}", flush=True)
+    print(f"  Password login success → {page.url}", flush=True)
 
 
 def get_week_dates(page):
@@ -218,9 +206,10 @@ def main():
         browser = make_browser(p)
         try:
             print(f"[DEBUG] Opening new page ...", flush=True)
-            page = browser.new_page()
+            context = browser.new_context()
+            page = context.new_page()
             print(f"[DEBUG] Page opened. Starting login ...", flush=True)
-            login(page, username, password)
+            login(page, context, username, password)
 
             print(f"[DEBUG] Navigating to schedule: {SCHEDULE_URL}", flush=True)
             page.goto(SCHEDULE_URL)

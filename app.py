@@ -2819,6 +2819,9 @@ def api_ezfacility_fetch_bookings():
     if not username or not password:
         return jsonify({'success': False, 'error': 'EZFacility credentials not configured. Go to Settings.'})
 
+    rec = ExternalIntegration.query.filter_by(name=EZF_NAME).first()
+    session_cookie = rec.session_cookie if rec else None
+
     data = request.get_json(silent=True) or {}
     target_dates = sorted(set(data.get('dates', [])))
     if not target_dates:
@@ -2830,6 +2833,8 @@ def api_ezfacility_fetch_bookings():
     env = os.environ.copy()
     env['RF_USERNAME'] = username
     env['RF_PASSWORD'] = password
+    if session_cookie:
+        env['RF_COOKIE'] = session_cookie
 
     try:
         proc = subprocess.run(
