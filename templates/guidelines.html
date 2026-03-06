@@ -20,13 +20,17 @@
         const formData = new FormData();
         formData.append('member_guidelines', this.memberContent);
         formData.append('booking_guidelines', this.bookingContent);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (csrfToken) formData.append('csrf_token', csrfToken);
         try {
             const response = await fetch('{{ url_for('edit_guidelines') }}', {
                 method: 'POST',
                 body: formData
             });
-            if (response.redirected) {
-                window.location.href = response.url;
+            if (response.ok || response.redirected) {
+                window.location.href = '{{ url_for('guidelines') }}';
+            } else {
+                alert('Failed to save guidelines (status ' + response.status + ')');
             }
         } catch (error) {
             alert('Failed to save guidelines');
