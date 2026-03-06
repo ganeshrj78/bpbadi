@@ -355,14 +355,14 @@ def guidelines():
 @admin_required
 def edit_guidelines():
     """Save updated guidelines"""
-    member_guidelines = request.form.get('member_guidelines', '')
-    booking_guidelines = request.form.get('booking_guidelines', '')
+    data = request.get_json(silent=True) or {}
+    member_guidelines = data.get('member_guidelines', '')
+    booking_guidelines = data.get('booking_guidelines', '')
 
     SiteSettings.set('member_guidelines', member_guidelines)
     SiteSettings.set('booking_guidelines', booking_guidelines)
 
-    flash('Guidelines updated successfully!', 'success')
-    return redirect(url_for('guidelines'))
+    return jsonify({'success': True})
 
 
 @app.route('/api/guidelines')

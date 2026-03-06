@@ -15,20 +15,25 @@
     memberContent: window.guidelinesData.member,
     bookingContent: window.guidelinesData.booking,
     saving: false,
+    saveSuccess: false,
     async saveGuidelines() {
         this.saving = true;
-        const formData = new FormData();
-        formData.append('member_guidelines', this.memberContent);
-        formData.append('booking_guidelines', this.bookingContent);
+        this.saveSuccess = false;
         try {
             const response = await fetch('{{ url_for('edit_guidelines') }}', {
                 method: 'POST',
-                body: formData
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    member_guidelines: this.memberContent,
+                    booking_guidelines: this.bookingContent
+                })
             });
-            if (response.ok || response.redirected) {
-                window.location.href = '{{ url_for('guidelines') }}';
+            const data = await response.json();
+            if (data.success) {
+                this.saveSuccess = true;
+                setTimeout(() => this.saveSuccess = false, 3000);
             } else {
-                alert('Failed to save guidelines (status ' + response.status + ')');
+                alert('Failed to save guidelines');
             }
         } catch (error) {
             alert('Failed to save guidelines');
@@ -54,6 +59,13 @@
                 <span x-text="saving ? 'Saving...' : 'Save All'"></span>
             </button>
         </div>
+    </div>
+
+    <!-- Save success banner -->
+    <div x-show="saveSuccess" x-cloak x-transition
+        class="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-center gap-2">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        Guidelines saved successfully!
     </div>
 
     <!-- Help Text -->
