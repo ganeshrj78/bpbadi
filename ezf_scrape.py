@@ -40,27 +40,46 @@ def make_browser(playwright):
 
 def login(page, username, password):
     page.goto(LOGIN_URL, timeout=30000)
+    page.wait_for_load_state('networkidle', timeout=15000)
 
-    # Wait for username field — try multiple selectors
-    for sel in ["input[name='UserName']", "input[type='email']", "input[id*='user' i]"]:
+    # Debug: log all input fields found on the page
+    inputs = page.query_selector_all("input")
+    for inp in inputs:
+        print(f"  input: name={inp.get_attribute('name')} type={inp.get_attribute('type')} id={inp.get_attribute('id')}", flush=True)
+
+    # Fill username — try multiple selectors
+    filled = False
+    for sel in ["input[name='UserName']", "input[name='username']", "input[name='Email']",
+                "input[type='email']", "input[id*='user' i]", "input[id*='email' i]"]:
         try:
-            page.wait_for_selector(sel, timeout=10000)
-            page.fill(sel, username)
-            break
+            el = page.query_selector(sel)
+            if el:
+                el.fill(username)
+                filled = True
+                print(f"  Filled username with selector: {sel}", flush=True)
+                break
         except Exception:
             continue
+
+    if not filled:
+        print("  WARNING: Could not find username field", flush=True)
 
     page.fill("input[type='password']", password)
 
-    for sel in ["button[type='submit']", "input[type='submit']"]:
+    # Click submit and wait for navigation
+    for sel in ["button[type='submit']", "input[type='submit']", "button:has-text('Login')",
+                "button:has-text('Sign in')", "button:has-text('Log in')"]:
         try:
-            page.click(sel, timeout=5000)
-            break
-        except Exception:
+            el = page.query_selector(sel)
+            if el:
+                print(f"  Clicking submit: {sel}", flush=True)
+                with page.expect_navigation(timeout=30000):
+                    el.click()
+                break
+        except Exception as e:
+            print(f"  Submit {sel} failed: {e}", flush=True)
             continue
 
-    # Wait for URL to change after login (up to 30s for remote browser latency)
-    page.wait_for_url(lambda url: url != LOGIN_URL, timeout=30000)
     print(f"Logged in → {page.url}", flush=True)
 
 
