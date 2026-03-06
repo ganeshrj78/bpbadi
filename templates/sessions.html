@@ -318,6 +318,7 @@
                             data-session-id="{{ session.id }}"
                             data-player-id="{{ player.id }}"
                             data-original="{{ status }}"
+                            data-player-name="{{ player.name | e }}"
                             class="attendance-select w-20 text-xs py-1 px-1 rounded border
                             {% if status == 'YES' %}bg-green-100 border-green-500 text-green-700
                             {% elif status == 'NO' %}bg-gray-100 border-gray-300 text-gray-500
@@ -474,6 +475,7 @@
                             data-session-id="{{ session.id }}"
                             data-player-id="{{ player.id }}"
                             data-original="{{ status }}"
+                            data-player-name="{{ player.name | e }}"
                             class="attendance-select w-20 text-xs py-1 px-1 rounded border
                             {% if status == 'YES' %}bg-green-100 border-green-500 text-green-700
                             {% elif status == 'NO' %}bg-gray-100 border-gray-300 text-gray-500
@@ -630,6 +632,7 @@
                             data-session-id="{{ session.id }}"
                             data-player-id="{{ player.id }}"
                             data-original="{{ status }}"
+                            data-player-name="{{ player.name | e }}"
                             class="attendance-select w-20 text-xs py-1 px-1 rounded border
                             {% if status == 'YES' %}bg-green-100 border-green-500 text-green-700
                             {% elif status == 'NO' %}bg-gray-100 border-gray-300 text-gray-500
@@ -970,12 +973,27 @@ function bulkSetAttendance(playerId, status) {
     });
 }
 
+// Dropout modal data (injected from server)
+const STANDBY_BY_SESSION = {{ standby_by_session | tojson }};
+const SESSION_BIRDIE = {{ session_birdie_map | tojson }};
+const SESSION_COST = {
+    {% for s in active_sessions %}
+    {{ s.id }}: {{ active_session_costs.get(s.id, {}).get('regular', 0) }},
+    {% endfor %}
+};
+
 // Track pending changes: Map of "sessionId-playerId" -> {sessionId, playerId, status, originalStatus}
 const pendingChanges = new Map();
 
 // Track a change when dropdown is modified
 function trackChange(selectElement, sessionId, playerId) {
     const newStatus = selectElement.value || 'CLEAR';
+    if (newStatus === 'DROPOUT') {
+        _sdropout = { selectEl: selectElement, sessionId, playerId,
+                      playerName: selectElement.dataset.playerName || '' };
+        openSessionsDropoutModal(sessionId, playerId, selectElement);
+        return;
+    }
     const originalStatus = selectElement.dataset.original || '';
     const key = `${sessionId}-${playerId}`;
 
@@ -1207,4 +1225,126 @@ function updatePlayerComments(playerId, comments) {
     {% endfor %}
 </div>
 {% endif %}
+
+<!-- ── Dropout / Fill-in Modal (sessions matrix) ──────────────────────────── -->
+<div id="sessions-dropout-modal" class="fixed inset-0 z-50 hidden items-center justify-center pt-10 pb-8 px-4">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="cancelSessionsDropout()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[85vh]">
+        <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white rounded-t-2xl flex-shrink-0">
+            <h2 class="text-lg font-serif font-bold text-wimbledon-purple">Player Dropped Out</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Assign a fill-in and set the refund amount</p>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 space-y-5">
+            <div class="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <div>
+                    <div class="text-sm font-semibold text-red-700" id="sdropout-player-name"></div>
+                    <div class="text-xs text-red-500">Marked as Dropout</div>
+                </div>
+            </div>
+            <div>
+                <div class="text-sm font-semibold text-wimbledon-purple mb-2">Assign Fill-in</div>
+                <div id="sdropout-standby-list" class="space-y-2"></div>
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-wimbledon-purple block mb-1">
+                    Refund Amount for <span id="sdropout-player-name-2" class="text-red-600"></span>
+                </label>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-500 font-medium">$</span>
+                    <input type="number" id="sdropout-refund" step="0.01" min="0"
+                        class="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-wimbledon-green">
+                    <span class="text-xs text-gray-400" id="sdropout-refund-hint"></span>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-wimbledon-gold/20 bg-wimbledon-cream/30 rounded-b-2xl flex items-center justify-between flex-shrink-0">
+            <button onclick="cancelSessionsDropout()"
+                class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors">Cancel</button>
+            <button onclick="confirmSessionsDropout()"
+                class="px-5 py-2 bg-wimbledon-green text-white rounded-xl text-sm font-semibold hover:bg-wimbledon-green/90 transition-all">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let _sdropout = { selectEl: null, sessionId: null, playerId: null, playerName: '' };
+
+function openSessionsDropoutModal(sessionId, playerId, selectEl) {
+    const playerName = selectEl.dataset.playerName || '';
+    document.getElementById('sdropout-player-name').textContent = playerName;
+    document.getElementById('sdropout-player-name-2').textContent = playerName;
+
+    const birdie = SESSION_BIRDIE[sessionId] || 0;
+    const costPerPlayer = SESSION_COST[sessionId] || 0;
+    const suggested = Math.max(0, costPerPlayer - birdie);
+    document.getElementById('sdropout-refund').value = suggested.toFixed(2);
+    document.getElementById('sdropout-refund-hint').textContent =
+        'Suggested: $' + suggested.toFixed(2) + ' (court cost – birdie)';
+
+    const standby = STANDBY_BY_SESSION[sessionId] || [];
+    const list = document.getElementById('sdropout-standby-list');
+    if (standby.length === 0) {
+        list.innerHTML = `<div class="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 italic">
+            No players on standby. Fill-in will be set to None.</div>`;
+    } else {
+        list.innerHTML = [
+            `<label class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                <input type="radio" name="sdropout-fillin" value="" checked class="accent-wimbledon-purple">
+                <span class="text-sm font-medium text-gray-700">None — no fill-in</span>
+            </label>`
+        ].concat(standby.map((p, i) => `
+            <label class="flex items-center gap-3 p-3 rounded-xl border border-wimbledon-purple/20 cursor-pointer hover:bg-wimbledon-cream/40 transition-colors">
+                <input type="radio" name="sdropout-fillin" value="${p.id}" class="accent-wimbledon-purple">
+                <div class="flex-1">
+                    <div class="text-sm font-semibold text-gray-800">${p.name}</div>
+                    <div class="text-xs text-gray-500">Priority #${i + 1} · ${p.category}</div>
+                </div>
+                <span class="text-xs font-medium text-teal-600 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">Standby</span>
+            </label>`
+        )).join('');
+    }
+
+    const modal = document.getElementById('sessions-dropout-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function cancelSessionsDropout() {
+    if (_sdropout.selectEl) {
+        _sdropout.selectEl.value = _sdropout.selectEl.dataset.original || '';
+    }
+    document.getElementById('sessions-dropout-modal').classList.add('hidden');
+    document.getElementById('sessions-dropout-modal').classList.remove('flex');
+}
+
+function confirmSessionsDropout() {
+    const fillinRadio = document.querySelector('input[name="sdropout-fillin"]:checked');
+    const fillinId = fillinRadio && fillinRadio.value ? parseInt(fillinRadio.value) : null;
+    const refundAmount = parseFloat(document.getElementById('sdropout-refund').value) || 0;
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+    fetch('/api/attendance/process-dropout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+        body: JSON.stringify({
+            session_id: _sdropout.sessionId,
+            dropout_player_id: _sdropout.playerId,
+            fillin_player_id: fillinId,
+            refund_amount: refundAmount
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('sessions-dropout-modal').classList.add('hidden');
+            document.getElementById('sessions-dropout-modal').classList.remove('flex');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to process dropout'));
+        }
+    })
+    .catch(() => { alert('Network error'); cancelSessionsDropout(); });
+}
+</script>
 {% endblock %}

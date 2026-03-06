@@ -1165,6 +1165,19 @@ def sessions():
             per_player = s.birdie_cost or 0
         active_session_costs[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
 
+    # Build standby-players-per-session map for the dropout modal
+    player_name_map = {p.id: p.name for p in all_players}
+    standby_by_session = {}
+    for att in sorted(all_attendances, key=lambda a: a.updated_at or a.created_at):
+        if att.status == 'STANDBY' and att.session_id in attendance_map:
+            standby_by_session.setdefault(att.session_id, []).append({
+                'id': att.player_id,
+                'name': player_name_map.get(att.player_id, ''),
+                'category': att.category or 'regular'
+            })
+
+    session_birdie_map = {s.id: (s.birdie_cost or 0) for s in active_sessions}
+
     return render_template('sessions.html',
                           active_sessions=active_sessions,
                           archived_groups=archived_sorted,
@@ -1175,7 +1188,9 @@ def sessions():
                           attendance_map=attendance_map,
                           attendance_details=attendance_details,
                           player_stats=player_stats,
-                          active_session_costs=active_session_costs)
+                          active_session_costs=active_session_costs,
+                          standby_by_session=standby_by_session,
+                          session_birdie_map=session_birdie_map)
 
 
 @app.route('/sessions/month/<month_key>')

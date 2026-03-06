@@ -374,8 +374,8 @@
                         </select>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-center">
-                        <select data-prev="{{ current_status }}"
-                            onchange="handleStatusChange({{ player.id }}, {{ session.id }}, {{ player.name | tojson }}, this)"
+                        <select data-prev="{{ current_status }}" data-player-name="{{ player.name | e }}"
+                            onchange="handleStatusChange({{ player.id }}, {{ session.id }}, this)"
                             class="px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all
                             {% if current_status == 'YES' %}bg-green-100 border-green-300 text-green-700
                             {% elif current_status == 'DROPOUT' %}bg-red-100 border-red-300 text-red-700
@@ -583,8 +583,9 @@ function bulkPayment() {
 // ── Dropout modal state ───────────────────────────────────────────────────────
 let _dropout = { playerId: null, sessionId: null, playerName: null, selectEl: null };
 
-function handleStatusChange(playerId, sessionId, playerName, selectEl) {
+function handleStatusChange(playerId, sessionId, selectEl) {
     const newStatus = selectEl.value;
+    const playerName = selectEl.dataset.playerName || '';
     if (newStatus === 'DROPOUT') {
         _dropout = { playerId, sessionId, playerName, selectEl };
         openDropoutModal();
