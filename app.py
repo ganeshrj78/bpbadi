@@ -2087,7 +2087,19 @@ def process_dropout():
     fillin_player_id  = data.get('fillin_player_id')   # may be None
     refund_amount    = float(data.get('refund_amount', 0))
 
+    from datetime import date as _date
     sess = Session.query.get_or_404(session_id)
+    today = _date.today().strftime('%b %d, %Y')
+
+    # ── Look up player names ──────────────────────────────────────────────────
+    dropout_player = Player.query.get(dropout_player_id)
+    fillin_player  = Player.query.get(fillin_player_id) if fillin_player_id else None
+    dropout_name   = dropout_player.name if dropout_player else f'Player {dropout_player_id}'
+    fillin_name    = fillin_player.name  if fillin_player  else None
+
+    def _append_comment(att, new_note):
+        existing = (att.comments or '').strip()
+        att.comments = (existing + '\n' + new_note).strip() if existing else new_note
 
     # ── Mark dropout ──────────────────────────────────────────────────────────
     dropout_att = Attendance.query.filter_by(
@@ -2097,6 +2109,9 @@ def process_dropout():
         return jsonify({'error': 'Player attendance not found'}), 404
 
     dropout_att.status = 'DROPOUT'
+    dropout_note = f'Dropped out on {today}'
+    dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
+    _append_comment(dropout_att, dropout_note)
 
     # Create / update refund record
     existing_refund = DropoutRefund.query.filter_by(
@@ -2122,14 +2137,15 @@ def process_dropout():
             fillin_att.status = 'FILLIN'
             fillin_att.payment_status = 'unpaid'
         else:
-            fillin_player = Player.query.get(fillin_player_id)
-            db.session.add(Attendance(
+            fillin_att = Attendance(
                 player_id=fillin_player_id,
                 session_id=session_id,
                 status='FILLIN',
                 category=fillin_player.category if fillin_player else 'regular',
                 payment_status='unpaid'
-            ))
+            )
+            db.session.add(fillin_att)
+        _append_comment(fillin_att, f'Filled in on {today} for {dropout_name}')
 
     db.session.commit()
     clear_session_cache()
