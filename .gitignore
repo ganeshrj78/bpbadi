@@ -25,3 +25,8 @@ Thumbs.db
 
 # EZFacility debug dumps (raw HTML from scraper, never commit)
 ezf_debug_*.html
+
+# Developer/AI guidelines — local only, not deployed to Render
+CLAUDE.md
+docs/CLAUDE.md
+templates/CLAUDE.md
