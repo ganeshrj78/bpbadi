@@ -38,13 +38,19 @@ def make_driver():
     opts.add_argument("--disable-extensions")
     opts.add_argument("--window-size=1400,900")
 
-    selenium_url = os.environ.get("SELENIUM_URL")
+    selenium_url  = os.environ.get("SELENIUM_URL", "").rstrip("/")
+    selenium_token = os.environ.get("SELENIUM_TOKEN", "")
     if selenium_url:
         # Remote WebDriver — Browserless.io or Selenium Grid
         opts.add_argument("--headless=new")
         opts.add_argument("--disable-gpu")
+        if selenium_token:
+            full_url = f"{selenium_url}?token={selenium_token}"
+        else:
+            full_url = selenium_url
+        print(f"Connecting to remote WebDriver: {selenium_url}", flush=True)
         return webdriver.Remote(
-            command_executor=selenium_url,
+            command_executor=full_url,
             options=opts
         )
 

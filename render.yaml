@@ -25,3 +25,5 @@ services:
         value: 3.11.0
       - key: SELENIUM_URL
         sync: false
+      - key: SELENIUM_TOKEN
+        sync: false
