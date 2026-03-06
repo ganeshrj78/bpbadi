@@ -16,6 +16,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 LOGIN_URL    = "https://royalbadminton.ezfacility.com/login"
 SCHEDULE_URL = "https://royalbadminton.ezfacility.com/MySchedule"
@@ -34,15 +35,20 @@ def make_driver():
     opts = Options()
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-extensions")
     opts.add_argument("--window-size=1400,900")
-    # Run headless on Render with memory optimisations
-    if os.environ.get("RENDER"):
+
+    selenium_url = os.environ.get("SELENIUM_URL")
+    if selenium_url:
+        # Remote WebDriver — Browserless.io or Selenium Grid
         opts.add_argument("--headless=new")
         opts.add_argument("--disable-gpu")
-        opts.add_argument("--disable-extensions")
-        opts.add_argument("--disable-images")
-        opts.add_argument("--blink-settings=imagesEnabled=false")
-        opts.add_argument("--js-flags=--max-old-space-size=128")
+        return webdriver.Remote(
+            command_executor=selenium_url,
+            options=opts
+        )
+
+    # Local Chrome
     return webdriver.Chrome(options=opts)
 
 
