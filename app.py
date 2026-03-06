@@ -351,6 +351,7 @@ def guidelines():
 
 
 @app.route('/guidelines/edit', methods=['POST'])
+@csrf.exempt
 @admin_required
 def edit_guidelines():
     """Save updated guidelines"""
