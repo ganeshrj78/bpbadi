@@ -6,17 +6,13 @@ Usage:
     python ezf_scrape.py --dates 2026-03-07,2026-03-14 --out /tmp/ezf_out.json
 
 Credentials from env vars: RF_USERNAME, RF_PASSWORD
+Remote browser: BROWSERLESS_URL (e.g. wss://production-sfo.browserless.io?token=TOKEN)
 Outputs JSON list of court bookings to --out file.
 """
-import sys, os, re, time, json, argparse, html as html_mod
-from datetime import datetime
+import sys, os, re, json, argparse, html as html_mod
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from playwright.sync_api import sync_playwright
 
 LOGIN_URL    = "https://royalbadminton.ezfacility.com/login"
 SCHEDULE_URL = "https://royalbadminton.ezfacility.com/MySchedule"
@@ -31,58 +27,45 @@ def suggest_cost(mins):
     return round(DEFAULT_RATE * mins / 60, 2)
 
 
-def make_driver():
-    opts = Options()
-    opts.add_argument("--no-sandbox")
-    opts.add_argument("--disable-dev-shm-usage")
-    opts.add_argument("--disable-extensions")
-    opts.add_argument("--window-size=1400,900")
-
-    if os.environ.get("RENDER"):
-        # Render: use Debian's chromium package (lighter than full Chrome)
-        opts.add_argument("--headless=new")
-        opts.add_argument("--disable-gpu")
-        opts.add_argument("--disable-images")
-        opts.add_argument("--blink-settings=imagesEnabled=false")
-        opts.binary_location = "/usr/bin/chromium"
-        from selenium.webdriver.chrome.service import Service
-        return webdriver.Chrome(options=opts, service=Service("/usr/bin/chromedriver"))
-
-    # Local: use whatever Chrome is installed
-    return webdriver.Chrome(options=opts)
+def make_browser(playwright):
+    browserless_url = os.environ.get("BROWSERLESS_URL", "").strip()
+    if browserless_url:
+        print(f"Connecting to remote browser: {browserless_url.split('?')[0]}", flush=True)
+        return playwright.chromium.connect_over_cdp(browserless_url)
+    # Local — run `playwright install chromium` once before using
+    return playwright.chromium.launch(headless=bool(os.environ.get("RENDER")))
 
 
-def login(driver, username, password):
-    wait = WebDriverWait(driver, 20)
-    driver.get(LOGIN_URL)
-    field = wait.until(EC.presence_of_element_located(
-        (By.CSS_SELECTOR, "input[name='UserName'], input[type='email'], input[id*='user' i]")
-    ))
-    field.clear()
-    field.send_keys(username)
-    driver.find_element(By.CSS_SELECTOR, "input[type='password']").send_keys(password)
-    driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']").click()
-    wait.until(EC.url_changes(LOGIN_URL))
-    print(f"Logged in → {driver.current_url}", flush=True)
+def login(page, username, password):
+    page.goto(LOGIN_URL)
+    page.wait_for_selector(
+        "input[name='UserName'], input[type='email'], input[id*='user' i]",
+        timeout=20000
+    )
+    page.locator("input[name='UserName'], input[type='email'], input[id*='user' i]").first.fill(username)
+    page.fill("input[type='password']", password)
+    page.click("button[type='submit'], input[type='submit']")
+    page.wait_for_function(f"() => window.location.href !== '{LOGIN_URL}'", timeout=20000)
+    print(f"Logged in → {page.url}", flush=True)
 
 
-def get_week_dates(driver):
-    headers = driver.find_elements(By.CSS_SELECTOR, "th.fc-day-header")
+def get_week_dates(page):
+    headers = page.query_selector_all("th.fc-day-header")
     return [h.get_attribute("data-date") for h in headers if h.get_attribute("data-date")]
 
 
-def navigate_to_date(driver, target_date):
+def navigate_to_date(page, target_date):
     for _ in range(30):
-        dates = get_week_dates(driver)
+        dates = get_week_dates(page)
         if not dates:
-            time.sleep(1)
+            page.wait_for_timeout(1000)
             continue
         first, last = min(dates), max(dates)
         if first <= target_date <= last:
             return True
         btn = ".calendar-next" if last < target_date else ".calendar-prev"
-        driver.find_element(By.CSS_SELECTOR, btn).click()
-        time.sleep(1.8)
+        page.click(btn)
+        page.wait_for_timeout(1800)
     return False
 
 
@@ -144,7 +127,6 @@ def parse_week(page_source, target_dates_set):
             for fmt in ('%I:%M%p', '%I:%M %p', '%I%p', '%I %p'):
                 try:
                     t = datetime.strptime(cleaned, fmt)
-                    from datetime import timedelta
                     end_t = t + timedelta(minutes=dur)
                     start_24 = t.strftime('%H:%M')
                     end_24   = end_t.strftime('%H:%M')
@@ -179,44 +161,47 @@ def main():
         sys.exit(1)
 
     print(f"Scraping {len(target_dates)} date(s): {', '.join(target_dates)}", flush=True)
-    driver = make_driver()
+
     all_bookings = []
 
-    try:
-        login(driver, username, password)
-
-        driver.get(SCHEDULE_URL)
-        time.sleep(3)
-
+    with sync_playwright() as p:
+        browser = make_browser(p)
         try:
-            driver.find_element(By.CSS_SELECTOR, "[data-calendar-view='basicWeek']").click()
-            time.sleep(2)
-        except Exception:
-            pass
+            page = browser.new_page()
+            login(page, username, password)
 
-        scraped_weeks = set()
-        for date_str in target_dates:
-            if not navigate_to_date(driver, date_str):
-                print(f"  Could not navigate to {date_str}", flush=True)
-                continue
+            page.goto(SCHEDULE_URL)
+            page.wait_for_timeout(3000)
 
-            dates_in_week = get_week_dates(driver)
-            if not dates_in_week:
-                continue
-            week_key = (min(dates_in_week), max(dates_in_week))
-            if week_key in scraped_weeks:
-                continue
-            scraped_weeks.add(week_key)
+            try:
+                page.click("[data-calendar-view='basicWeek']", timeout=3000)
+                page.wait_for_timeout(2000)
+            except Exception:
+                pass
 
-            time.sleep(1.2)
-            result = parse_week(driver.page_source, set(target_dates))
-            for date, courts in result.items():
-                for c in courts:
-                    all_bookings.append({"date": date, **c})
-            print(f"  Week {week_key}: {sum(len(v) for v in result.values())} court(s)", flush=True)
+            scraped_weeks = set()
+            for date_str in target_dates:
+                if not navigate_to_date(page, date_str):
+                    print(f"  Could not navigate to {date_str}", flush=True)
+                    continue
 
-    finally:
-        driver.quit()
+                dates_in_week = get_week_dates(page)
+                if not dates_in_week:
+                    continue
+                week_key = (min(dates_in_week), max(dates_in_week))
+                if week_key in scraped_weeks:
+                    continue
+                scraped_weeks.add(week_key)
+
+                page.wait_for_timeout(1200)
+                result = parse_week(page.content(), set(target_dates))
+                for date, courts in result.items():
+                    for c in courts:
+                        all_bookings.append({"date": date, **c})
+                print(f"  Week {week_key}: {sum(len(v) for v in result.values())} court(s)", flush=True)
+
+        finally:
+            browser.close()
 
     # Deduplicate
     seen = set()

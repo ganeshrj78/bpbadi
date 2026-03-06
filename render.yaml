@@ -23,3 +23,5 @@ services:
         value: true
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: BROWSERLESS_URL
+        sync: false
