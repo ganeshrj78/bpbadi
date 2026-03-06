@@ -30,12 +30,20 @@ def suggest_cost(mins):
 def make_browser(playwright):
     browserless_url = os.environ.get("BROWSERLESS_URL", "").strip()
     if browserless_url:
-        # Browserless: connect() with /chromium/playwright path
-        # URL format: wss://production-sfo.browserless.io/chromium/playwright?token=TOKEN
-        print(f"Connecting to remote browser: {browserless_url.split('?')[0]}", flush=True)
-        return playwright.chromium.connect(browserless_url)
-    # Local — run `playwright install chromium` once before using
-    return playwright.chromium.launch(headless=bool(os.environ.get("RENDER")))
+        base = browserless_url.split('?')[0]
+        has_token = 'token=' in browserless_url
+        print(f"[DEBUG] BROWSERLESS_URL found. Base: {base} | Token present: {has_token}", flush=True)
+        try:
+            print(f"[DEBUG] Calling playwright.chromium.connect() ...", flush=True)
+            browser = playwright.chromium.connect(browserless_url)
+            print(f"[DEBUG] Connected! Browser version: {browser.version}", flush=True)
+            return browser
+        except Exception as e:
+            print(f"[DEBUG] connect() failed: {type(e).__name__}: {e}", flush=True)
+            raise
+    else:
+        print(f"[DEBUG] BROWSERLESS_URL not set — using local Chromium", flush=True)
+        return playwright.chromium.launch(headless=bool(os.environ.get("RENDER")))
 
 
 def login(page, username, password):
@@ -199,11 +207,15 @@ def main():
     all_bookings = []
 
     with sync_playwright() as p:
+        print(f"[DEBUG] Starting Playwright ...", flush=True)
         browser = make_browser(p)
         try:
+            print(f"[DEBUG] Opening new page ...", flush=True)
             page = browser.new_page()
+            print(f"[DEBUG] Page opened. Starting login ...", flush=True)
             login(page, username, password)
 
+            print(f"[DEBUG] Navigating to schedule: {SCHEDULE_URL}", flush=True)
             page.goto(SCHEDULE_URL)
             page.wait_for_timeout(3000)
 
