@@ -37,15 +37,28 @@ def make_browser(playwright):
 
 
 def login(page, username, password):
-    page.goto(LOGIN_URL)
-    page.wait_for_selector(
-        "input[name='UserName'], input[type='email'], input[id*='user' i]",
-        timeout=20000
-    )
-    page.locator("input[name='UserName'], input[type='email'], input[id*='user' i]").first.fill(username)
+    page.goto(LOGIN_URL, timeout=30000)
+
+    # Wait for username field — try multiple selectors
+    for sel in ["input[name='UserName']", "input[type='email']", "input[id*='user' i]"]:
+        try:
+            page.wait_for_selector(sel, timeout=10000)
+            page.fill(sel, username)
+            break
+        except Exception:
+            continue
+
     page.fill("input[type='password']", password)
-    page.click("button[type='submit'], input[type='submit']")
-    page.wait_for_function(f"() => window.location.href !== '{LOGIN_URL}'", timeout=20000)
+
+    for sel in ["button[type='submit']", "input[type='submit']"]:
+        try:
+            page.click(sel, timeout=5000)
+            break
+        except Exception:
+            continue
+
+    # Wait for URL to change after login (up to 30s for remote browser latency)
+    page.wait_for_url(lambda url: url != LOGIN_URL, timeout=30000)
     print(f"Logged in → {page.url}", flush=True)
 
 
