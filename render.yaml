@@ -7,10 +7,9 @@ databases:
 services:
   - type: web
     name: bp-badminton
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: apt-get update -y && apt-get install -y wget && wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y /tmp/chrome.deb && pip install -r requirements.txt
-    startCommand: bash start.sh
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: DATABASE_URL
         fromDatabase:
