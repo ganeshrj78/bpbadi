@@ -1062,9 +1062,10 @@ def sessions():
     refund_stats = db.session.query(
         DropoutRefund.player_id,
         func.count(DropoutRefund.id).filter(DropoutRefund.status == 'pending').label('pending_count'),
+        func.sum(DropoutRefund.refund_amount).filter(DropoutRefund.status == 'pending').label('pending_amount'),
         func.sum(DropoutRefund.refund_amount).filter(DropoutRefund.status == 'processed').label('total_refunded')
     ).group_by(DropoutRefund.player_id).all()
-    refund_map = {r.player_id: {'pending': r.pending_count or 0, 'refunded': r.total_refunded or 0} for r in refund_stats}
+    refund_map = {r.player_id: {'pending': r.pending_count or 0, 'pending_amount': float(r.pending_amount or 0), 'refunded': r.total_refunded or 0} for r in refund_stats}
 
     # 2. All sessions + courts in two queries (needed for all-time balance)
     all_sessions_all = Session.query.all()
@@ -1075,11 +1076,12 @@ def sessions():
         Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
     ).all()
 
-    # 4. Payment totals per player in one aggregated query
+    # 4. Payment totals per player — exclude refund payments (negative) so balance
+    #    reflects actual cash received; refunds are tracked separately in refund_map
     payment_totals = db.session.query(
         Payment.player_id,
         func.sum(Payment.amount).label('total')
-    ).group_by(Payment.player_id).all()
+    ).filter(Payment.amount > 0).group_by(Payment.player_id).all()
     player_payments = {r.player_id: float(r.total or 0) for r in payment_totals}
 
     # Build court cost map: session_id -> {regular: X, adhoc: X}
@@ -1130,11 +1132,12 @@ def sessions():
     for player in all_players:
         charges = round(player_charges.get(player.id, 0), 2)
         payments = round(player_payments.get(player.id, 0), 2)
-        refund_data = refund_map.get(player.id, {'pending': 0, 'refunded': 0})
+        refund_data = refund_map.get(player.id, {'pending': 0, 'pending_amount': 0.0, 'refunded': 0})
         player_stats[player.id] = {
             'balance': round(charges - payments, 2),
             'total_payments': payments,
             'pending_refunds': refund_data['pending'],
+            'pending_refund_amount': refund_data['pending_amount'],
             'total_refunded': refund_data['refunded']
         }
 
@@ -1177,6 +1180,20 @@ def sessions():
             })
 
     session_birdie_map = {s.id: (s.birdie_cost or 0) for s in active_sessions}
+
+    # Patch attendance_details for existing dropouts that have a pending DropoutRefund
+    # (handles records created before payment_status='pending_refund' was added)
+    active_session_ids = [s.id for s in active_sessions]
+    if active_session_ids:
+        pending_refunds_q = db.session.query(
+            DropoutRefund.session_id, DropoutRefund.player_id
+        ).filter(
+            DropoutRefund.status == 'pending',
+            DropoutRefund.session_id.in_(active_session_ids)
+        ).all()
+        for sid, pid in pending_refunds_q:
+            if sid in attendance_details and pid in attendance_details[sid]:
+                attendance_details[sid][pid]['payment_status'] = 'pending_refund'
 
     return render_template('sessions.html',
                           active_sessions=active_sessions,
@@ -1360,12 +1377,19 @@ def session_detail(id):
         for att in standby_atts if att.player
     ]
 
+    # Refund data per player for this session (direct query avoids backref expiry after commit)
+    session_refunds = DropoutRefund.query.filter_by(session_id=id).all()
+    pending_refund_pids = {r.player_id for r in session_refunds if r.status == 'pending'}
+    refund_by_player = {r.player_id: r for r in session_refunds}
+
     return render_template('session_detail.html', session=sess, players=players,
                           players_display=players_display,
                           attendance_map=attendance_map, category_map=category_map,
                           attendance_records=attendance_records,
                           player_session_costs=player_session_costs,
-                          standby_players=standby_players)
+                          standby_players=standby_players,
+                          pending_refund_pids=pending_refund_pids,
+                          refund_by_player=refund_by_player)
 
 
 @app.route('/sessions/<int:id>/edit', methods=['GET', 'POST'])
@@ -1856,6 +1880,14 @@ def update_dropout_refund(id):
             notes=f'Dropout refund for session {refund.session.date.strftime("%b %d, %Y")}. {refund.instructions or ""}'.strip()
         )
         db.session.add(payment)
+
+        # Revert dropout attendance payment_status to 'paid'
+        dropout_att = Attendance.query.filter_by(
+            player_id=refund.player_id, session_id=refund.session_id
+        ).first()
+        if dropout_att:
+            dropout_att.payment_status = 'paid'
+
         flash(f'Refund of ${refund.refund_amount:.2f} processed and credited to {refund.player.name}', 'success')
 
     elif action == 'cancel':
@@ -1879,6 +1911,8 @@ def update_dropout_refund(id):
         refund.status = 'cancelled'
 
     db.session.commit()
+    if request.form.get('from_session'):
+        return redirect(url_for('session_detail', id=session_id))
     return redirect(url_for('session_refunds', id=session_id))
 
 
@@ -2089,7 +2123,7 @@ def process_dropout():
 
     from datetime import date as _date
     sess = Session.query.get_or_404(session_id)
-    today = _date.today().strftime('%b %d, %Y')
+    today = _date.today().strftime('%m/%d')
 
     # ── Look up player names ──────────────────────────────────────────────────
     dropout_player = Player.query.get(dropout_player_id)
@@ -2109,6 +2143,7 @@ def process_dropout():
         return jsonify({'error': 'Player attendance not found'}), 404
 
     dropout_att.status = 'DROPOUT'
+    dropout_att.payment_status = 'pending_refund'
     dropout_note = f'Dropped out on {today}'
     dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
     _append_comment(dropout_att, dropout_note)

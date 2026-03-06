@@ -386,7 +386,7 @@ class Attendance(db.Model):
     category = db.Column(db.String(20), default='regular', index=True)  # regular, adhoc, kid - category for this session
 
     # Per-session payment tracking
-    payment_status = db.Column(db.String(20), default='unpaid', index=True)  # unpaid, paid
+    payment_status = db.Column(db.String(20), default='unpaid', index=True)  # unpaid, paid, pending_refund
     additional_cost = db.Column(db.Float, default=0)  # Extra charges for this player in this session
     comments = db.Column(db.Text)  # Admin comments for this player in this session
 

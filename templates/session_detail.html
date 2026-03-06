@@ -246,6 +246,7 @@
                 <!-- Inline amount edit -->
                 <form method="POST" action="{{ url_for('update_dropout_refund', id=r.id) }}" class="flex items-center gap-1.5">
                     <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="from_session" value="1">
                     <span class="text-gray-500 text-sm">$</span>
                     <input type="number" name="refund_amount" value="{{ '%.2f'|format(r.refund_amount) }}"
                         step="0.01" min="0"
@@ -255,6 +256,7 @@
                 <!-- Process button -->
                 <form method="POST" action="{{ url_for('update_dropout_refund', id=r.id) }}">
                     <input type="hidden" name="action" value="process">
+                    <input type="hidden" name="from_session" value="1">
                     <button type="submit"
                         class="px-3 py-1.5 bg-wimbledon-green text-white text-sm font-semibold rounded-lg hover:bg-wimbledon-green/90 transition-all">
                         ✓ Process
@@ -369,6 +371,7 @@
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Session Cost</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Extra</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Refund</th>
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Payment</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Amount</th>
                     <th class="px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Comments</th>
@@ -381,11 +384,12 @@
                 {% set current_status = attendance_map.get(player.id, 'NO') %}
                 {% set owed = player_session_costs.get(player.id, 0) %}
                 {% set payment_status = att.payment_status if att else 'unpaid' %}
+                {% if player.id in (pending_refund_pids | default([])) %}{% set payment_status = 'pending_refund' %}{% endif %}
                 {% set is_billable = current_status in ['YES', 'FILLIN', 'DROPOUT'] %}
                 {% if current_status != 'STANDBY' and not ns_hdr.participants_shown %}
                 {% set ns_hdr.participants_shown = true %}
                 <tr class="bg-gray-50/60">
-                    <td colspan="9" class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                    <td colspan="10" class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                         Participants
                     </td>
                 </tr>
@@ -393,7 +397,7 @@
                 {% if current_status == 'STANDBY' and not ns_hdr.standby_shown %}
                 {% set ns_hdr.standby_shown = true %}
                 <tr class="bg-teal-50/60">
-                    <td colspan="9" class="px-4 py-2 text-xs font-semibold text-teal-700 uppercase tracking-wider border-b border-teal-200">
+                    <td colspan="10" class="px-4 py-2 text-xs font-semibold text-teal-700 uppercase tracking-wider border-b border-teal-200">
                         ⏳ Waitlisted — priority fill-in when a confirmed player drops out
                     </td>
                 </tr>
@@ -485,8 +489,28 @@
                             onchange="updateAdditionalCost({{ player.id }}, {{ session.id }}, this.value)"
                             class="w-20 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
                     </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-right">
+                        {% set r = (refund_by_player | default({})).get(player.id) %}
+                        {% if r %}
+                            {% if r.status == 'pending' %}
+                            <span class="text-sm font-bold text-yellow-600">-${{ "%.2f"|format(r.refund_amount) }}</span>
+                            {% elif r.status == 'processed' %}
+                            <span class="text-xs text-gray-400 flex flex-col items-end leading-tight">
+                                <span>-${{ "%.2f"|format(r.refund_amount) }}</span>
+                                <span>settled</span>
+                            </span>
+                            {% else %}
+                            <span class="text-gray-300 text-xs">—</span>
+                            {% endif %}
+                        {% else %}
+                        <span class="text-gray-300 text-xs">—</span>
+                        {% endif %}
+                    </td>
                     <td class="px-4 py-3 whitespace-nowrap text-center">
                         {% if is_billable %}
+                        {% if payment_status == 'pending_refund' %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 border-2 border-yellow-300 text-yellow-700">Pending Refund</span>
+                        {% else %}
                         <select onchange="updatePaymentStatus({{ player.id }}, {{ session.id }}, this.value, this)"
                             class="px-3 py-1.5 text-xs font-bold rounded-full border-2 cursor-pointer transition-all
                             {% if payment_status == 'paid' %}bg-green-100 border-green-300 text-green-700
@@ -494,6 +518,7 @@
                             <option value="unpaid" {% if payment_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
                             <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>Paid</option>
                         </select>
+                        {% endif %}
                         {% else %}
                         <span class="text-gray-400 text-xs">—</span>
                         {% endif %}
@@ -584,7 +609,7 @@ const SUGGESTED_REFUND = parseFloat(Math.max(0, COST_PER_PLAYER - BIRDIE_COST).t
 
 function bulkPayment() {
     const selected = {
-        {% for player in players_display %}{% set att = attendance_records.get(player.id) %}{% set s = attendance_map.get(player.id, 'NO') %}{% if s in ['YES', 'DROPOUT', 'FILLIN'] %}{{ player.id }}: {{ 'false' if att and att.payment_status == 'paid' else 'true' }},
+        {% for player in players_display %}{% set att = attendance_records.get(player.id) %}{% set s = attendance_map.get(player.id, 'NO') %}{% if s in ['YES', 'DROPOUT', 'FILLIN'] %}{{ player.id }}: {{ 'false' if att and att.payment_status in ('paid', 'pending_refund') else 'true' }},
         {% endif %}{% endfor %}
     };
     const amounts = {

@@ -187,7 +187,7 @@
             <button @click="paymentFilter = 'not_participating'"
                 :class="paymentFilter === 'not_participating' ? 'bg-gray-500 text-white' : 'bg-white text-gray-600 border border-gray-300'"
                 class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all">
-                Not Participating
+                Not Playing
             </button>
         </div>
 
@@ -258,7 +258,10 @@
                     <th class="px-2 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[70px]">
                         Status
                     </th>
-                    <th class="px-2 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[120px]">
+                    <th class="px-2 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[80px]">
+                        Refund
+                    </th>
+                    <th class="px-2 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[160px]">
                         Comments
                     </th>
                 </tr>
@@ -267,7 +270,7 @@
                 <!-- Regular Players Section -->
                 {% if regular_players %}
                 <tr class="bg-green-50">
-                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-2 text-xs font-bold text-green-700 uppercase tracking-wider sticky left-0 bg-green-50">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-green-700 uppercase tracking-wider sticky left-0 bg-green-50">
                         Regular Players ({{ regular_players|length }})
                     </td>
                 </tr>
@@ -278,8 +281,8 @@
                 {% if ns_np.all_no and active_sessions and not seen_np_reg.val %}
                 {% set seen_np_reg.val = true %}
                 <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
-                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
-                        Not Participating
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
+                        Not Playing
                     </td>
                 </tr>
                 {% endif %}
@@ -312,6 +315,7 @@
                         </div>
                     </td>
                     {% for session in active_sessions %}
+                    {% set att_comment = attendance_details.get(session.id, {}).get(player.id, {}).get('comments', '') %}
                     <td class="px-1 py-1 text-center">
                         {% set status = attendance_map.get(session.id, {}).get(player.id, '') %}
                         <select onchange="trackChange(this, {{ session.id }}, {{ player.id }})"
@@ -393,29 +397,54 @@
                     </td>
                     <td class="px-2 py-2 text-center whitespace-nowrap">
                         {% if ns_np.all_no and active_sessions %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Participating</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
                         {% else %}
-                        {% set has_unpaid = namespace(val=false) %}
+                        {% set pstatus = namespace(val='paid') %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] and att_details.get('payment_status', 'unpaid') == 'unpaid' %}
-                                {% set has_unpaid.val = true %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                                {% set ps = att_details.get('payment_status', 'unpaid') %}
+                                {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
+                                {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% if has_unpaid.val %}
+                        {% if pstatus.val == 'unpaid' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
+                        {% elif pstatus.val == 'pending_refund' %}
+                        <span class="inline-flex flex-col items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 leading-tight" data-player-status="{{ player.id }}">
+                            <span>Pending Refund</span>
+                            {% if player_stats[player.id].pending_refund_amount %}<span>(${{ '%.0f'|format(player_stats[player.id].pending_refund_amount) }})</span>{% endif %}
+                        </span>
                         {% else %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
                         {% endif %}
                         {% endif %}
                     </td>
+                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                        {% if stats.pending_refund_amount %}
+                        <span class="text-sm font-bold text-yellow-600">-${{ "%.2f"|format(stats.pending_refund_amount) }}</span>
+                        {% elif stats.total_refunded %}
+                        <span class="text-xs text-gray-400 flex flex-col items-end leading-tight">
+                            <span>-${{ "%.2f"|format(stats.total_refunded) }}</span>
+                            <span>settled</span>
+                        </span>
+                        {% else %}
+                        <span class="text-gray-300 text-xs">—</span>
+                        {% endif %}
+                    </td>
                     <td class="px-2 py-2 text-left">
+                        {% set ns_ac = namespace(val='') %}
+                        {% for _sess in active_sessions %}
+                            {% set _c = attendance_details.get(_sess.id, {}).get(player.id, {}).get('comments', '') %}
+                            {% if _c %}{% if ns_ac.val %}{% set ns_ac.val = ns_ac.val + ' | ' + _c %}{% else %}{% set ns_ac.val = _c %}{% endif %}{% endif %}
+                        {% endfor %}
+                        {% set comment_val = player.admin_comments or ns_ac.val %}
                         <input type="text"
-                            value="{{ player.admin_comments or '' }}"
+                            value="{{ comment_val | e }}"
                             onchange="updatePlayerComments({{ player.id }}, this.value)"
                             placeholder="Add comment..."
-                            class="w-full min-w-[100px] px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
+                            class="w-full min-w-[140px] px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
                     </td>
                 </tr>
                 {% endfor %}
@@ -424,7 +453,7 @@
                 <!-- Adhoc Players Section -->
                 {% if adhoc_players %}
                 <tr class="bg-purple-50">
-                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-2 text-xs font-bold text-purple-700 uppercase tracking-wider sticky left-0 bg-purple-50">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-purple-700 uppercase tracking-wider sticky left-0 bg-purple-50">
                         Adhoc Players ({{ adhoc_players|length }})
                     </td>
                 </tr>
@@ -435,8 +464,8 @@
                 {% if ns_np.all_no and active_sessions and not seen_np_adhoc.val %}
                 {% set seen_np_adhoc.val = true %}
                 <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
-                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
-                        Not Participating
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
+                        Not Playing
                     </td>
                 </tr>
                 {% endif %}
@@ -469,6 +498,7 @@
                         </div>
                     </td>
                     {% for session in active_sessions %}
+                    {% set att_comment = attendance_details.get(session.id, {}).get(player.id, {}).get('comments', '') %}
                     <td class="px-1 py-1 text-center">
                         {% set status = attendance_map.get(session.id, {}).get(player.id, '') %}
                         <select onchange="trackChange(this, {{ session.id }}, {{ player.id }})"
@@ -550,29 +580,54 @@
                     </td>
                     <td class="px-2 py-2 text-center whitespace-nowrap">
                         {% if ns_np.all_no and active_sessions %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Participating</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
                         {% else %}
-                        {% set has_unpaid = namespace(val=false) %}
+                        {% set pstatus = namespace(val='paid') %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] and att_details.get('payment_status', 'unpaid') == 'unpaid' %}
-                                {% set has_unpaid.val = true %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                                {% set ps = att_details.get('payment_status', 'unpaid') %}
+                                {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
+                                {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% if has_unpaid.val %}
+                        {% if pstatus.val == 'unpaid' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
+                        {% elif pstatus.val == 'pending_refund' %}
+                        <span class="inline-flex flex-col items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 leading-tight" data-player-status="{{ player.id }}">
+                            <span>Pending Refund</span>
+                            {% if player_stats[player.id].pending_refund_amount %}<span>(${{ '%.0f'|format(player_stats[player.id].pending_refund_amount) }})</span>{% endif %}
+                        </span>
                         {% else %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
                         {% endif %}
                         {% endif %}
                     </td>
+                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                        {% if stats.pending_refund_amount %}
+                        <span class="text-sm font-bold text-yellow-600">-${{ "%.2f"|format(stats.pending_refund_amount) }}</span>
+                        {% elif stats.total_refunded %}
+                        <span class="text-xs text-gray-400 flex flex-col items-end leading-tight">
+                            <span>-${{ "%.2f"|format(stats.total_refunded) }}</span>
+                            <span>settled</span>
+                        </span>
+                        {% else %}
+                        <span class="text-gray-300 text-xs">—</span>
+                        {% endif %}
+                    </td>
                     <td class="px-2 py-2 text-left">
+                        {% set ns_ac = namespace(val='') %}
+                        {% for _sess in active_sessions %}
+                            {% set _c = attendance_details.get(_sess.id, {}).get(player.id, {}).get('comments', '') %}
+                            {% if _c %}{% if ns_ac.val %}{% set ns_ac.val = ns_ac.val + ' | ' + _c %}{% else %}{% set ns_ac.val = _c %}{% endif %}{% endif %}
+                        {% endfor %}
+                        {% set comment_val = player.admin_comments or ns_ac.val %}
                         <input type="text"
-                            value="{{ player.admin_comments or '' }}"
+                            value="{{ comment_val | e }}"
                             onchange="updatePlayerComments({{ player.id }}, this.value)"
                             placeholder="Add comment..."
-                            class="w-full min-w-[100px] px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
+                            class="w-full min-w-[140px] px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
                     </td>
                 </tr>
                 {% endfor %}
@@ -581,7 +636,7 @@
                 <!-- Kid Players Section -->
                 {% if kid_players %}
                 <tr class="bg-blue-50">
-                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-2 text-xs font-bold text-blue-700 uppercase tracking-wider sticky left-0 bg-blue-50">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-blue-700 uppercase tracking-wider sticky left-0 bg-blue-50">
                         Kids ({{ kid_players|length }})
                     </td>
                 </tr>
@@ -592,8 +647,8 @@
                 {% if ns_np.all_no and active_sessions and not seen_np_kid.val %}
                 {% set seen_np_kid.val = true %}
                 <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
-                    <td colspan="{{ active_sessions|length + 4 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
-                        Not Participating
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
+                        Not Playing
                     </td>
                 </tr>
                 {% endif %}
@@ -626,6 +681,7 @@
                         </div>
                     </td>
                     {% for session in active_sessions %}
+                    {% set att_comment = attendance_details.get(session.id, {}).get(player.id, {}).get('comments', '') %}
                     <td class="px-1 py-1 text-center">
                         {% set status = attendance_map.get(session.id, {}).get(player.id, '') %}
                         <select onchange="trackChange(this, {{ session.id }}, {{ player.id }})"
@@ -707,29 +763,54 @@
                     </td>
                     <td class="px-2 py-2 text-center whitespace-nowrap">
                         {% if ns_np.all_no and active_sessions %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Participating</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
                         {% else %}
-                        {% set has_unpaid = namespace(val=false) %}
+                        {% set pstatus = namespace(val='paid') %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] and att_details.get('payment_status', 'unpaid') == 'unpaid' %}
-                                {% set has_unpaid.val = true %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                                {% set ps = att_details.get('payment_status', 'unpaid') %}
+                                {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
+                                {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% if has_unpaid.val %}
+                        {% if pstatus.val == 'unpaid' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
+                        {% elif pstatus.val == 'pending_refund' %}
+                        <span class="inline-flex flex-col items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 leading-tight" data-player-status="{{ player.id }}">
+                            <span>Pending Refund</span>
+                            {% if player_stats[player.id].pending_refund_amount %}<span>(${{ '%.0f'|format(player_stats[player.id].pending_refund_amount) }})</span>{% endif %}
+                        </span>
                         {% else %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
                         {% endif %}
                         {% endif %}
                     </td>
+                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                        {% if stats.pending_refund_amount %}
+                        <span class="text-sm font-bold text-yellow-600">-${{ "%.2f"|format(stats.pending_refund_amount) }}</span>
+                        {% elif stats.total_refunded %}
+                        <span class="text-xs text-gray-400 flex flex-col items-end leading-tight">
+                            <span>-${{ "%.2f"|format(stats.total_refunded) }}</span>
+                            <span>settled</span>
+                        </span>
+                        {% else %}
+                        <span class="text-gray-300 text-xs">—</span>
+                        {% endif %}
+                    </td>
                     <td class="px-2 py-2 text-left">
+                        {% set ns_ac = namespace(val='') %}
+                        {% for _sess in active_sessions %}
+                            {% set _c = attendance_details.get(_sess.id, {}).get(player.id, {}).get('comments', '') %}
+                            {% if _c %}{% if ns_ac.val %}{% set ns_ac.val = ns_ac.val + ' | ' + _c %}{% else %}{% set ns_ac.val = _c %}{% endif %}{% endif %}
+                        {% endfor %}
+                        {% set comment_val = player.admin_comments or ns_ac.val %}
                         <input type="text"
-                            value="{{ player.admin_comments or '' }}"
+                            value="{{ comment_val | e }}"
                             onchange="updatePlayerComments({{ player.id }}, this.value)"
                             placeholder="Add comment..."
-                            class="w-full min-w-[100px] px-1 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
+                            class="w-full min-w-[140px] px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
                     </td>
                 </tr>
                 {% endfor %}
