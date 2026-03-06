@@ -30,8 +30,8 @@ def suggest_cost(mins):
 def make_browser(playwright):
     browserless_url = os.environ.get("BROWSERLESS_URL", "").strip()
     if browserless_url:
-        # Browserless uses Playwright Wire Protocol — connect() not connect_over_cdp()
-        # URL must end with /playwright e.g. wss://production-sfo.browserless.io/playwright?token=TOKEN
+        # Browserless: connect() with /chromium/playwright path
+        # URL format: wss://production-sfo.browserless.io/chromium/playwright?token=TOKEN
         print(f"Connecting to remote browser: {browserless_url.split('?')[0]}", flush=True)
         return playwright.chromium.connect(browserless_url)
     # Local — run `playwright install chromium` once before using
