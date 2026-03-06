@@ -7,6 +7,7 @@ Create Date: 2026-03-05
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine.reflection import Inspector
 
 revision = 'e6f7a8b9c0d1'
 down_revision = 'd5e6f7a8b9c0'
@@ -15,9 +16,13 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('external_integrations',
-        sa.Column('session_cookie', sa.Text(), nullable=True)
-    )
+    conn = op.get_bind()
+    inspector = Inspector.from_engine(conn)
+    existing_cols = [c['name'] for c in inspector.get_columns('external_integrations')]
+    if 'session_cookie' not in existing_cols:
+        op.add_column('external_integrations',
+            sa.Column('session_cookie', sa.Text(), nullable=True)
+        )
 
 
 def downgrade():
