@@ -355,14 +355,18 @@ def guidelines():
 @admin_required
 def edit_guidelines():
     """Save updated guidelines"""
-    data = request.get_json(silent=True) or {}
-    member_guidelines = data.get('member_guidelines', '')
-    booking_guidelines = data.get('booking_guidelines', '')
+    try:
+        data = request.get_json(silent=True) or {}
+        member_guidelines = data.get('member_guidelines', '')
+        booking_guidelines = data.get('booking_guidelines', '')
 
-    SiteSettings.set('member_guidelines', member_guidelines)
-    SiteSettings.set('booking_guidelines', booking_guidelines)
+        SiteSettings.set('member_guidelines', member_guidelines)
+        SiteSettings.set('booking_guidelines', booking_guidelines)
 
-    return jsonify({'success': True})
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f'edit_guidelines error: {e}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/guidelines')

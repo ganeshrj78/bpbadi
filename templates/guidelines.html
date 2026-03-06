@@ -28,15 +28,19 @@
                     booking_guidelines: this.bookingContent
                 })
             });
-            const data = await response.json();
+            let data;
+            try { data = await response.json(); } catch(e) {
+                alert('Server error (HTTP ' + response.status + ') — check app logs');
+                this.saving = false; return;
+            }
             if (data.success) {
                 this.saveSuccess = true;
                 setTimeout(() => this.saveSuccess = false, 3000);
             } else {
-                alert('Failed to save guidelines');
+                alert('Error: ' + (data.error || 'Unknown error'));
             }
         } catch (error) {
-            alert('Failed to save guidelines');
+            alert('Network error — is the server running?');
         }
         this.saving = false;
     }
