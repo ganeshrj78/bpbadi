@@ -55,6 +55,8 @@ def login(page, username, password):
     for inp in inputs:
         print(f"  input: name={inp.get_attribute('name')} type={inp.get_attribute('type')} id={inp.get_attribute('id')}", flush=True)
 
+    print(f"  Credentials: username='{username[:3]}***' password={'set' if password else 'EMPTY'}", flush=True)
+
     # Fill username — try multiple selectors
     filled = False
     for sel in ["input[name='UserName']", "input[name='username']", "input[name='Email']",
@@ -88,7 +90,12 @@ def login(page, username, password):
             print(f"  Submit {sel} failed: {e}", flush=True)
             continue
 
-    print(f"Logged in → {page.url}", flush=True)
+    print(f"  After submit URL: {page.url}", flush=True)
+    if LOGIN_URL in page.url:
+        print("  ERROR: Still on login page — credentials may be wrong or form not submitted correctly", flush=True)
+        sys.exit(1)
+
+    print(f"Logged in successfully → {page.url}", flush=True)
 
 
 def get_week_dates(page):

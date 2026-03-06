@@ -2839,9 +2839,9 @@ def api_ezfacility_fetch_bookings():
             capture_output=True,
             text=True
         )
-        app.logger.info(f'ezf_scrape stdout: {proc.stdout[-500:]}')
+        app.logger.info(f'ezf_scrape stdout: {proc.stdout[-3000:]}')
         if proc.returncode != 0:
-            app.logger.error(f'ezf_scrape stderr: {proc.stderr[-500:]}')
+            app.logger.error(f'ezf_scrape stderr: {proc.stderr[-2000:]}')
             return jsonify({'success': False, 'error': f'Scraper exited with error. Check that Chrome is installed.'})
     except subprocess.TimeoutExpired:
         return jsonify({'success': False, 'error': 'Scraper timed out (3 min). Try fewer dates.'})
