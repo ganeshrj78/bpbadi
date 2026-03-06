@@ -2532,19 +2532,24 @@ def ezfacility_settings():
             rec.username = username
         if password:
             rec.password = password
+        cookie = request.form.get('session_cookie', '').strip()
+        if cookie:
+            rec.session_cookie = cookie
         db.session.commit()
 
-        flash('EZFacility credentials saved (encrypted).', 'success')
+        flash('Royal Facility settings saved (encrypted).', 'success')
         return redirect(url_for('ezfacility_settings'))
 
     rec = ExternalIntegration.query.filter_by(name=EZF_NAME).first()
-    stored_url      = rec.url      if rec else ''
-    stored_username = rec.username if rec else ''
+    stored_url      = rec.url            if rec else ''
+    stored_username = rec.username       if rec else ''
     has_credentials = bool(rec and rec.username and rec._password_enc)
+    has_cookie      = bool(rec and rec._cookie_enc)
     return render_template('ezfacility_settings.html',
                            has_credentials=has_credentials,
                            stored_username=stored_username,
-                           stored_url=stored_url)
+                           stored_url=stored_url,
+                           has_cookie=has_cookie)
 
 
 @app.route('/ezfacility/sync')
@@ -2560,35 +2565,157 @@ def ezfacility_sync_page():
     return render_template('ezfacility_sync.html')
 
 
+@app.route('/api/ezfacility/open-browser', methods=['POST'])
+@csrf.exempt
+@admin_required
+def api_ezfacility_open_browser():
+    """Open EZFacility login page in the system default browser."""
+    import subprocess, sys
+    url = 'https://royalbadminton.ezfacility.com/login'
+    try:
+        if sys.platform == 'darwin':
+            subprocess.Popen(['open', url])
+        elif sys.platform == 'win32':
+            subprocess.Popen(['start', url], shell=True)
+        else:
+            subprocess.Popen(['xdg-open', url])
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/ezfacility/import-browser-cookies', methods=['POST'])
+@csrf.exempt
+@admin_required
+def api_ezfacility_import_browser_cookies():
+    """
+    Read fresh EZFacility cookies from any installed browser.
+    Tries Chrome, Brave, Edge, Arc, Chromium, Firefox, Safari — uses first with a valid auth cookie.
+    Works on macOS, Windows, and Linux.
+    """
+    try:
+        import browser_cookie3
+    except ImportError:
+        return jsonify({'success': False, 'error': 'browser_cookie3 not installed.'})
+
+    domain = 'royalbadminton.ezfacility.com'
+    auth_names = {'EZSelfServiceAuth', '.ASPXAUTH', 'EZAuth'}
+
+    # Try all supported browsers — order by most common
+    candidates = [
+        ('Chrome',    browser_cookie3.chrome),
+        ('Brave',     browser_cookie3.brave),
+        ('Edge',      browser_cookie3.edge),
+        ('Arc',       browser_cookie3.arc),
+        ('Chromium',  browser_cookie3.chromium),
+        ('Firefox',   browser_cookie3.firefox),
+        ('Safari',    browser_cookie3.safari),
+        ('Opera',     browser_cookie3.opera),
+        ('Vivaldi',   browser_cookie3.vivaldi),
+    ]
+
+    cookies = []
+    browser_used = None
+    for name, getter in candidates:
+        try:
+            jar = getter(domain_name=domain)
+            found = list(jar)
+            # Must have an auth cookie — not just pre-login cookies
+            if found and any(c.name in auth_names for c in found):
+                cookies = found
+                browser_used = name
+                break
+        except Exception:
+            continue
+
+    if not cookies:
+        tried = ', '.join(n for n, _ in candidates)
+        return jsonify({'success': False, 'error':
+            f'No active session found in any browser ({tried}). '
+            'Please log in to Royal Facility in your browser first, then try again.'})
+
+    # Verify cookies actually work against /MySchedule
+    from playwright.sync_api import sync_playwright
+    pw_cookies = [{'name': c.name, 'value': c.value, 'domain': domain, 'path': '/'} for c in cookies]
+    try:
+        with sync_playwright() as pw:
+            browser_pw = pw.chromium.launch(headless=True, args=['--no-sandbox'])
+            ctx = browser_pw.new_context()
+            ctx.add_cookies(pw_cookies)
+            page = ctx.new_page()
+            page.goto(f'https://{domain}/MySchedule', wait_until='networkidle', timeout=20000)
+            logged_in = '/login' not in page.url.lower()
+            browser_pw.close()
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Cookie verification failed: {e}'})
+
+    if not logged_in:
+        return jsonify({'success': False, 'error':
+            f'Session in {browser_used} has expired — please log in to Royal Facility again, then retry.'})
+
+    cookie_str = '; '.join(f'{c.name}={c.value}' for c in cookies)
+    rec = ExternalIntegration.get_or_create(EZF_NAME)
+    rec.session_cookie = cookie_str
+    db.session.commit()
+    return jsonify({'success': True,
+                    'message': f'Connected via {browser_used} — session verified and saved.'})
+
+
 @app.route('/api/ezfacility/fetch-bookings', methods=['POST'])
 @csrf.exempt
 @admin_required
 def api_ezfacility_fetch_bookings():
-    if not EZF_AVAILABLE:
-        return jsonify({'success': False, 'error': 'ezfacility module not installed'})
+    import subprocess, sys, json as _json, tempfile
 
     _, username, password = ExternalIntegration.get_credentials(EZF_NAME)
     if not username or not password:
         return jsonify({'success': False, 'error': 'EZFacility credentials not configured. Go to Settings.'})
 
-    try:
-        # In debug mode, dump the raw HTML for selector inspection
-        dump_path = os.path.join(os.path.dirname(__file__), 'ezf_debug_schedule.html') if app.debug else None
-        bookings = ezf_fetch_bookings(username, password, debug_dump_path=dump_path)
-    except ValueError as e:
-        return jsonify({'success': False, 'error': str(e)})
-    except Exception as e:
-        app.logger.error(f'EZFacility fetch error: {e}')
-        return jsonify({'success': False, 'error': f'Could not reach EZFacility: {e}'})
+    data = request.get_json(silent=True) or {}
+    target_dates = sorted(set(data.get('dates', [])))
+    if not target_dates:
+        return jsonify({'success': False, 'error': 'No dates provided.'})
 
-    # Group bookings by date
+    out_path = os.path.join(os.path.dirname(__file__), 'instance', 'ezf_scrape_output.json')
+    script   = os.path.join(os.path.dirname(__file__), 'ezf_scrape.py')
+
+    env = os.environ.copy()
+    env['RF_USERNAME'] = username
+    env['RF_PASSWORD'] = password
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, script, '--dates', ','.join(target_dates), '--out', out_path],
+            env=env,
+            timeout=180,
+            capture_output=True,
+            text=True
+        )
+        app.logger.info(f'ezf_scrape stdout: {proc.stdout[-500:]}')
+        if proc.returncode != 0:
+            app.logger.error(f'ezf_scrape stderr: {proc.stderr[-500:]}')
+            return jsonify({'success': False, 'error': f'Scraper exited with error. Check that Chrome is installed.'})
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'error': 'Scraper timed out (3 min). Try fewer dates.'})
+    except Exception as e:
+        app.logger.error(f'ezf_scrape launch error: {e}', exc_info=True)
+        return jsonify({'success': False, 'error': f'Could not run scraper: {e}'})
+
+    try:
+        with open(out_path) as f:
+            raw_bookings = _json.load(f)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Could not read scraper output: {e}'})
+
+    # Group by date
     bookings_by_date = defaultdict(list)
-    for b in bookings:
-        bookings_by_date[b['date'].isoformat()].append(b)
+    for b in raw_bookings:
+        bookings_by_date[b['date']].append(b)
 
     # Load matching local sessions
     if bookings_by_date:
-        booking_dates = [date.fromisoformat(d) for d in bookings_by_date]
+        from datetime import date as _date
+        booking_dates = [_date.fromisoformat(d) for d in bookings_by_date]
         local_sessions = Session.query.filter(Session.date.in_(booking_dates)).all()
     else:
         local_sessions = []
@@ -2604,22 +2731,18 @@ def api_ezfacility_fetch_bookings():
         result.append({
             'date': date_str,
             'local_session_id': local_sess.id if local_sess else None,
-            'local_court_count': len(local_courts),
-            'local_courts': [{'name': c.name, 'start_time': c.start_time, 'end_time': c.end_time, 'cost': c.cost}
-                             for c in local_courts],
             'courts': [{
-                'court_name': b['court_name'],
-                'start_time': b['start_time'],
-                'end_time': b['end_time'],
-                'start_time_24': b['start_time_24'],
-                'end_time_24': b['end_time_24'],
+                'court_name':       b['court_name'],
+                'start_time':       b['start_time'],
+                'start_time_24':    b['start_time_24'],
+                'end_time_24':      b['end_time_24'],
                 'duration_minutes': b['duration_minutes'],
-                'suggested_cost': b['suggested_cost'],
+                'suggested_cost':   b['suggested_cost'],
                 'already_in_local': b['court_name'].lower() in local_court_names,
             } for b in courts],
         })
 
-    return jsonify({'success': True, 'bookings': result, 'total': len(bookings)})
+    return jsonify({'success': True, 'bookings': result, 'total': len(raw_bookings)})
 
 
 @app.route('/api/ezfacility/sync', methods=['POST'])
@@ -2700,4 +2823,4 @@ def ratelimit_handler(e):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5050)  # Using 5050 as 5000 is often used by macOS AirPlay
+    app.run(debug=True, port=5050, use_reloader=False)  # use_reloader=False prevents Playwright/Chromium conflicts

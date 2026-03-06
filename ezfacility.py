@@ -1,308 +1,303 @@
 """
 EZFacility scraper for Royal Badminton Academy.
-Handles login, schedule page scraping, court booking data parsing,
-and password encryption (key derived from app's SECRET_KEY).
 
-SECURITY: No credentials are stored in this file.
-Credentials are stored encrypted in the SiteSettings DB table.
+Flow:
+  1. Read live session cookies from the user's Brave browser (browser_cookie3).
+  2. Inject them into headless Playwright Chromium.
+  3. Navigate to /MySchedule — no login form, no reCAPTCHA.
+  4. Parse FullCalendar week views for the requested session dates.
+
+The user must be logged into royalbadminton.ezfacility.com in Brave.
 """
+import html as html_mod
 import re
-import base64
-import hashlib
+import time
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import List, Optional
 
-import requests
+import browser_cookie3
 from bs4 import BeautifulSoup
-from cryptography.fernet import Fernet
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = 'https://royalbadminton.ezfacility.com'
-LOGIN_URL = f'{BASE_URL}/Account/Login'
+BASE_URL     = 'https://royalbadminton.ezfacility.com'
+LOGIN_URL    = f'{BASE_URL}/login'
 SCHEDULE_URL = f'{BASE_URL}/MySchedule'
+DOMAIN       = 'royalbadminton.ezfacility.com'
 
-# ── Court cost rules ──────────────────────────────────────────────────────────
-# These are SUGGESTED costs. Admin can override per court during sync.
+# ── Court cost rules ────────────────────────────────────────────────────────────
 COST_RULES = {
-    60:  45.00,   # $45/hr × 1 hr
-    120: 75.00,   # $37.50/hr × 2 hrs
+    60:  45.00,
+    120: 75.00,
     150: 90.00,   # flat rate
-    180: 105.00,  # $35/hr × 3 hrs
+    180: 105.00,
 }
 DEFAULT_RATE_PER_HOUR = 45.00
 
 
 def suggest_cost(duration_minutes: int) -> float:
-    """Return suggested court cost based on reservation duration."""
     if duration_minutes in COST_RULES:
         return COST_RULES[duration_minutes]
     return round(DEFAULT_RATE_PER_HOUR * duration_minutes / 60, 2)
 
 
-# ── Encryption helpers ────────────────────────────────────────────────────────
+# ── Cookie helpers ──────────────────────────────────────────────────────────────
 
-def _get_fernet(secret_key: str) -> Fernet:
-    """Derive a Fernet cipher from the app's SECRET_KEY (never stored)."""
-    key_bytes = hashlib.sha256(secret_key.encode()).digest()
-    return Fernet(base64.urlsafe_b64encode(key_bytes))
-
-
-def encrypt_password(plaintext: str, secret_key: str) -> str:
-    """Encrypt a password; returns ciphertext string safe for DB storage."""
-    return _get_fernet(secret_key).encrypt(plaintext.encode()).decode()
-
-
-def decrypt_password(ciphertext: str, secret_key: str) -> str:
-    """Decrypt a previously encrypted password."""
-    return _get_fernet(secret_key).decrypt(ciphertext.encode()).decode()
-
-
-# ── Scraper ───────────────────────────────────────────────────────────────────
-
-def fetch_bookings(username: str, password: str, debug_dump_path: str = None) -> list:
+def get_brave_cookies() -> List[dict]:
     """
-    Log into EZFacility and scrape court bookings from MySchedule.
-
-    Returns a list of booking dicts:
-      {
-        'date': date,
-        'court_name': str,
-        'start_time': str,        e.g. '6:30 AM'
-        'end_time': str,          e.g. '9:30 AM'
-        'start_time_24': str,     e.g. '06:30'
-        'end_time_24': str,       e.g. '09:30'
-        'duration_minutes': int,
-        'suggested_cost': float,
-      }
-
-    Raises ValueError on login failure, requests.RequestException on network error.
-    If debug_dump_path is provided, the raw schedule HTML is written there.
+    Read live EZFacility session cookies from the user's Brave browser.
+    Returns a list of Playwright-compatible cookie dicts.
+    Raises ValueError if no valid session is found.
     """
-    sess = requests.Session()
-    sess.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
-                      'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36'
-    })
+    try:
+        jar = browser_cookie3.brave(domain_name=DOMAIN)
+        cookies = list(jar)
+    except Exception as e:
+        raise ValueError(
+            f'Could not read Brave cookies: {e}. '
+            'Make sure Brave is installed and you are logged into Royal Facility.'
+        )
 
-    # GET login page to harvest anti-forgery token
-    r = sess.get(LOGIN_URL, timeout=20)
-    r.raise_for_status()
-    soup = BeautifulSoup(r.text, 'html.parser')
+    if not cookies:
+        raise ValueError(
+            'No EZFacility cookies found in Brave. '
+            'Please log into royalbadminton.ezfacility.com in Brave and try again.'
+        )
 
-    token_input = (
-        soup.find('input', {'name': '__RequestVerificationToken'}) or
-        soup.find('input', {'name': 'csrf_token'})
-    )
-    token = token_input['value'] if token_input else ''
-
-    # POST credentials
-    payload = {
-        'UserName': username,
-        'Password': password,
-        '__RequestVerificationToken': token,
-    }
-    r = sess.post(LOGIN_URL, data=payload, timeout=20, allow_redirects=True)
-    r.raise_for_status()
-
-    # Detect login failure
-    if 'Account/Login' in r.url or '/login' in r.url.lower():
-        raise ValueError('EZFacility login failed — check username and password in Settings.')
-
-    # Fetch schedule
-    r = sess.get(SCHEDULE_URL, timeout=20)
-    r.raise_for_status()
-
-    if debug_dump_path:
-        try:
-            with open(debug_dump_path, 'w', encoding='utf-8') as f:
-                f.write(r.text)
-            logger.info(f'EZFacility HTML dumped to {debug_dump_path}')
-        except Exception as e:
-            logger.warning(f'Could not write debug dump: {e}')
-
-    return _parse_schedule(r.text)
+    # Convert to Playwright format
+    return [
+        {'name': c.name, 'value': c.value, 'domain': DOMAIN, 'path': '/'}
+        for c in cookies
+    ]
 
 
-def _parse_schedule(html: str) -> list:
-    """
-    Parse the MySchedule page to extract court bookings.
-    EZFacility renders schedules in several possible formats; this handles
-    the most common table and list-based layouts with graceful fallbacks.
-    """
-    soup = BeautifulSoup(html, 'html.parser')
+# ── FullCalendar parsing ────────────────────────────────────────────────────────
+
+def _parse_week_source(page_source: str) -> list:
+    """Parse one week's FullCalendar HTML into a list of booking dicts."""
+    soup = BeautifulSoup(page_source, 'html.parser')
     bookings = []
 
-    # Strategy 1: look for structured booking elements (EZFacility uses
-    # data attributes on some versions)
-    booking_blocks = (
-        soup.select('[data-start-time]') or
-        soup.select('.schedule-item') or
-        soup.select('.booking-item') or
-        soup.select('.reservation-item')
-    )
-    if booking_blocks:
-        for block in booking_blocks:
-            b = _parse_block(block)
-            if b:
-                bookings.append(b)
-        if bookings:
-            return bookings
+    headers = soup.select('th.fc-day-header')
+    col_dates = {
+        i: th.get('data-date', '')
+        for i, th in enumerate(headers) if th.get('data-date')
+    }
 
-    # Strategy 2: parse table rows
-    for table in soup.find_all('table'):
-        headers = [th.get_text(strip=True).lower() for th in table.find_all('th')]
-        # Look for tables that have date+time or court columns
-        if not any(kw in ' '.join(headers) for kw in ['date', 'court', 'time', 'resource', 'reserv']):
+    tbody = soup.select_one('.fc-content-skeleton table tbody')
+    if not tbody:
+        return bookings
+
+    col_events: dict = {i: [] for i in col_dates}
+    rowspan_remaining: dict = {}
+
+    for row in tbody.find_all('tr'):
+        tds = row.find_all('td')
+        col_ptr = 0
+        for td in tds:
+            while rowspan_remaining.get(col_ptr, 0) > 0:
+                rowspan_remaining[col_ptr] -= 1
+                col_ptr += 1
+            rowspan = int(td.get('rowspan', 1))
+            if rowspan > 1:
+                rowspan_remaining[col_ptr] = rowspan - 1
+            for a in td.select('a.fc-day-grid-event'):
+                div = a.find('div', class_='fc-content')
+                if not div:
+                    continue
+                raw  = div.get('data-content', '')
+                text = BeautifulSoup(
+                    html_mod.unescape(raw), 'html.parser'
+                ).get_text(' ', strip=True)
+                time_tag = div.find('span', class_='fc-time')
+                col_events.setdefault(col_ptr, []).append({
+                    'time': time_tag.text.strip() if time_tag else '',
+                    'info': text,
+                })
+            col_ptr += 1
+
+    for col_i, date_str in col_dates.items():
+        if not date_str:
             continue
-        rows = table.find_all('tr')[1:]  # skip header
-        for row in rows:
-            cells = row.find_all('td')
-            if len(cells) < 2:
-                continue
-            b = _parse_row_cells([c.get_text(strip=True) for c in cells])
+        for e in col_events.get(col_i, []):
+            b = _event_to_booking(date_str, e)
             if b:
                 bookings.append(b)
 
-    # Strategy 3: look for any text blocks containing court + time info
-    if not bookings:
-        bookings = _parse_text_blocks(soup)
+    return bookings
 
-    # Deduplicate by (date, court_name, start_time)
-    seen = set()
+
+def _duration_to_minutes(info: str) -> int:
+    after_venue = re.split(r'Venues\s*-', info, flags=re.I)
+    text = after_venue[-1] if len(after_venue) > 1 else info
+    hours   = re.search(r'(\d+)\s*hour', text, re.I)
+    minutes = re.search(r'(\d+)\s*min',  text, re.I)
+    h = int(hours.group(1))   if hours   else 0
+    m = int(minutes.group(1)) if minutes else 0
+    return h * 60 + m
+
+
+def _extract_court_name(info: str) -> str:
+    m = re.search(r'Venues\s*-\s*(.+?)\s+\d+\s*hour', info, re.I)
+    return m.group(1).strip() if m else 'Court'
+
+
+def _parse_start_end(time_str: str, duration_minutes: int):
+    time_str = time_str.strip()
+    cleaned  = re.sub(r'([aApP])$', lambda x: x.group(1).upper() + 'M', time_str)
+    for fmt in ('%I:%M%p', '%I:%M %p', '%I%p', '%I %p'):
+        try:
+            t_start = datetime.strptime(cleaned, fmt)
+            t_end   = t_start + timedelta(minutes=duration_minutes)
+            return t_start.strftime('%H:%M'), t_end.strftime('%H:%M')
+        except ValueError:
+            continue
+    return None, None
+
+
+def _event_to_booking(date_str: str, event: dict):
+    try:
+        info     = event['info']
+        time_str = event['time']
+        dur      = _duration_to_minutes(info)
+        court    = _extract_court_name(info)
+        start_24, end_24 = _parse_start_end(time_str, dur)
+        return {
+            'date':             datetime.strptime(date_str, '%Y-%m-%d').date(),
+            'date_str':         date_str,
+            'court_name':       court,
+            'start_time':       time_str,
+            'start_time_24':    start_24 or '',
+            'end_time_24':      end_24   or '',
+            'duration_minutes': dur,
+            'suggested_cost':   suggest_cost(dur),
+        }
+    except Exception as e:
+        logger.debug(f'Event parse error: {e} | {event}')
+        return None
+
+
+# ── Playwright navigation ───────────────────────────────────────────────────────
+
+def _get_current_week_dates(page) -> list:
+    return page.eval_on_selector_all(
+        'th.fc-day-header',
+        'els => els.map(e => e.getAttribute("data-date")).filter(Boolean)'
+    )
+
+
+def _navigate_to_date(page, target_date: str) -> bool:
+    """Navigate FullCalendar until the week containing target_date is visible."""
+    for _ in range(26):
+        dates = _get_current_week_dates(page)
+        if not dates:
+            page.wait_for_timeout(1000)
+            continue
+        first, last = min(dates), max(dates)
+        if first <= target_date <= last:
+            return True
+        btn = '.calendar-next' if last < target_date else '.calendar-prev'
+        page.click(btn)
+        page.wait_for_timeout(1500)
+    return False
+
+
+# ── Public API ──────────────────────────────────────────────────────────────────
+
+def fetch_bookings(username: str, password: str,
+                   debug_dump_path: Optional[str] = None,
+                   target_dates: Optional[List[str]] = None,
+                   **_kwargs) -> list:
+    """
+    Get cookies from the user's live Brave browser and scrape court bookings
+    for the given session dates using headless Playwright.
+
+    The user must be logged into royalbadminton.ezfacility.com in Brave.
+    target_dates: list of 'YYYY-MM-DD' strings.
+    """
+    target_dates = sorted(set(target_dates or []))
+    all_bookings = []
+
+    # Step 1: get live cookies from Brave
+    pw_cookies = get_brave_cookies()
+    logger.info(f'Got {len(pw_cookies)} cookies from Brave')
+
+    # Step 2: inject into headless Playwright and scrape
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-dev-shm-usage']
+        )
+        context = browser.new_context(
+            user_agent=(
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/121.0.0.0 Safari/537.36'
+            )
+        )
+        context.add_cookies(pw_cookies)
+        page = context.new_page()
+
+        # Verify session is valid
+        page.goto(SCHEDULE_URL, wait_until='networkidle', timeout=30000)
+        if '/login' in page.url.lower():
+            browser.close()
+            raise ValueError(
+                'EZFacility session in Brave has expired. '
+                'Please log into royalbadminton.ezfacility.com in Brave and try again.'
+            )
+
+        logger.info('Brave session verified — at schedule page')
+
+        # Switch to week view
+        try:
+            page.click("[data-calendar-view='basicWeek']", timeout=3000)
+            page.wait_for_timeout(2000)
+        except Exception:
+            pass
+
+        if debug_dump_path:
+            try:
+                with open(debug_dump_path, 'w', encoding='utf-8') as f:
+                    f.write(page.content())
+                logger.info(f'Debug HTML dumped to {debug_dump_path}')
+            except Exception as e:
+                logger.warning(f'Could not write debug dump: {e}')
+
+        # Scrape each target week
+        scraped_weeks: set = set()
+        for date_str in target_dates:
+            if not _navigate_to_date(page, date_str):
+                logger.warning(f'Could not navigate to week for {date_str}')
+                continue
+
+            week_dates = _get_current_week_dates(page)
+            if not week_dates:
+                continue
+            week_key = (min(week_dates), max(week_dates))
+            if week_key in scraped_weeks:
+                continue
+            scraped_weeks.add(week_key)
+
+            page.wait_for_timeout(1200)
+            source = page.content()
+
+            week_bookings = _parse_week_source(source)
+            matched = [b for b in week_bookings if b['date_str'] in target_dates]
+            all_bookings.extend(matched)
+            logger.info(f'Week {week_key}: {len(matched)} booking(s) for {date_str}')
+
+        browser.close()
+
+    # Deduplicate
+    seen: set = set()
     unique = []
-    for b in bookings:
-        key = (b['date'], b['court_name'], b['start_time'])
+    for b in all_bookings:
+        key = (b['date_str'], b['court_name'], b['start_time'])
         if key not in seen:
             seen.add(key)
             unique.append(b)
 
-    return sorted(unique, key=lambda x: (x['date'], x['start_time']))
-
-
-def _parse_block(block) -> dict:
-    """Parse a single booking block element."""
-    try:
-        text = block.get_text(' ', strip=True)
-        date_val = _extract_date(text) or _extract_date(block.get('data-date', ''))
-        start_str, end_str = _extract_time_range(text)
-        if not date_val or start_str == 'TBD':
-            return None
-        court = _extract_court_name(text) or 'Court'
-        dur = _duration_minutes(start_str, end_str)
-        return _make_booking(date_val, court, start_str, end_str, dur)
-    except Exception:
-        return None
-
-
-def _parse_row_cells(cells: list) -> dict:
-    """Parse a list of cell text values into a booking dict."""
-    try:
-        combined = ' '.join(cells)
-        date_val = _extract_date(combined)
-        if not date_val:
-            return None
-        start_str, end_str = _extract_time_range(combined)
-        if start_str == 'TBD':
-            return None
-        court = _extract_court_name(combined) or 'Court'
-        dur = _duration_minutes(start_str, end_str)
-        return _make_booking(date_val, court, start_str, end_str, dur)
-    except Exception:
-        return None
-
-
-def _parse_text_blocks(soup) -> list:
-    """Last-resort: scan all text in the page for court/time patterns."""
-    bookings = []
-    text = soup.get_text('\n')
-    lines = text.split('\n')
-    date_val = None
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        d = _extract_date(line)
-        if d:
-            date_val = d
-            continue
-        if date_val:
-            start_str, end_str = _extract_time_range(line)
-            court = _extract_court_name(line)
-            if start_str != 'TBD' and court:
-                dur = _duration_minutes(start_str, end_str)
-                bookings.append(_make_booking(date_val, court, start_str, end_str, dur))
-    return bookings
-
-
-# ── Parsing helpers ───────────────────────────────────────────────────────────
-
-_DATE_PATTERNS = [
-    ('%m/%d/%Y', r'\d{1,2}/\d{1,2}/\d{4}'),
-    ('%Y-%m-%d', r'\d{4}-\d{2}-\d{2}'),
-    ('%B %d, %Y', r'[A-Z][a-z]+ \d{1,2}, \d{4}'),
-    ('%b %d, %Y',  r'[A-Z][a-z]{2} \d{1,2}, \d{4}'),
-    ('%m/%d/%y',  r'\d{1,2}/\d{1,2}/\d{2}'),
-]
-
-_TIME_RE = re.compile(r'\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)', re.IGNORECASE)
-_COURT_RE = re.compile(r'(?:Court|Ct\.?)\s*\d+', re.IGNORECASE)
-
-
-def _extract_date(text: str):
-    for fmt, pattern in _DATE_PATTERNS:
-        m = re.search(pattern, text)
-        if m:
-            try:
-                return datetime.strptime(m.group(), fmt).date()
-            except ValueError:
-                continue
-    return None
-
-
-def _extract_time_range(text: str):
-    times = _TIME_RE.findall(text)
-    start = times[0].strip() if len(times) >= 1 else 'TBD'
-    end   = times[1].strip() if len(times) >= 2 else 'TBD'
-    return start, end
-
-
-def _extract_court_name(text: str) -> str:
-    m = _COURT_RE.search(text)
-    return m.group().strip() if m else ''
-
-
-def _duration_minutes(start_str: str, end_str: str) -> int:
-    if start_str == 'TBD' or end_str == 'TBD':
-        return 0
-    for fmt in ('%I:%M %p', '%I:%M%p', '%I:%M %P', '%I:%M%P'):
-        try:
-            t1 = datetime.strptime(start_str.upper().replace('.', ''), fmt)
-            t2 = datetime.strptime(end_str.upper().replace('.', ''), fmt)
-            return int((t2 - t1).total_seconds() / 60)
-        except ValueError:
-            continue
-    return 0
-
-
-def _to_24h(time_str: str) -> str:
-    """Convert '6:30 AM' → '06:30'."""
-    for fmt in ('%I:%M %p', '%I:%M%p'):
-        try:
-            return datetime.strptime(time_str.upper().replace('.', ''), fmt).strftime('%H:%M')
-        except ValueError:
-            continue
-    return time_str  # return as-is if unparseable
-
-
-def _make_booking(date_val, court_name: str, start_str: str, end_str: str, dur: int) -> dict:
-    return {
-        'date': date_val,
-        'court_name': court_name,
-        'start_time': start_str,
-        'end_time': end_str,
-        'start_time_24': _to_24h(start_str),
-        'end_time_24': _to_24h(end_str),
-        'duration_minutes': dur,
-        'suggested_cost': suggest_cost(dur),
-    }
+    return sorted(unique, key=lambda x: (x['date_str'], x['start_time']))

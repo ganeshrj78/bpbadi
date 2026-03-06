@@ -576,9 +576,10 @@ class ExternalIntegration(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)  # e.g. 'ezfacility'
     # Sensitive columns — values encrypted by _encrypt()/_decrypt() helpers
-    _url_enc      = db.Column('url',      db.Text, nullable=True)
-    _username_enc = db.Column('username', db.Text, nullable=True)
-    _password_enc = db.Column('password', db.Text, nullable=True)
+    _url_enc      = db.Column('url',            db.Text, nullable=True)
+    _username_enc = db.Column('username',        db.Text, nullable=True)
+    _password_enc = db.Column('password',        db.Text, nullable=True)
+    _cookie_enc   = db.Column('session_cookie',  db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -607,6 +608,14 @@ class ExternalIntegration(db.Model):
     @password.setter
     def password(self, value: str):
         self._password_enc = _encrypt(value)
+
+    @property
+    def session_cookie(self) -> str:
+        return _decrypt(self._cookie_enc)
+
+    @session_cookie.setter
+    def session_cookie(self, value: str):
+        self._cookie_enc = _encrypt(value)
 
     # ── Convenience class methods ─────────────────────────────────────────────
 
