@@ -35,10 +35,14 @@ def make_driver():
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--window-size=1400,900")
-    # Run headless on Render (no display server available)
+    # Run headless on Render with memory optimisations
     if os.environ.get("RENDER"):
         opts.add_argument("--headless=new")
         opts.add_argument("--disable-gpu")
+        opts.add_argument("--disable-extensions")
+        opts.add_argument("--disable-images")
+        opts.add_argument("--blink-settings=imagesEnabled=false")
+        opts.add_argument("--js-flags=--max-old-space-size=128")
     return webdriver.Chrome(options=opts)
 
 
