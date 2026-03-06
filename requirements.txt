@@ -14,3 +14,4 @@ cryptography
 requests==2.31.0
 beautifulsoup4==4.12.3
 playwright>=1.40.0
+browser-cookie3>=0.19.1

@@ -86,7 +86,7 @@
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Attendees</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Birdie</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Total Charged</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Refunds</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider whitespace-normal leading-tight">Refund /<br>Fill In</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Credits</th>
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                 </tr>
@@ -122,8 +122,18 @@
                         {% if s.birdie > 0 %}${{ "%.2f"|format(s.birdie) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-right font-semibold text-wimbledon-purple">${{ "%.2f"|format(s.collection) }}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-red-600">
-                        {% if s.refunds > 0 %}-${{ "%.2f"|format(s.refunds) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm">
+                        {% if s.refunds > 0 or s.fillin > 0 %}
+                        <span class="flex flex-col items-end leading-tight">
+                            {% if s.refunds > 0 %}
+                            <span class="text-xs text-gray-500 flex flex-col items-end leading-tight">
+                                <span>-${{ "%.2f"|format(s.refunds) }}</span>
+                                <span>settled</span>
+                            </span>
+                            {% endif %}
+                            {% if s.fillin > 0 %}<span class="text-sm font-bold text-blue-600">+${{ "%.2f"|format(s.fillin) }}</span>{% endif %}
+                        </span>
+                        {% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-blue-600 font-medium">
                         {% if s.credits > 0 %}${{ "%.2f"|format(s.credits) }}{% else %}<span class="text-gray-300">—</span>{% endif %}

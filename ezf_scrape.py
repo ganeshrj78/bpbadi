@@ -30,27 +30,23 @@ def suggest_cost(mins):
 def make_browser(playwright):
     browserless_url = os.environ.get("BROWSERLESS_URL", "").strip()
     if browserless_url:
+        if 'stealth' not in browserless_url:
+            sep = '&' if '?' in browserless_url else '?'
+            browserless_url = f"{browserless_url}{sep}stealth=true"
         base = browserless_url.split('?')[0]
-        has_token = 'token=' in browserless_url
-        print(f"[DEBUG] BROWSERLESS_URL found. Base: {base} | Token present: {has_token}", flush=True)
-        try:
-            print(f"[DEBUG] Calling playwright.chromium.connect() ...", flush=True)
-            browser = playwright.chromium.connect(browserless_url)
-            print(f"[DEBUG] Connected! Browser version: {browser.version}", flush=True)
-            return browser
-        except Exception as e:
-            print(f"[DEBUG] connect() failed: {type(e).__name__}: {e}", flush=True)
-            raise
+        print(f"[DEBUG] Connecting to Browserless (stealth): {base}", flush=True)
+        browser = playwright.chromium.connect(browserless_url)
+        print(f"[DEBUG] Connected! Browser version: {browser.version}", flush=True)
+        return browser
     else:
         print(f"[DEBUG] BROWSERLESS_URL not set — using local Chromium", flush=True)
-        return playwright.chromium.launch(headless=bool(os.environ.get("RENDER")))
+        return playwright.chromium.launch(headless=True)
 
 
 def login(page, context, username, password):
     cookie_str = os.environ.get("RF_COOKIE", "").strip()
 
     if cookie_str:
-        # Inject saved session cookies — bypasses reCAPTCHA entirely
         print(f"  Using saved session cookie ({len(cookie_str)} chars)", flush=True)
         cookies = []
         for part in cookie_str.split(';'):
@@ -62,28 +58,34 @@ def login(page, context, username, password):
         context.add_cookies(cookies)
         page.goto(SCHEDULE_URL, timeout=30000)
         page.wait_for_load_state('networkidle', timeout=15000)
-        if 'login' in page.url.lower():
-            print("  Session cookie expired — falling back to password login", flush=True)
-            cookie_str = None  # fall through to password login
-        else:
+        if 'login' not in page.url.lower():
             print(f"  Cookie login success → {page.url}", flush=True)
             return
+        print("  Session cookie expired — falling back to password login", flush=True)
 
-    # Password login (reCAPTCHA may block this on production)
     print(f"  Password login: username='{username[:3]}***'", flush=True)
     page.goto(LOGIN_URL, timeout=30000)
     page.wait_for_load_state('networkidle', timeout=15000)
     page.fill("input[name='Username']", username)
     page.fill("input[name='Password']", password)
     page.click("button[type='submit']")
-    page.wait_for_load_state('networkidle', timeout=30000)
+    try:
+        page.wait_for_url(lambda url: 'login' not in url.lower(), timeout=30000)
+    except Exception:
+        pass
+
     print(f"  After submit URL: {page.url}", flush=True)
 
-    if LOGIN_URL in page.url:
-        print("  ERROR: Login failed — reCAPTCHA block or wrong credentials", flush=True)
+    if 'login' in page.url.lower():
+        try:
+            shot_path = os.path.join(os.path.dirname(__file__), 'instance', 'login_fail.png')
+            page.screenshot(path=shot_path)
+        except Exception:
+            pass
+        print("  ERROR: Login failed — check credentials or reCAPTCHA", flush=True)
         sys.exit(1)
 
-    print(f"  Password login success → {page.url}", flush=True)
+    print(f"  Login success → {page.url}", flush=True)
 
 
 def get_week_dates(page):

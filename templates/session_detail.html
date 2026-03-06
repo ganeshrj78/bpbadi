@@ -371,7 +371,7 @@
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Session Cost</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Extra</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Refund</th>
+                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider whitespace-normal leading-tight">Refund /<br>Fill In</th>
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Payment</th>
                     <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Amount</th>
                     <th class="px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Comments</th>
@@ -490,6 +490,9 @@
                             class="w-20 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
+                        {% if current_status == 'FILLIN' %}
+                        <span class="text-sm font-bold text-blue-600">+${{ "%.2f"|format(owed) }}</span>
+                        {% else %}
                         {% set r = (refund_by_player | default({})).get(player.id) %}
                         {% if r %}
                             {% if r.status == 'pending' %}
@@ -504,6 +507,7 @@
                             {% endif %}
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
+                        {% endif %}
                         {% endif %}
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-center">

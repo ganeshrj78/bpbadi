@@ -1126,11 +1126,14 @@ def sessions():
 
     # Compute total charges per player in Python (no extra queries)
     player_charges = {}
+    player_fillin_amount = {}
     for att in all_chargeable_att:
         pid = att.player_id
         costs = session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
         cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
         player_charges[pid] = player_charges.get(pid, 0.0) + costs[cat]
+        if att.status == 'FILLIN':
+            player_fillin_amount[pid] = player_fillin_amount.get(pid, 0.0) + costs[cat]
 
     # Build player_stats (no per-player DB calls)
     player_stats = {}
@@ -1143,7 +1146,8 @@ def sessions():
             'total_payments': payments,
             'pending_refunds': refund_data['pending'],
             'pending_refund_amount': refund_data['pending_amount'],
-            'total_refunded': refund_data['refunded']
+            'total_refunded': refund_data['refunded'],
+            'fillin_amount': round(player_fillin_amount.get(player.id, 0.0), 2)
         }
 
     # Sort each player group: participating first (any active session YES/FILLIN/etc.), then NP — both sub-groups sorted by name
@@ -1233,10 +1237,26 @@ def sessions_by_month(month_key):
         db.extract('month', Session.date) == month
     ).order_by(Session.date.asc()).all()
 
+    # Batch-fetch fillin attendances for all sessions in the month
+    session_ids = [s.id for s in month_sessions]
+    fillin_atts = Attendance.query.filter(
+        Attendance.session_id.in_(session_ids),
+        Attendance.status == 'FILLIN'
+    ).all() if session_ids else []
+    fillin_by_session = {}
+    for att in fillin_atts:
+        fillin_by_session.setdefault(att.session_id, []).append(att)
+
     session_stats = []
     for sess in month_sessions:
         start_time, end_time = sess.get_time_range()
         courts = sess.courts.all()
+        # Compute fillin total for this session
+        cost_reg = sess.get_cost_per_regular_player()
+        fillin_total = 0.0
+        for att in fillin_by_session.get(sess.id, []):
+            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+            fillin_total += 11.0 if cat == 'kid' else cost_reg
         session_stats.append({
             'session': sess,
             'start_time': start_time,
@@ -1245,6 +1265,7 @@ def sessions_by_month(month_key):
             'total_cost': sess.get_total_cost(),
             'collection': sess.get_total_collection(),
             'refunds': sess.get_total_refunds(),
+            'fillin': round(fillin_total, 2),
             'birdie': sess.get_birdie_cost_total(),
             'credits': sess.credits or 0,
             'courts': [{'name': c.name, 'start_time': c.start_time,
@@ -1256,6 +1277,7 @@ def sessions_by_month(month_key):
         'sessions': len(month_sessions),
         'collection': sum(s['collection'] for s in session_stats),
         'refunds': sum(s['refunds'] for s in session_stats),
+        'fillin': sum(s['fillin'] for s in session_stats),
         'birdie': sum(s['birdie'] for s in session_stats),
         'credits': sum(s['credits'] for s in session_stats),
     }
@@ -2693,11 +2715,14 @@ def ezfacility_settings():
     stored_username = rec.username       if rec else ''
     has_credentials = bool(rec and rec.username and rec._password_enc)
     has_cookie      = bool(rec and rec._cookie_enc)
+    cookie_val      = (rec.session_cookie if rec else '') or ''
     return render_template('ezfacility_settings.html',
                            has_credentials=has_credentials,
                            stored_username=stored_username,
                            stored_url=stored_url,
-                           has_cookie=has_cookie)
+                           has_cookie=has_cookie,
+                           has_session_cookie=bool(cookie_val),
+                           session_cookie_len=len(cookie_val))
 
 
 @app.route('/ezfacility/sync')
@@ -2787,7 +2812,11 @@ def api_ezfacility_import_browser_cookies():
     pw_cookies = [{'name': c.name, 'value': c.value, 'domain': domain, 'path': '/'} for c in cookies]
     try:
         with sync_playwright() as pw:
-            browser_pw = pw.chromium.launch(headless=True, args=['--no-sandbox'])
+            browserless_url = os.environ.get('BROWSERLESS_URL', '').strip()
+            if browserless_url:
+                browser_pw = pw.chromium.connect(browserless_url)
+            else:
+                browser_pw = pw.chromium.launch(headless=True, args=['--no-sandbox'])
             ctx = browser_pw.new_context()
             ctx.add_cookies(pw_cookies)
             page = ctx.new_page()
@@ -2847,7 +2876,8 @@ def api_ezfacility_fetch_bookings():
         app.logger.info(f'ezf_scrape stdout: {proc.stdout[-3000:]}')
         if proc.returncode != 0:
             app.logger.error(f'ezf_scrape stderr: {proc.stderr[-2000:]}')
-            return jsonify({'success': False, 'error': f'Scraper exited with error. Check that Chrome is installed.'})
+            err_detail = (proc.stderr or proc.stdout or 'no output')[-500:]
+            return jsonify({'success': False, 'error': f'Scraper failed: {err_detail}'})
     except subprocess.TimeoutExpired:
         return jsonify({'success': False, 'error': 'Scraper timed out (3 min). Try fewer dates.'})
     except Exception as e:

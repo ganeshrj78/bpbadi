@@ -258,8 +258,8 @@
                     <th class="px-2 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[70px]">
                         Status
                     </th>
-                    <th class="px-2 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[80px]">
-                        Refund
+                    <th class="px-2 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[80px] whitespace-normal leading-tight">
+                        Refund /<br>Fill In
                     </th>
                     <th class="px-2 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[160px]">
                         Comments
@@ -429,6 +429,8 @@
                             <span>-${{ "%.2f"|format(stats.total_refunded) }}</span>
                             <span>settled</span>
                         </span>
+                        {% elif stats.fillin_amount %}
+                        <span class="text-sm font-bold text-blue-600">+${{ "%.2f"|format(stats.fillin_amount) }}</span>
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
                         {% endif %}
@@ -612,6 +614,8 @@
                             <span>-${{ "%.2f"|format(stats.total_refunded) }}</span>
                             <span>settled</span>
                         </span>
+                        {% elif stats.fillin_amount %}
+                        <span class="text-sm font-bold text-blue-600">+${{ "%.2f"|format(stats.fillin_amount) }}</span>
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
                         {% endif %}
@@ -795,6 +799,8 @@
                             <span>-${{ "%.2f"|format(stats.total_refunded) }}</span>
                             <span>settled</span>
                         </span>
+                        {% elif stats.fillin_amount %}
+                        <span class="text-sm font-bold text-blue-600">+${{ "%.2f"|format(stats.fillin_amount) }}</span>
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
                         {% endif %}
