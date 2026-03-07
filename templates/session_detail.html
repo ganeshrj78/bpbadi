@@ -270,39 +270,93 @@
 {% endif %}
 
 <!-- Courts Line Items -->
-{% if session.courts.count() > 0 %}
-<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 mb-6 overflow-hidden">
-    <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white">
+<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 mb-6 overflow-hidden" x-data="courtEditor()">
+    <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white flex items-center justify-between">
         <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
             <svg class="w-5 h-5 mr-2 text-wimbledon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
             </svg>
             Court Reservations
         </h2>
+        <button @click="addCourt()" class="px-3 py-1.5 bg-wimbledon-green text-white rounded-lg text-xs font-bold hover:bg-wimbledon-green/90 transition-all flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Add Court
+        </button>
     </div>
+    {% if session.courts.count() > 0 %}
     <div class="divide-y divide-gray-100">
         {% for court in session.courts.all() %}
-        <div class="px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div class="w-10 h-10 {% if court.court_type == 'adhoc' %}bg-purple-100{% else %}bg-wimbledon-purple/10{% endif %} rounded-lg flex items-center justify-center">
-                    <span class="{% if court.court_type == 'adhoc' %}text-purple-600{% else %}text-wimbledon-purple{% endif %} font-bold">{{ loop.index }}</span>
-                </div>
-                <div>
-                    <div class="font-medium text-gray-800 flex items-center gap-2">
-                        {{ court.name }}
-                        <span class="text-xs px-2 py-0.5 rounded-full {% if court.court_type == 'adhoc' %}bg-purple-100 text-purple-700{% else %}bg-green-100 text-green-700{% endif %}">
-                            {{ court.court_type|capitalize }}
-                        </span>
+        <div class="px-6 py-4 flex items-center justify-between gap-3" x-data="{editing: false}">
+            <template x-if="!editing">
+                <div class="flex items-center justify-between w-full">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 {% if court.court_type == 'adhoc' %}bg-purple-100{% else %}bg-wimbledon-purple/10{% endif %} rounded-lg flex items-center justify-center">
+                            <span class="{% if court.court_type == 'adhoc' %}text-purple-600{% else %}text-wimbledon-purple{% endif %} font-bold">{{ loop.index }}</span>
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-800 flex items-center gap-2">
+                                {{ court.name }}
+                                <span class="text-xs px-2 py-0.5 rounded-full {% if court.court_type == 'adhoc' %}bg-purple-100 text-purple-700{% else %}bg-green-100 text-green-700{% endif %}">
+                                    {{ court.court_type|capitalize }}
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-500">{{ court.start_time }} - {{ court.end_time }}</div>
+                        </div>
                     </div>
-                    <div class="text-sm text-gray-500">{{ court.start_time }} - {{ court.end_time }}</div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-lg font-bold {% if court.court_type == 'adhoc' %}text-purple-600{% else %}text-wimbledon-purple{% endif %}">${{ "%.2f"|format(court.cost) }}</div>
+                        <button @click="editing = true" class="p-1.5 text-gray-400 hover:text-wimbledon-purple rounded-lg hover:bg-gray-100 transition-all" title="Edit court">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <div class="text-lg font-bold {% if court.court_type == 'adhoc' %}text-purple-600{% else %}text-wimbledon-purple{% endif %}">${{ "%.2f"|format(court.cost) }}</div>
+            </template>
+            <template x-if="editing">
+                <form class="flex flex-wrap items-end gap-2 w-full" @submit.prevent="saveCourt({{ court.id }}, $event.target); editing = false;">
+                    <div class="flex-1 min-w-[100px]">
+                        <label class="text-[10px] text-gray-400 uppercase font-bold">Name</label>
+                        <input type="text" name="name" value="{{ court.name }}" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                    </div>
+                    <div class="w-24">
+                        <label class="text-[10px] text-gray-400 uppercase font-bold">Type</label>
+                        <select name="court_type" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                            <option value="regular" {% if court.court_type == 'regular' %}selected{% endif %}>Regular</option>
+                            <option value="adhoc" {% if court.court_type == 'adhoc' %}selected{% endif %}>Adhoc</option>
+                        </select>
+                    </div>
+                    <div class="w-24">
+                        <label class="text-[10px] text-gray-400 uppercase font-bold">Start</label>
+                        <input type="text" name="start_time" value="{{ court.start_time }}" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                    </div>
+                    <div class="w-24">
+                        <label class="text-[10px] text-gray-400 uppercase font-bold">End</label>
+                        <input type="text" name="end_time" value="{{ court.end_time }}" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                    </div>
+                    <div class="w-20">
+                        <label class="text-[10px] text-gray-400 uppercase font-bold">Cost</label>
+                        <input type="number" name="cost" step="0.01" value="{{ court.cost }}" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                    </div>
+                    <div class="flex gap-1">
+                        <button type="submit" class="p-1.5 bg-wimbledon-green text-white rounded-lg hover:bg-wimbledon-green/90" title="Save">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        </button>
+                        <button type="button" @click="editing = false" class="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300" title="Cancel">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                        <button type="button" @click="if(confirm('Delete this court?')) deleteCourt({{ court.id }})" class="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </form>
+            </template>
         </div>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="px-6 py-8 text-center text-gray-400 text-sm">No courts added yet. Click "Add Court" above.</div>
+    {% endif %}
+    <div x-show="courtMsg" x-cloak class="px-6 py-3 text-sm" :class="courtOk ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'" x-text="courtMsg"></div>
 </div>
-{% endif %}
 
 {% if session.notes %}
 <div class="bg-gradient-to-r from-wimbledon-gold/10 to-wimbledon-cream border-2 border-wimbledon-gold/40 rounded-2xl p-5 mb-8">
@@ -605,6 +659,7 @@
 
 {% block scripts %}
 <script>
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
 const SESSION_ID = {{ session.id }};
 const STANDBY_PLAYERS = {{ standby_players | tojson }};
 const BIRDIE_COST = {{ session.birdie_cost or 0 }};
@@ -911,6 +966,50 @@ function updateComments(playerId, sessionId, comments) {
         console.error('Error:', error);
         alert('Failed to update comments');
     });
+}
+
+function courtEditor() {
+    return {
+        courtMsg: '',
+        courtOk: false,
+        async saveCourt(courtId, form) {
+            const data = Object.fromEntries(new FormData(form));
+            data.cost = parseFloat(data.cost);
+            try {
+                const resp = await fetch(`/api/court/${courtId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+                    body: JSON.stringify(data)
+                });
+                const result = await resp.json();
+                if (result.success) location.reload();
+                else { this.courtOk = false; this.courtMsg = 'Error: ' + result.error; }
+            } catch(e) { this.courtOk = false; this.courtMsg = 'Network error.'; }
+        },
+        async deleteCourt(courtId) {
+            try {
+                const resp = await fetch(`/api/court/${courtId}/delete`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': CSRF_TOKEN}
+                });
+                const result = await resp.json();
+                if (result.success) location.reload();
+                else { this.courtOk = false; this.courtMsg = 'Error: ' + result.error; }
+            } catch(e) { this.courtOk = false; this.courtMsg = 'Network error.'; }
+        },
+        async addCourt() {
+            try {
+                const resp = await fetch(`/api/session/${SESSION_ID}/court`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+                    body: JSON.stringify({})
+                });
+                const result = await resp.json();
+                if (result.success) location.reload();
+                else { this.courtOk = false; this.courtMsg = 'Error: ' + result.error; }
+            } catch(e) { this.courtOk = false; this.courtMsg = 'Network error.'; }
+        }
+    };
 }
 </script>
 {% endblock %}

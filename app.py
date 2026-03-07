@@ -4,6 +4,7 @@ from datetime import datetime, date
 from werkzeug.utils import secure_filename
 import os
 import uuid
+import hashlib
 import logging
 from collections import defaultdict
 from logging.handlers import RotatingFileHandler
@@ -1656,6 +1657,64 @@ def bulk_delete_sessions():
     return redirect(url_for('sessions'))
 
 
+@app.route('/api/court/<int:court_id>', methods=['POST'])
+@csrf.exempt
+@admin_required
+def api_update_court(court_id):
+    """Update a single court's fields inline from session detail."""
+    court = Court.query.get_or_404(court_id)
+    data = request.get_json()
+
+    if 'name' in data:
+        court.name = data['name']
+    if 'court_type' in data:
+        court.court_type = data['court_type']
+    if 'cost' in data:
+        court.cost = float(data['cost'])
+    if 'start_time' in data:
+        court.start_time = data['start_time']
+    if 'end_time' in data:
+        court.end_time = data['end_time']
+
+    db.session.commit()
+    clear_session_cache()
+    return jsonify({'success': True, 'court': court.to_dict()})
+
+
+@app.route('/api/session/<int:session_id>/court', methods=['POST'])
+@csrf.exempt
+@admin_required
+def api_add_court(session_id):
+    """Add a new court to a session."""
+    sess = Session.query.get_or_404(session_id)
+    data = request.get_json()
+
+    court = Court(
+        session_id=session_id,
+        name=data.get('name', f'Court {sess.courts.count() + 1}'),
+        court_type=data.get('court_type', 'regular'),
+        cost=float(data.get('cost', 105)),
+        start_time=data.get('start_time', '6:30 AM'),
+        end_time=data.get('end_time', '9:30 AM')
+    )
+    db.session.add(court)
+    db.session.commit()
+    clear_session_cache()
+    return jsonify({'success': True, 'court': court.to_dict()})
+
+
+@app.route('/api/court/<int:court_id>/delete', methods=['POST'])
+@csrf.exempt
+@admin_required
+def api_delete_court(court_id):
+    """Delete a court from a session."""
+    court = Court.query.get_or_404(court_id)
+    db.session.delete(court)
+    db.session.commit()
+    clear_session_cache()
+    return jsonify({'success': True})
+
+
 @app.route('/api/bulk-assign-courts', methods=['POST'])
 @csrf.exempt
 @admin_required
@@ -2780,13 +2839,17 @@ def ezfacility_settings():
     has_credentials = bool(rec and rec.username and rec._password_enc)
     has_cookie      = bool(rec and rec._cookie_enc)
     cookie_val      = (rec.session_cookie if rec else '') or ''
+    bookmarklet_token = hashlib.sha256(app.config['SECRET_KEY'].encode()).hexdigest()[:16]
+    current_month = date.today().strftime('%Y-%m')
     return render_template('ezfacility_settings.html',
+                           current_month=current_month,
                            has_credentials=has_credentials,
                            stored_username=stored_username,
                            stored_url=stored_url,
                            has_cookie=has_cookie,
                            has_session_cookie=bool(cookie_val),
-                           session_cookie_len=len(cookie_val))
+                           session_cookie_len=len(cookie_val),
+                           bookmarklet_token=bookmarklet_token)
 
 
 @app.route('/ezfacility/sync')
@@ -2900,6 +2963,98 @@ def api_ezfacility_import_browser_cookies():
     db.session.commit()
     return jsonify({'success': True,
                     'message': f'Connected via {browser_used} — session verified and saved.'})
+
+
+@app.route('/api/ezfacility/paste-cookie', methods=['POST', 'OPTIONS'])
+@csrf.exempt
+def api_ezfacility_paste_cookie():
+    """Accept a cookie string (from bookmarklet or manual paste), verify, and save.
+    Auth: either admin session (from settings page) or token param (from bookmarklet).
+    """
+    cors_origin = 'https://royalbadminton.ezfacility.com'
+
+    def cors_response(data, status=200):
+        resp = jsonify(data)
+        resp.status_code = status
+        resp.headers['Access-Control-Allow-Origin'] = cors_origin
+        return resp
+
+    # CORS preflight for bookmarklet (runs on ezfacility.com domain)
+    if request.method == 'OPTIONS':
+        resp = app.make_default_options_response()
+        resp.headers['Access-Control-Allow-Origin'] = cors_origin
+        resp.headers['Access-Control-Allow-Methods'] = 'POST'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return resp
+
+    data = request.get_json(silent=True) or {}
+
+    # Auth check: admin session OR valid token
+    token = request.args.get('token') or data.get('token') or ''
+    expected_token = hashlib.sha256(app.config['SECRET_KEY'].encode()).hexdigest()[:16]
+    is_admin = session.get('user_type') in ('admin', 'player_admin')
+    if not is_admin and token != expected_token:
+        return cors_response({'success': False, 'error': 'Unauthorized'}, 401)
+
+    cookie_str = (data.get('cookie') or '').strip()
+    skip_verify = data.get('skip_verify', False)
+    if not cookie_str:
+        return cors_response({'success': False, 'error': 'No cookie provided.'})
+
+    domain = 'royalbadminton.ezfacility.com'
+    auth_names = {'EZSelfServiceAuth', '.ASPXAUTH', 'EZAuth'}
+
+    # Parse cookie string into name=value pairs
+    pairs = []
+    for part in cookie_str.split(';'):
+        part = part.strip()
+        if '=' in part:
+            name, value = part.split('=', 1)
+            pairs.append((name.strip(), value.strip()))
+
+    # If no name=value pairs found, treat the whole string as an .ASPXAUTH value
+    if not pairs and cookie_str:
+        pairs = [('.ASPXAUTH', cookie_str)]
+
+    if not pairs:
+        return cors_response({'success': False, 'error': 'No cookie provided.'})
+
+    if not skip_verify:
+        has_auth = any(name in auth_names for name, _ in pairs)
+        if not has_auth and len(pairs) < 2:
+            return cors_response({'success': False, 'error':
+                f'No recognized auth cookie found (looked for: {", ".join(auth_names)}). '
+                f'Found: {", ".join(n for n, _ in pairs)}. '
+                'Try copying the full Cookie header from Network tab, or use "Save Without Verifying".'})
+
+        # Verify cookies via Playwright/Browserless
+        from playwright.sync_api import sync_playwright
+        pw_cookies = [{'name': n, 'value': v, 'domain': domain, 'path': '/'} for n, v in pairs]
+        try:
+            with sync_playwright() as pw:
+                browserless_url = os.environ.get('BROWSERLESS_URL', '').strip()
+                if browserless_url:
+                    browser_pw = pw.chromium.connect(browserless_url)
+                else:
+                    browser_pw = pw.chromium.launch(headless=True, args=['--no-sandbox'])
+                ctx = browser_pw.new_context()
+                ctx.add_cookies(pw_cookies)
+                page = ctx.new_page()
+                page.goto(f'https://{domain}/MySchedule', wait_until='networkidle', timeout=20000)
+                logged_in = '/login' not in page.url.lower()
+                browser_pw.close()
+        except Exception as e:
+            return cors_response({'success': False, 'error': f'Cookie verification failed: {e}'})
+
+        if not logged_in:
+            return cors_response({'success': False, 'error': 'Cookie is expired or invalid. Please log in to Royal Facility again.'})
+
+    # Save
+    normalized = '; '.join(f'{n}={v}' for n, v in pairs)
+    rec = ExternalIntegration.get_or_create(EZF_NAME)
+    rec.session_cookie = normalized
+    db.session.commit()
+    return cors_response({'success': True, 'message': 'Cookie verified and saved successfully.'})
 
 
 @app.route('/api/ezfacility/fetch-bookings', methods=['POST'])
