@@ -1186,7 +1186,9 @@ def sessions():
     kid_players = [p for p in all_players if p.category == 'kid']
 
     # Load pre-computed player stats from cache (60s TTL)
-    player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts = get_cached_player_stats()
+    _player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts = get_cached_player_stats()
+    # Shallow-copy so we can override refund/fillin with month-scoped values without mutating cache
+    player_stats = {pid: dict(stats) for pid, stats in _player_stats.items()}
 
     # Sort each player group: participating first (any active session YES/FILLIN/etc.), then NP — both sub-groups sorted by name
     def _is_participating(player_id):
@@ -1227,6 +1229,34 @@ def sessions():
             })
 
     session_birdie_map = {s.id: (s.birdie_cost or 0) for s in active_sessions}
+
+    # Scope refund/fillin amounts to active sessions only (clean slate each month)
+    # Fillin amounts: only from active sessions
+    month_fillin = {}
+    for att in all_attendances:
+        if att.status == 'FILLIN':
+            costs = active_session_costs.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
+            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+            month_fillin[att.player_id] = month_fillin.get(att.player_id, 0.0) + costs[cat]
+    # Refund amounts: only from active sessions
+    month_refund_pending = {}
+    month_refund_settled = {}
+    if active_session_ids:
+        month_refunds = DropoutRefund.query.filter(
+            DropoutRefund.session_id.in_(active_session_ids)
+        ).all()
+        for r in month_refunds:
+            pid = r.player_id
+            if r.status == 'pending':
+                month_refund_pending[pid] = month_refund_pending.get(pid, 0.0) + (r.refund_amount or 0)
+            elif r.status == 'processed':
+                month_refund_settled[pid] = month_refund_settled.get(pid, 0.0) + (r.refund_amount or 0)
+    # Override all-time values with month-scoped values
+    for pid in player_stats:
+        player_stats[pid]['fillin_amount'] = round(month_fillin.get(pid, 0.0), 2)
+        player_stats[pid]['pending_refund_amount'] = round(month_refund_pending.get(pid, 0.0), 2)
+        player_stats[pid]['total_refunded'] = round(month_refund_settled.get(pid, 0.0), 2)
+        player_stats[pid]['pending_refunds'] = 1 if pid in month_refund_pending else 0
 
     # Patch attendance_details for existing dropouts that have a pending DropoutRefund
     # (handles records created before payment_status='pending_refund' was added)
