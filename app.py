@@ -16,6 +16,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_caching import Cache
 from flask_migrate import Migrate
+from flask_compress import Compress
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -24,6 +25,9 @@ app.config.from_object(Config)
 app.config['CACHE_TYPE'] = 'SimpleCache'  # In-memory cache (use 'RedisCache' for production with Redis)
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
 cache = Cache(app)
+
+# Gzip compression — reduces HTML response size ~70% on slow Render free tier
+Compress(app)
 
 # CSRF Protection
 csrf = CSRFProtect(app)
@@ -271,6 +275,19 @@ def get_cached_player_stats():
             'fillin_amount': round(player_fillin_amount.get(player.id, 0.0), 2)
         }
     return player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts
+
+
+@cache.memoize(timeout=30)
+def get_cached_session_costs(session_id):
+    """Cache per-session cost rates — avoids repeated court/attendance queries per page load."""
+    sess = Session.query.get(session_id)
+    if not sess:
+        return {'regular': 0, 'adhoc': 0, 'kid': 11.0}
+    return {
+        'regular': sess.get_cost_per_regular_player(),
+        'adhoc':   sess.get_cost_per_adhoc_player(),
+        'kid':     sess.get_cost_per_kid(),
+    }
 
 
 def clear_session_cache():
@@ -1367,19 +1384,15 @@ def session_detail(id):
             attendance_records[player.id] = attendance
     db.session.commit()
 
-    # Calculate per-player session costs for bulk payment
+    # Calculate per-player session costs for bulk payment (cached rates)
+    session_costs = get_cached_session_costs(id)
     player_session_costs = {}
     for player in players:
         if player.is_active:
             att = attendance_records.get(player.id)
             if att and att.status in ['YES', 'DROPOUT', 'FILLIN']:
-                cat = att.category
-                if cat == 'kid':
-                    base = sess.get_cost_per_kid()
-                elif cat == 'adhoc':
-                    base = sess.get_cost_per_adhoc_player()
-                else:
-                    base = sess.get_cost_per_regular_player()
+                cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+                base = session_costs[cat]
                 player_session_costs[player.id] = round(base + (att.additional_cost or 0), 2)
             else:
                 player_session_costs[player.id] = 0

@@ -296,7 +296,7 @@
                                 class="w-3.5 h-3.5 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple cursor-pointer flex-shrink-0">
                             <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-2 hover:text-wimbledon-purple">
                                 {% if player.profile_photo %}
-                                <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
+                                <img loading="lazy" src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
                                 {% else %}
                                 <div class="w-8 h-8 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center text-white text-xs font-bold">
                                     {{ player.name[0] }}
@@ -481,7 +481,7 @@
                                 class="w-3.5 h-3.5 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple cursor-pointer flex-shrink-0">
                             <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-2 hover:text-wimbledon-purple">
                                 {% if player.profile_photo %}
-                                <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
+                                <img loading="lazy" src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
                                 {% else %}
                                 <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white text-xs font-bold">
                                     {{ player.name[0] }}
@@ -666,7 +666,7 @@
                                 class="w-3.5 h-3.5 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple cursor-pointer flex-shrink-0">
                             <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-2 hover:text-wimbledon-purple">
                                 {% if player.profile_photo %}
-                                <img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
+                                <img loading="lazy" src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
                                 {% else %}
                                 <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-xs font-bold">
                                     {{ player.name[0] }}

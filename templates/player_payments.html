@@ -45,7 +45,7 @@
             <div class="p-4 rounded-xl border {% if mp.get_balance() > 0 %}border-red-200 bg-red-50{% else %}border-green-200 bg-green-50{% endif %}">
                 <div class="flex items-center gap-3 mb-2">
                     {% if mp.profile_photo %}
-                    <img src="{{ url_for('static', filename='uploads/' + mp.profile_photo) }}" alt="{{ mp.name }}" class="w-10 h-10 rounded-full object-cover">
+                    <img loading="lazy" src="{{ url_for('static', filename='uploads/' + mp.profile_photo) }}" alt="{{ mp.name }}" class="w-10 h-10 rounded-full object-cover">
                     {% else %}
                     <div class="w-10 h-10 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center">
                         <span class="text-white font-bold text-sm">{{ mp.name[0] }}</span>

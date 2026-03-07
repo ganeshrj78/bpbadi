@@ -33,4 +33,4 @@ with app.app_context():
 PYEOF
 
 echo "Starting gunicorn..."
-exec gunicorn -w 1 --timeout 180 app:app
+exec gunicorn -w 1 --threads 2 --timeout 180 --preload app:app
