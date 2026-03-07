@@ -936,15 +936,21 @@
 <!-- JavaScript for attendance management -->
 <script>
 function sessionsMatrix() {
+    const _saved = JSON.parse(localStorage.getItem('bpbadi_sessions_filter') || '{}');
     return {
         selectedSessions: [],
         selectedPlayers: [],
         bulkPayMethod: 'Zelle',
-        paymentFilter: 'all',
-        searchQuery: '',
+        paymentFilter: _saved.paymentFilter || 'all',
+        searchQuery: _saved.searchQuery || '',
         showCourtsModal: false,
         bulkCourts: [{ name: 'Court 1', court_type: 'regular', cost: 105, hours: '3', start_time: '06:30' }],
         overwriteExisting: false,
+
+        init() {
+            this.$watch('paymentFilter', v => localStorage.setItem('bpbadi_sessions_filter', JSON.stringify({paymentFilter: v, searchQuery: this.searchQuery})));
+            this.$watch('searchQuery',   v => localStorage.setItem('bpbadi_sessions_filter', JSON.stringify({paymentFilter: this.paymentFilter, searchQuery: v})));
+        },
 
         async bulkMarkPayment(status) {
             if (this.selectedPlayers.length === 0) return;

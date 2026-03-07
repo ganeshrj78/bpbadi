@@ -10,6 +10,7 @@ from logging.handlers import RotatingFileHandler
 from config import Config
 from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, init_encryption
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -1346,11 +1347,11 @@ def session_detail(id):
     sess = Session.query.get_or_404(id)
     players = Player.query.order_by(Player.name).all()
 
-    # Get attendance for all players
+    # Get attendance for all players — joinedload player to avoid N+1
     attendance_map = {}
     category_map = {}
     attendance_records = {}  # Full attendance records for additional fields
-    for att in sess.attendances.all():
+    for att in Attendance.query.filter_by(session_id=id).options(joinedload(Attendance.player)).all():
         attendance_map[att.player_id] = att.status
         category_map[att.player_id] = att.category
         attendance_records[att.player_id] = att

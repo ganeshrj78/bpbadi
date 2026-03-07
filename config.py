@@ -22,3 +22,11 @@ class Config:
 
     # Environment detection
     IS_PRODUCTION = os.environ.get('RENDER') == 'true'
+
+    # Connection pool tuning — prevents stale connection errors after Render free tier sleep
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,   # test connection before use; reconnects transparently
+        'pool_recycle': 300,     # recycle connections every 5 min (before Render closes them)
+        'pool_size': 5,
+        'max_overflow': 2,
+    }
