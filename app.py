@@ -187,9 +187,95 @@ def get_cached_monthly_summary():
     return sorted(monthly_summary.items(), key=lambda x: x[0], reverse=True)
 
 
+@cache.memoize(timeout=60)
+def get_cached_player_stats():
+    """Compute all-time player balances, charges, refunds — cached 60s."""
+    all_sessions_all = Session.query.all()
+    all_courts_all = Court.query.all()
+    all_chargeable_att = Attendance.query.filter(
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
+    ).all()
+    payment_totals = db.session.query(
+        Payment.player_id,
+        func.sum(Payment.amount).label('total')
+    ).filter(Payment.amount > 0).group_by(Payment.player_id).all()
+    player_payments = {r.player_id: float(r.total or 0) for r in payment_totals}
+
+    refund_stats = db.session.query(
+        DropoutRefund.player_id,
+        func.count(DropoutRefund.id).filter(DropoutRefund.status == 'pending').label('pending_count'),
+        func.sum(DropoutRefund.refund_amount).filter(DropoutRefund.status == 'pending').label('pending_amount'),
+        func.sum(DropoutRefund.refund_amount).filter(DropoutRefund.status == 'processed').label('total_refunded')
+    ).group_by(DropoutRefund.player_id).all()
+    refund_map = {r.player_id: {
+        'pending': r.pending_count or 0,
+        'pending_amount': float(r.pending_amount or 0),
+        'refunded': r.total_refunded or 0
+    } for r in refund_stats}
+
+    court_cost_by_session = {}
+    for court in all_courts_all:
+        sid = court.session_id
+        if sid not in court_cost_by_session:
+            court_cost_by_session[sid] = {'regular': 0.0, 'adhoc': 0.0}
+        if court.court_type == 'adhoc':
+            court_cost_by_session[sid]['adhoc'] += court.cost
+        else:
+            court_cost_by_session[sid]['regular'] += court.cost
+
+    session_counts = {}
+    for att in all_chargeable_att:
+        if att.status in ('YES', 'DROPOUT'):
+            sid = att.session_id
+            if sid not in session_counts:
+                session_counts[sid] = {'regular': 0, 'adhoc': 0}
+            if att.category == 'adhoc':
+                session_counts[sid]['adhoc'] += 1
+            elif att.category == 'regular':
+                session_counts[sid]['regular'] += 1
+
+    session_birdie = {s.id: s.birdie_cost for s in all_sessions_all}
+    session_cost_map = {}
+    for s in all_sessions_all:
+        sid = s.id
+        courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
+        counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
+        birdie = session_birdie.get(sid, 0)
+        reg = round(courts['regular'] / counts['regular'] + birdie, 2) if counts['regular'] > 0 else 0
+        adhoc = round(courts['adhoc'] / counts['adhoc'] + birdie, 2) if counts['adhoc'] > 0 else 0
+        session_cost_map[sid] = {'regular': reg, 'adhoc': adhoc, 'kid': 11.0}
+
+    player_charges = {}
+    player_fillin_amount = {}
+    for att in all_chargeable_att:
+        pid = att.player_id
+        costs = session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
+        cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+        player_charges[pid] = player_charges.get(pid, 0.0) + costs[cat]
+        if att.status == 'FILLIN':
+            player_fillin_amount[pid] = player_fillin_amount.get(pid, 0.0) + costs[cat]
+
+    all_players = Player.query.filter_by(is_active=True, is_approved=True).all()
+    player_stats = {}
+    for player in all_players:
+        charges = round(player_charges.get(player.id, 0), 2)
+        payments = round(player_payments.get(player.id, 0), 2)
+        refund_data = refund_map.get(player.id, {'pending': 0, 'pending_amount': 0.0, 'refunded': 0})
+        player_stats[player.id] = {
+            'balance': round(charges - payments, 2),
+            'total_payments': payments,
+            'pending_refunds': refund_data['pending'],
+            'pending_refund_amount': refund_data['pending_amount'],
+            'total_refunded': refund_data['refunded'],
+            'fillin_amount': round(player_fillin_amount.get(player.id, 0.0), 2)
+        }
+    return player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts
+
+
 def clear_session_cache():
     """Clear session-related cache when data changes"""
     cache.delete_memoized(get_cached_monthly_summary)
+    cache.delete_memoized(get_cached_player_stats)
 
 
 # Master admin only decorator (for sensitive operations like promoting admins)
@@ -1062,93 +1148,8 @@ def sessions():
     adhoc_players = [p for p in all_players if p.category == 'adhoc']
     kid_players = [p for p in all_players if p.category == 'kid']
 
-    # Pre-compute player stats using batch queries (avoids N×M query explosion)
-    # 1. Refund totals
-    refund_stats = db.session.query(
-        DropoutRefund.player_id,
-        func.count(DropoutRefund.id).filter(DropoutRefund.status == 'pending').label('pending_count'),
-        func.sum(DropoutRefund.refund_amount).filter(DropoutRefund.status == 'pending').label('pending_amount'),
-        func.sum(DropoutRefund.refund_amount).filter(DropoutRefund.status == 'processed').label('total_refunded')
-    ).group_by(DropoutRefund.player_id).all()
-    refund_map = {r.player_id: {'pending': r.pending_count or 0, 'pending_amount': float(r.pending_amount or 0), 'refunded': r.total_refunded or 0} for r in refund_stats}
-
-    # 2. All sessions + courts in two queries (needed for all-time balance)
-    all_sessions_all = Session.query.all()
-    all_courts_all = Court.query.all()
-
-    # 3. All chargeable attendances (YES/DROPOUT/FILLIN) across all sessions
-    all_chargeable_att = Attendance.query.filter(
-        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
-    ).all()
-
-    # 4. Payment totals per player — exclude refund payments (negative) so balance
-    #    reflects actual cash received; refunds are tracked separately in refund_map
-    payment_totals = db.session.query(
-        Payment.player_id,
-        func.sum(Payment.amount).label('total')
-    ).filter(Payment.amount > 0).group_by(Payment.player_id).all()
-    player_payments = {r.player_id: float(r.total or 0) for r in payment_totals}
-
-    # Build court cost map: session_id -> {regular: X, adhoc: X}
-    court_cost_by_session = {}
-    for court in all_courts_all:
-        sid = court.session_id
-        if sid not in court_cost_by_session:
-            court_cost_by_session[sid] = {'regular': 0.0, 'adhoc': 0.0}
-        if court.court_type == 'adhoc':
-            court_cost_by_session[sid]['adhoc'] += court.cost
-        else:
-            court_cost_by_session[sid]['regular'] += court.cost
-
-    # Count YES+DROPOUT per session per category (FILLIN not counted in divisor)
-    session_counts = {}
-    for att in all_chargeable_att:
-        if att.status in ('YES', 'DROPOUT'):
-            sid = att.session_id
-            if sid not in session_counts:
-                session_counts[sid] = {'regular': 0, 'adhoc': 0}
-            if att.category == 'adhoc':
-                session_counts[sid]['adhoc'] += 1
-            elif att.category == 'regular':
-                session_counts[sid]['regular'] += 1
-
-    # Build per-session cost-per-player map
-    session_birdie = {s.id: s.birdie_cost for s in all_sessions_all}
-    session_cost_map = {}
-    for s in all_sessions_all:
-        sid = s.id
-        courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
-        counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
-        birdie = session_birdie.get(sid, 0)
-        reg = round(courts['regular'] / counts['regular'] + birdie, 2) if counts['regular'] > 0 else 0
-        adhoc = round(courts['adhoc'] / counts['adhoc'] + birdie, 2) if counts['adhoc'] > 0 else 0
-        session_cost_map[sid] = {'regular': reg, 'adhoc': adhoc, 'kid': 11.0}
-
-    # Compute total charges per player in Python (no extra queries)
-    player_charges = {}
-    player_fillin_amount = {}
-    for att in all_chargeable_att:
-        pid = att.player_id
-        costs = session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
-        cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
-        player_charges[pid] = player_charges.get(pid, 0.0) + costs[cat]
-        if att.status == 'FILLIN':
-            player_fillin_amount[pid] = player_fillin_amount.get(pid, 0.0) + costs[cat]
-
-    # Build player_stats (no per-player DB calls)
-    player_stats = {}
-    for player in all_players:
-        charges = round(player_charges.get(player.id, 0), 2)
-        payments = round(player_payments.get(player.id, 0), 2)
-        refund_data = refund_map.get(player.id, {'pending': 0, 'pending_amount': 0.0, 'refunded': 0})
-        player_stats[player.id] = {
-            'balance': round(charges - payments, 2),
-            'total_payments': payments,
-            'pending_refunds': refund_data['pending'],
-            'pending_refund_amount': refund_data['pending_amount'],
-            'total_refunded': refund_data['refunded'],
-            'fillin_amount': round(player_fillin_amount.get(player.id, 0.0), 2)
-        }
+    # Load pre-computed player stats from cache (60s TTL)
+    player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts = get_cached_player_stats()
 
     # Sort each player group: participating first (any active session YES/FILLIN/etc.), then NP — both sub-groups sorted by name
     def _is_participating(player_id):
