@@ -3,6 +3,7 @@
 venv/
 .venv/
 __pycache__/
+.jinja_cache/
 *.py[cod]
 *$py.class
 

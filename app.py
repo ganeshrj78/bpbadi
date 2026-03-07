@@ -21,6 +21,13 @@ from flask_compress import Compress
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Jinja2 bytecode caching — templates compiled once, reused across requests
+from jinja2 import FileSystemBytecodeCache
+_jinja_cache_dir = app.config.get('JINJA_BYTECODE_CACHE_DIR')
+if _jinja_cache_dir:
+    os.makedirs(_jinja_cache_dir, exist_ok=True)
+    app.jinja_env.bytecode_cache = FileSystemBytecodeCache(_jinja_cache_dir)
+
 # Caching Configuration
 app.config['CACHE_TYPE'] = 'SimpleCache'  # In-memory cache (use 'RedisCache' for production with Redis)
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
@@ -41,12 +48,24 @@ limiter = Limiter(
 )
 
 
-# Static file cache headers (1 week for assets)
+# Cache headers + ETag for all responses
 @app.after_request
 def add_cache_headers(response):
-    # Cache static files (CSS, JS, images) for 1 week
     if request.path.startswith('/static/'):
-        response.headers['Cache-Control'] = 'public, max-age=604800'  # 1 week
+        # Static files: cache 1 week
+        response.headers['Cache-Control'] = 'public, max-age=604800'
+    elif response.content_type and 'text/html' in response.content_type:
+        # HTML pages: allow browser conditional requests via ETag
+        import hashlib
+        if response.status_code == 200 and response.data:
+            etag = hashlib.md5(response.data).hexdigest()
+            response.headers['ETag'] = f'"{etag}"'
+            response.headers['Cache-Control'] = 'no-cache'  # always revalidate, but use ETag
+            # Check If-None-Match — return 304 if content unchanged
+            if_none_match = request.headers.get('If-None-Match')
+            if if_none_match and if_none_match.strip('"') == etag:
+                response.status_code = 304
+                response.data = b''
     return response
 
 # Logging Configuration

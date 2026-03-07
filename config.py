@@ -23,6 +23,9 @@ class Config:
     # Environment detection
     IS_PRODUCTION = os.environ.get('RENDER') == 'true'
 
+    # Jinja2 bytecode caching — compiles templates once, reuses on subsequent requests
+    JINJA_BYTECODE_CACHE_DIR = os.path.join(os.path.dirname(__file__), '.jinja_cache')
+
     # Connection pool tuning — prevents stale connection errors after Render free tier sleep
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,   # test connection before use; reconnects transparently
