@@ -91,23 +91,27 @@
                     <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for s in session_stats %}
-                <tr class="border-t border-wimbledon-gold/10 hover:bg-wimbledon-cream/40 transition-colors cursor-pointer {% if s.session.is_archived %}opacity-60{% endif %}"
-                    onclick="window.location='{{ url_for('session_detail', id=s.session.id) }}'">
+            {% for s in session_stats %}
+            <tbody x-data="{expanded: false}">
+                <tr class="border-t border-wimbledon-gold/10 hover:bg-wimbledon-cream/40 transition-colors {% if s.session.is_archived %}opacity-60{% endif %}">
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <a href="{{ url_for('session_detail', id=s.session.id) }}" class="flex items-center gap-3 group" onclick="event.stopPropagation()">
-                            <div class="w-12 h-12 gradient-primary rounded-xl flex flex-col items-center justify-center text-white shadow border border-wimbledon-gold/30 flex-shrink-0">
-                                <span class="text-lg font-bold leading-none">{{ s.session.date.strftime('%d') }}</span>
-                                <span class="text-[10px] uppercase opacity-80">{{ s.session.date.strftime('%a') }}</span>
-                            </div>
-                            <div>
-                                <div class="font-semibold text-gray-800 group-hover:text-wimbledon-purple transition-colors">{{ s.session.date.strftime('%B %d, %Y') }}</div>
-                                {% if s.session.notes %}
-                                <div class="text-xs text-gray-400 truncate max-w-[200px]">{{ s.session.notes }}</div>
-                                {% endif %}
-                            </div>
-                        </a>
+                        <div class="flex items-center gap-3">
+                            <button @click.stop="expanded = !expanded" class="text-gray-400 hover:text-wimbledon-purple transition-colors flex-shrink-0 p-1">
+                                <svg class="w-4 h-4 transition-transform" :class="expanded && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                            <a href="{{ url_for('session_detail', id=s.session.id) }}" class="flex items-center gap-3 group">
+                                <div class="w-12 h-12 gradient-primary rounded-xl flex flex-col items-center justify-center text-white shadow border border-wimbledon-gold/30 flex-shrink-0">
+                                    <span class="text-lg font-bold leading-none">{{ s.session.date.strftime('%d') }}</span>
+                                    <span class="text-[10px] uppercase opacity-80">{{ s.session.date.strftime('%a') }}</span>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-gray-800 group-hover:text-wimbledon-purple transition-colors">{{ s.session.date.strftime('%B %d, %Y') }}</div>
+                                    {% if s.session.notes %}
+                                    <div class="text-xs text-gray-400 truncate max-w-[200px]">{{ s.session.notes }}</div>
+                                    {% endif %}
+                                </div>
+                            </a>
+                        </div>
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{{ s.start_time }} – {{ s.end_time }}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">
@@ -146,8 +150,68 @@
                         {% endif %}
                     </td>
                 </tr>
-                {% endfor %}
+                <!-- Expanded court detail row -->
+                <tr x-show="expanded" x-cloak class="border-t border-gray-100 bg-gray-50/50"
+                    x-data="sessionExpand_{{ s.session.id }}()" x-init="init()">
+                    <td colspan="9" class="px-6 py-4">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                            <div class="bg-green-50 rounded-lg p-3 border border-green-200">
+                                <div class="text-[10px] font-bold text-green-600 uppercase tracking-wide">Regular Courts</div>
+                                <div class="text-lg font-bold text-green-700" x-text="regularCount"></div>
+                                <div class="text-xs text-green-600" x-text="'$' + regularCost.toFixed(2)"></div>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                                <div class="text-[10px] font-bold text-purple-600 uppercase tracking-wide">Adhoc Courts</div>
+                                <div class="text-lg font-bold text-purple-700" x-text="adhocCount"></div>
+                                <div class="text-xs text-purple-600" x-text="'$' + adhocCost.toFixed(2)"></div>
+                            </div>
+                            <div class="bg-wimbledon-purple/5 rounded-lg p-3 border border-wimbledon-purple/20">
+                                <div class="text-[10px] font-bold text-wimbledon-purple uppercase tracking-wide">Total Cost</div>
+                                <div class="text-lg font-bold text-wimbledon-purple" x-text="'$' + totalCost.toFixed(2)"></div>
+                            </div>
+                            <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                <div class="text-[10px] font-bold text-blue-600 uppercase tracking-wide">Credits</div>
+                                <div class="text-lg font-bold text-blue-700">${{ "%.2f"|format(s.credits) }}</div>
+                            </div>
+                            <div class="bg-wimbledon-gold/10 rounded-lg p-3 border border-wimbledon-gold/30">
+                                <div class="text-[10px] font-bold text-wimbledon-gold uppercase tracking-wide">Per Player</div>
+                                <div class="text-lg font-bold text-gray-800" x-text="'$' + perPlayer.toFixed(2)"></div>
+                                <div class="text-xs text-gray-500">court + birdie</div>
+                            </div>
+                        </div>
+                        <!-- Court list with inline edit -->
+                        <div class="space-y-2">
+                            <template x-for="(court, ci) in courts" :key="court.id">
+                                <div class="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-200 text-sm">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                                            :class="court.court_type === 'adhoc' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'"
+                                            x-text="court.court_type === 'adhoc' ? 'Adhoc' : 'Regular'"></span>
+                                        <span class="font-medium text-gray-800" x-text="court.name"></span>
+                                        <span class="text-gray-400 text-xs" x-text="court.start_time + ' – ' + court.end_time"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-gray-500">$</span>
+                                        <input type="number" step="0.01" :value="court.cost" @click.stop
+                                            @change="updateCourt(ci, {cost: parseFloat($event.target.value)})"
+                                            class="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green text-right">
+                                        <select @click.stop
+                                            @change="updateCourt(ci, {court_type: $event.target.value})"
+                                            class="text-xs border border-gray-300 rounded px-1 py-1 focus:outline-none bg-white">
+                                            <option value="regular" :selected="court.court_type === 'regular'">Regular</option>
+                                            <option value="adhoc" :selected="court.court_type === 'adhoc'">Adhoc</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="courts.length === 0">
+                                <div class="text-xs text-gray-400 italic">No courts added yet.</div>
+                            </template>
+                        </div>
+                    </td>
+                </tr>
             </tbody>
+            {% endfor %}
         </table>
     </div>
     {% else %}
@@ -267,6 +331,39 @@
 {% block scripts %}
 <script>
 const CSRF = document.querySelector('meta[name=csrf-token]').content;
+
+// Session expand components — reactive court editing
+{% for s in session_stats %}
+function sessionExpand_{{ s.session.id }}() {
+    return {
+        courts: {{ s.courts | tojson }},
+        credits: {{ s.credits }},
+        birdie: {{ s.birdie }},
+        nonKidCount: {{ s.non_kid_count }},
+        init() {},
+        get regularCost() { return this.courts.filter(c => c.court_type === 'regular').reduce((s, c) => s + c.cost, 0); },
+        get adhocCost() { return this.courts.filter(c => c.court_type === 'adhoc').reduce((s, c) => s + c.cost, 0); },
+        get regularCount() { return this.courts.filter(c => c.court_type === 'regular').length; },
+        get adhocCount() { return this.courts.filter(c => c.court_type === 'adhoc').length; },
+        get totalCost() { return this.regularCost + this.adhocCost; },
+        get perPlayer() {
+            if (this.nonKidCount === 0) return 0;
+            return (this.regularCost + this.credits) / this.nonKidCount + this.birdie;
+        },
+        async updateCourt(ci, changes) {
+            const court = this.courts[ci];
+            Object.assign(court, changes);
+            try {
+                await fetch('/api/court/' + court.id, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+                    body: JSON.stringify(changes)
+                });
+            } catch(e) { /* tiles already updated reactively */ }
+        }
+    };
+}
+{% endfor %}
 
 // Local courts per date injected from server
 const LOCAL_COURTS = {

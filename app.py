@@ -1326,18 +1326,29 @@ def sessions_by_month(month_key):
         for att in fillin_by_session.get(sess.id, []):
             cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
             fillin_total += 11.0 if cat == 'kid' else cost_reg
+        regular_courts = [c for c in courts if c.court_type == 'regular']
+        adhoc_courts = [c for c in courts if c.court_type == 'adhoc']
+        per_player = sess.get_cost_per_regular_player()
+        non_kid_count = sess.get_regular_player_count() + sess.get_adhoc_player_count()
         session_stats.append({
+            'per_player': per_player,
+            'non_kid_count': non_kid_count,
+            'birdie': sess.birdie_cost or 0,
             'session': sess,
             'start_time': start_time,
             'end_time': end_time,
             'attendees': sess.get_attendee_count(),
             'total_cost': sess.get_total_cost(),
+            'regular_cost': sum(c.cost for c in regular_courts),
+            'adhoc_cost': sum(c.cost for c in adhoc_courts),
+            'regular_count': len(regular_courts),
+            'adhoc_count': len(adhoc_courts),
             'collection': sess.get_total_collection(),
             'refunds': sess.get_total_refunds(),
             'fillin': round(fillin_total, 2),
             'birdie': sess.get_birdie_cost_total(),
             'credits': sess.credits or 0,
-            'courts': [{'name': c.name, 'start_time': c.start_time,
+            'courts': [{'id': c.id, 'name': c.name, 'start_time': c.start_time,
                         'end_time': c.end_time, 'cost': c.cost,
                         'court_type': c.court_type} for c in courts],
         })
