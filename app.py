@@ -265,9 +265,9 @@ def get_cached_player_stats():
         courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
         counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
         birdie = session_birdie.get(sid, 0)
-        reg = round(courts['regular'] / counts['regular'] + birdie, 2) if counts['regular'] > 0 else 0
-        adhoc = round(courts['adhoc'] / counts['adhoc'] + birdie, 2) if counts['adhoc'] > 0 else 0
-        session_cost_map[sid] = {'regular': reg, 'adhoc': adhoc, 'kid': 11.0}
+        non_kid_count = counts['regular'] + counts['adhoc']
+        per_player = round((courts['regular'] + (s.credits or 0)) / non_kid_count + birdie, 2) if non_kid_count > 0 else 0
+        session_cost_map[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
 
     player_charges = {}
     player_fillin_amount = {}
@@ -1207,7 +1207,7 @@ def sessions():
     for s in active_sessions:
         sid = s.id
         courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
-        total_court_cost = courts['regular'] + courts['adhoc']
+        total_court_cost = courts['regular']
         counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
         non_kid_count = counts['regular'] + counts['adhoc']
         credits = s.credits or 0
