@@ -229,25 +229,6 @@
                 class="p-3 border rounded-xl text-sm" x-text="pasteResult">
             </div>
         </div>
-
-        <!-- Local Import (only works when running locally) -->
-        <div class="border border-gray-200 rounded-xl p-4 space-y-3">
-            <h3 class="text-sm font-bold text-gray-700">Option C: Import from local browser</h3>
-            <p class="text-xs text-gray-500">Only works when running the app locally (reads browser cookie stores directly).</p>
-            <button type="button" @click="importCookies()" :disabled="importing"
-                class="px-5 py-2.5 bg-gray-600 text-white rounded-xl font-medium text-sm hover:bg-gray-700 disabled:opacity-50 transition-all flex items-center gap-2">
-                <svg x-show="importing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                <svg x-show="!importing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                <span x-text="importing ? 'Importing...' : 'Import from Browser'"></span>
-            </button>
-            <div x-show="importResult" x-cloak
-                :class="importOk ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'"
-                class="p-3 border rounded-xl text-sm" x-text="importResult">
-            </div>
-        </div>
     </div>
 </div>
 
