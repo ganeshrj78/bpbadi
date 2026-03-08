@@ -339,7 +339,7 @@ function sessionExpand_{{ s.session.id }}() {
         courts: {{ s.courts | tojson }},
         credits: {{ s.credits }},
         birdie: {{ s.birdie }},
-        nonKidCount: {{ s.non_kid_count }},
+        regularPlayerCount: {{ s.regular_player_count }},
         init() {},
         get regularCost() { return this.courts.filter(c => c.court_type === 'regular').reduce((s, c) => s + c.cost, 0); },
         get adhocCost() { return this.courts.filter(c => c.court_type === 'adhoc').reduce((s, c) => s + c.cost, 0); },
@@ -347,8 +347,8 @@ function sessionExpand_{{ s.session.id }}() {
         get adhocCount() { return this.courts.filter(c => c.court_type === 'adhoc').length; },
         get totalCost() { return this.regularCost + this.adhocCost; },
         get perPlayer() {
-            if (this.nonKidCount === 0) return 0;
-            return (this.regularCost + this.credits) / this.nonKidCount + this.birdie;
+            if (this.regularPlayerCount === 0) return 0;
+            return this.regularCost / this.regularPlayerCount + this.birdie;
         },
         async updateCourt(ci, changes) {
             const court = this.courts[ci];

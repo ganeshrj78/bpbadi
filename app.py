@@ -266,8 +266,8 @@ def get_cached_player_stats():
         courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
         counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
         birdie = session_birdie.get(sid, 0)
-        non_kid_count = counts['regular'] + counts['adhoc']
-        per_player = round((courts['regular'] + (s.credits or 0)) / non_kid_count + birdie, 2) if non_kid_count > 0 else 0
+        reg_count = counts['regular']
+        per_player = round(courts['regular'] / reg_count + birdie, 2) if reg_count > 0 else 0
         session_cost_map[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
 
     player_charges = {}
@@ -1210,10 +1210,9 @@ def sessions():
         courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
         total_court_cost = courts['regular']
         counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
-        non_kid_count = counts['regular'] + counts['adhoc']
-        credits = s.credits or 0
-        if non_kid_count > 0:
-            per_player = round((total_court_cost + credits) / non_kid_count + s.birdie_cost, 2)
+        reg_count = counts['regular']
+        if reg_count > 0:
+            per_player = round(total_court_cost / reg_count + s.birdie_cost, 2)
         else:
             per_player = s.birdie_cost or 0
         active_session_costs[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
@@ -1329,10 +1328,10 @@ def sessions_by_month(month_key):
         regular_courts = [c for c in courts if c.court_type == 'regular']
         adhoc_courts = [c for c in courts if c.court_type == 'adhoc']
         per_player = sess.get_cost_per_regular_player()
-        non_kid_count = sess.get_regular_player_count() + sess.get_adhoc_player_count()
+        regular_player_count = sess.get_regular_player_count()
         session_stats.append({
             'per_player': per_player,
-            'non_kid_count': non_kid_count,
+            'regular_player_count': regular_player_count,
             'birdie': sess.birdie_cost or 0,
             'session': sess,
             'start_time': start_time,
