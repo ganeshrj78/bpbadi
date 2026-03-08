@@ -1333,7 +1333,7 @@ def sessions_by_month(month_key):
         session_stats.append({
             'per_player': per_player,
             'regular_player_count': regular_player_count,
-            'birdie': sess.birdie_cost or 0,
+            'birdie_per_player': sess.birdie_cost or 0,
             'session': sess,
             'start_time': start_time,
             'end_time': end_time,
@@ -1346,7 +1346,7 @@ def sessions_by_month(month_key):
             'collection': sess.get_total_collection(),
             'refunds': sess.get_total_refunds(),
             'fillin': round(fillin_total, 2),
-            'birdie': sess.get_birdie_cost_total(),
+            'birdie_total': sess.get_birdie_cost_total(),
             'credits': sess.credits or 0,
             'apply_credits': sess.apply_credits or False,
             'courts': [{'id': c.id, 'name': c.name, 'start_time': c.start_time,
@@ -1359,7 +1359,7 @@ def sessions_by_month(month_key):
         'collection': sum(s['collection'] for s in session_stats),
         'refunds': sum(s['refunds'] for s in session_stats),
         'fillin': sum(s['fillin'] for s in session_stats),
-        'birdie': sum(s['birdie'] for s in session_stats),
+        'birdie': sum(s['birdie_total'] for s in session_stats),
         'credits': sum(s['credits'] for s in session_stats),
     }
 

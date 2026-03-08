@@ -123,7 +123,7 @@
                         <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-bold text-xs">{{ s.attendees }}</span>
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-yellow-700 font-medium">
-                        {% if s.birdie > 0 %}${{ "%.2f"|format(s.birdie) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+                        {% if s.birdie_total > 0 %}${{ "%.2f"|format(s.birdie_total) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-right font-semibold text-wimbledon-purple">${{ "%.2f"|format(s.collection) }}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-right text-sm">
@@ -339,7 +339,7 @@ function sessionExpand_{{ s.session.id }}() {
         courts: {{ s.courts | tojson }},
         credits: {{ s.credits }},
         applyCredits: {{ s.apply_credits | tojson }},
-        birdie: {{ s.birdie }},
+        birdie: {{ s.birdie_per_player }},
         regularPlayerCount: {{ s.regular_player_count }},
         init() {},
         get regularCost() { return this.courts.filter(c => c.court_type === 'regular').reduce((s, c) => s + c.cost, 0); },
