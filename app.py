@@ -267,7 +267,8 @@ def get_cached_player_stats():
         counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
         birdie = session_birdie.get(sid, 0)
         reg_count = counts['regular']
-        per_player = round(courts['regular'] / reg_count + birdie, 2) if reg_count > 0 else 0
+        court_pool = courts['regular'] + ((s.credits or 0) if s.apply_credits else 0)
+        per_player = round(court_pool / reg_count + birdie, 2) if reg_count > 0 else 0
         session_cost_map[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
 
     player_charges = {}
@@ -1208,11 +1209,11 @@ def sessions():
     for s in active_sessions:
         sid = s.id
         courts = court_cost_by_session.get(sid, {'regular': 0.0, 'adhoc': 0.0})
-        total_court_cost = courts['regular']
+        court_pool = courts['regular'] + ((s.credits or 0) if s.apply_credits else 0)
         counts = session_counts.get(sid, {'regular': 0, 'adhoc': 0})
         reg_count = counts['regular']
         if reg_count > 0:
-            per_player = round(total_court_cost / reg_count + s.birdie_cost, 2)
+            per_player = round(court_pool / reg_count + s.birdie_cost, 2)
         else:
             per_player = s.birdie_cost or 0
         active_session_costs[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
@@ -1347,6 +1348,7 @@ def sessions_by_month(month_key):
             'fillin': round(fillin_total, 2),
             'birdie': sess.get_birdie_cost_total(),
             'credits': sess.credits or 0,
+            'apply_credits': sess.apply_credits or False,
             'courts': [{'id': c.id, 'name': c.name, 'start_time': c.start_time,
                         'end_time': c.end_time, 'cost': c.cost,
                         'court_type': c.court_type} for c in courts],
@@ -1396,7 +1398,16 @@ def add_session():
             db.session.add(new_session)
             db.session.flush()
 
-            # No courts added during creation - they will be added when editing individual sessions
+            # Auto-create a default adhoc court ($0) to balance monthly cost
+            adhoc_court = Court(
+                session_id=new_session.id,
+                name='Adhoc Court',
+                court_type='adhoc',
+                start_time='6:30 AM',
+                end_time='9:30 AM',
+                cost=0
+            )
+            db.session.add(adhoc_court)
 
             # Create attendance records for all players (default NO, category from player)
             for player in players:
@@ -1503,6 +1514,7 @@ def edit_session(id):
         sess.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
         sess.birdie_cost = float(request.form.get('birdie_cost', 0))
         sess.credits = float(request.form.get('credits', 0))
+        sess.apply_credits = request.form.get('apply_credits') == 'on'
         sess.notes = request.form.get('notes')
 
         def format_time(time_str):

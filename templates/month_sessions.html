@@ -338,6 +338,7 @@ function sessionExpand_{{ s.session.id }}() {
     return {
         courts: {{ s.courts | tojson }},
         credits: {{ s.credits }},
+        applyCredits: {{ s.apply_credits | tojson }},
         birdie: {{ s.birdie }},
         regularPlayerCount: {{ s.regular_player_count }},
         init() {},
@@ -348,7 +349,8 @@ function sessionExpand_{{ s.session.id }}() {
         get totalCost() { return this.regularCost + this.adhocCost; },
         get perPlayer() {
             if (this.regularPlayerCount === 0) return 0;
-            return this.regularCost / this.regularPlayerCount + this.birdie;
+            const pool = this.regularCost + (this.applyCredits ? this.credits : 0);
+            return pool / this.regularPlayerCount + this.birdie;
         },
         async updateCourt(ci, changes) {
             const court = this.courts[ci];

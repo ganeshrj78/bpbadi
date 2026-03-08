@@ -153,6 +153,7 @@ class Session(db.Model):
     end_time = db.Column(db.String(10), default='09:30')  # HH:MM format
     court_cost = db.Column(db.Float, default=105)  # Default cost per court based on hours
     credits = db.Column(db.Float, default=0)  # Credits issued for this session, usable toward future bookings
+    apply_credits = db.Column(db.Boolean, default=False)  # If True, credits are included in per-player cost calculation
 
     # Audit fields
     created_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)
@@ -233,11 +234,13 @@ class Session(db.Model):
         return self.get_cost_per_regular_player()
 
     def get_cost_per_regular_player(self):
-        """Cost per non-kid player: regular courts split across regular players + birdie"""
+        """Cost per non-kid player: (regular courts + credits if applied) / regular players + birdie"""
         reg_count = self.get_regular_player_count()
         if reg_count == 0:
             return 0
         total_shared = self.get_regular_court_cost()
+        if self.apply_credits:
+            total_shared += (self.credits or 0)
         return round(total_shared / reg_count + self.birdie_cost, 2)
 
     def get_cost_per_adhoc_player(self):
