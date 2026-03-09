@@ -1342,15 +1342,18 @@ def sessions_by_month(month_key):
         db.extract('month', Session.date) == month
     ).order_by(Session.date.asc()).all()
 
-    # Batch-fetch fillin attendances for all sessions in the month
+    # Batch-fetch attendances for all sessions in the month
     session_ids = [s.id for s in month_sessions]
-    fillin_atts = Attendance.query.filter(
+    all_month_atts = Attendance.query.filter(
         Attendance.session_id.in_(session_ids),
-        Attendance.status == 'FILLIN'
-    ).all() if session_ids else []
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
+    ).options(joinedload(Attendance.player)).all() if session_ids else []
     fillin_by_session = {}
-    for att in fillin_atts:
-        fillin_by_session.setdefault(att.session_id, []).append(att)
+    attendees_by_session = {}
+    for att in all_month_atts:
+        if att.status == 'FILLIN':
+            fillin_by_session.setdefault(att.session_id, []).append(att)
+        attendees_by_session.setdefault(att.session_id, []).append(att)
 
     session_stats = []
     for sess in month_sessions:
@@ -1366,9 +1369,19 @@ def sessions_by_month(month_key):
         adhoc_courts = [c for c in courts if c.court_type == 'adhoc']
         per_player = sess.get_cost_per_regular_player()
         regular_player_count = sess.get_regular_player_count()
+        sess_atts = attendees_by_session.get(sess.id, [])
+        reg_att_count = sum(1 for a in sess_atts if a.category == 'regular')
+        adhoc_att_count = sum(1 for a in sess_atts if a.category == 'adhoc')
+        kid_att_count = sum(1 for a in sess_atts if a.category == 'kid')
+        player_list = [{'name': a.player.name, 'category': a.category or 'regular', 'status': a.status}
+                       for a in sorted(sess_atts, key=lambda a: a.player.name)]
         session_stats.append({
             'per_player': per_player,
             'regular_player_count': regular_player_count,
+            'reg_att_count': reg_att_count,
+            'adhoc_att_count': adhoc_att_count,
+            'kid_att_count': kid_att_count,
+            'players': player_list,
             'birdie_per_player': sess.birdie_cost or 0,
             'session': sess,
             'start_time': start_time,
