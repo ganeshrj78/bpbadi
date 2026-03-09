@@ -1049,7 +1049,16 @@ def edit_player(id):
 
     if request.method == 'POST':
         player.name = request.form.get('name')
-        player.category = request.form.get('category', 'regular')
+        new_category = request.form.get('category', 'regular')
+        if new_category != player.category:
+            player.category = new_category
+            # Sync attendance records in non-archived sessions
+            Attendance.query.filter(
+                Attendance.player_id == id,
+                Attendance.session_id.in_(
+                    db.session.query(Session.id).filter_by(is_archived=False)
+                )
+            ).update({Attendance.category: new_category}, synchronize_session='fetch')
         player.phone = request.form.get('phone')
         player.email = request.form.get('email')
         player.zelle_preference = request.form.get('zelle_preference', 'email')
@@ -1120,7 +1129,16 @@ def update_player_category(id):
     if category not in ['regular', 'adhoc', 'kid']:
         return jsonify({'error': 'Invalid category'}), 400
 
+    old_category = player.category
     player.category = category
+    if category != old_category:
+        # Sync attendance records in non-archived sessions
+        Attendance.query.filter(
+            Attendance.player_id == id,
+            Attendance.session_id.in_(
+                db.session.query(Session.id).filter_by(is_archived=False)
+            )
+        ).update({Attendance.category: category}, synchronize_session='fetch')
     db.session.commit()
 
     return jsonify({
