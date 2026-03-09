@@ -249,8 +249,8 @@
                         </a>
                     </th>
                     {% endfor %}
-                    <th class="px-2 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[70px]">
-                        Add'l Charges
+                    <th class="px-2 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[70px] whitespace-normal leading-tight">
+                        Add'l Charges /<br>Credits
                     </th>
                     <th class="px-2 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider min-w-[70px]">
                         Total
@@ -357,6 +357,7 @@
                             {% elif status == 'STANDBY' %}
                             <option value="YES">Yes</option>
                             <option value="NO">No</option>
+                            <option value="FILLIN">Fill-In</option>
                             <option value="STANDBY" selected>Stand By</option>
                             {% endif %}
                             {% else %}
@@ -372,7 +373,7 @@
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
-                        <input type="number" step="0.01" min="0"
+                        <input type="number" step="0.01"
                             value="{{ player.additional_charges or 0 }}"
                             onchange="updatePlayerCharges({{ player.id }}, this.value)"
                             data-player-id="{{ player.id }}"
@@ -542,6 +543,7 @@
                             {% elif status == 'STANDBY' %}
                             <option value="YES">Yes</option>
                             <option value="NO">No</option>
+                            <option value="FILLIN">Fill-In</option>
                             <option value="STANDBY" selected>Stand By</option>
                             {% endif %}
                             {% else %}
@@ -557,7 +559,7 @@
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
-                        <input type="number" step="0.01" min="0"
+                        <input type="number" step="0.01"
                             value="{{ player.additional_charges or 0 }}"
                             onchange="updatePlayerCharges({{ player.id }}, this.value)"
                             data-player-id="{{ player.id }}"
@@ -727,6 +729,7 @@
                             {% elif status == 'STANDBY' %}
                             <option value="YES">Yes</option>
                             <option value="NO">No</option>
+                            <option value="FILLIN">Fill-In</option>
                             <option value="STANDBY" selected>Stand By</option>
                             {% endif %}
                             {% else %}
@@ -742,7 +745,7 @@
                     </td>
                     {% endfor %}
                     <td class="px-2 py-2 text-right whitespace-nowrap">
-                        <input type="number" step="0.01" min="0"
+                        <input type="number" step="0.01"
                             value="{{ player.additional_charges or 0 }}"
                             onchange="updatePlayerCharges({{ player.id }}, this.value)"
                             data-player-id="{{ player.id }}"

@@ -156,7 +156,15 @@ def log_activity(action, description, entity_type=None, entity_id=None):
     """Log an activity. Non-blocking — failures are silently logged, never affect the main request."""
     try:
         user_type = session.get('user_type', 'unknown')
-        user_name = session.get('player_name') or ('Admin' if user_type == 'admin' else 'Unknown')
+        user_name = session.get('player_name')
+        if not user_name:
+            if user_type == 'admin':
+                user_name = 'Admin'
+            elif session.get('player_id'):
+                player = Player.query.get(session['player_id'])
+                user_name = player.name if player else 'Unknown'
+            else:
+                user_name = 'Unknown'
         log = ActivityLog(
             user_type=user_type,
             user_name=user_name,
@@ -365,6 +373,7 @@ def login():
             if password == app.config['APP_PASSWORD']:
                 session['authenticated'] = True
                 session['user_type'] = 'admin'
+                session['player_name'] = 'Admin'
                 security_logger.info(f'ADMIN_LOGIN_SUCCESS - IP: {client_ip}')
                 flash('Successfully logged in as admin!', 'success')
                 log_activity('login', 'Admin login')
@@ -391,6 +400,7 @@ def login():
                                            booking_guidelines=SiteSettings.get('booking_guidelines', ''))
                 session['authenticated'] = True
                 session['player_id'] = player.id
+                session['player_name'] = player.name
                 if player.is_admin:
                     session['user_type'] = 'player_admin'
                     security_logger.info(f'PLAYER_ADMIN_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
@@ -417,6 +427,7 @@ def logout():
     session.pop('authenticated', None)
     session.pop('user_type', None)
     session.pop('player_id', None)
+    session.pop('player_name', None)
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
 
