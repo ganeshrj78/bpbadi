@@ -539,6 +539,26 @@ class BirdieBank(db.Model):
         return db.session.query(db.func.sum(BirdieBank.cost)).filter_by(transaction_type='purchase').scalar() or 0
 
 
+class ActivityLog(db.Model):
+    """Log every admin and user action for audit trail"""
+    __tablename__ = 'activity_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    user_type = db.Column(db.String(20), nullable=False)  # 'admin', 'player', 'player_admin'
+    user_name = db.Column(db.String(100), nullable=False)  # Display name or 'Admin'
+    action = db.Column(db.String(50), nullable=False, index=True)  # e.g. 'login', 'create_session', 'update_attendance'
+    entity_type = db.Column(db.String(50))  # e.g. 'session', 'player', 'payment', 'attendance'
+    entity_id = db.Column(db.Integer)
+    description = db.Column(db.Text, nullable=False)  # Human-readable description
+    ip_address = db.Column(db.String(45))  # IPv4 or IPv6
+
+    __table_args__ = (
+        db.Index('idx_activity_log_action', 'action'),
+        db.Index('idx_activity_log_ts_action', 'timestamp', 'action'),
+    )
+
+
 class SiteSettings(db.Model):
     """Store site-wide settings and content like guidelines"""
     __tablename__ = 'site_settings'

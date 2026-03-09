@@ -9,7 +9,7 @@ import logging
 from collections import defaultdict
 from logging.handlers import RotatingFileHandler
 from config import Config
-from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, init_encryption
+from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, ActivityLog, init_encryption
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from flask_wtf.csrf import CSRFProtect
@@ -149,6 +149,28 @@ def admin_required(f):
             return redirect(url_for('player_profile'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+# Activity logging helper
+def log_activity(action, description, entity_type=None, entity_id=None):
+    """Log an activity. Non-blocking — failures are silently logged, never affect the main request."""
+    try:
+        user_type = session.get('user_type', 'unknown')
+        user_name = session.get('player_name') or ('Admin' if user_type == 'admin' else 'Unknown')
+        log = ActivityLog(
+            user_type=user_type,
+            user_name=user_name,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            description=description,
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.warning(f'Failed to log activity: {action} - {description}')
 
 
 # Cached helper for monthly summary (expensive calculation)
@@ -345,6 +367,7 @@ def login():
                 session['user_type'] = 'admin'
                 security_logger.info(f'ADMIN_LOGIN_SUCCESS - IP: {client_ip}')
                 flash('Successfully logged in as admin!', 'success')
+                log_activity('login', 'Admin login')
                 return redirect(url_for('dashboard'))
             security_logger.warning(f'ADMIN_LOGIN_FAILED - IP: {client_ip}')
             flash('Invalid password', 'error')
@@ -372,11 +395,13 @@ def login():
                     session['user_type'] = 'player_admin'
                     security_logger.info(f'PLAYER_ADMIN_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
                     flash(f'Welcome back, {player.name}! (Admin)', 'success')
+                    log_activity('login', f'Player {player.name} logged in')
                     return redirect(url_for('dashboard'))
                 else:
                     session['user_type'] = 'player'
                     security_logger.info(f'PLAYER_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
                     flash(f'Welcome back, {player.name}!', 'success')
+                    log_activity('login', f'Player {player.name} logged in')
                     return redirect(url_for('player_profile'))
             security_logger.warning(f'PLAYER_LOGIN_FAILED - Email: {email}, IP: {client_ip}')
             flash('Invalid email or password', 'error')
@@ -449,6 +474,7 @@ def register():
         db.session.commit()
 
         security_logger.info(f'REGISTRATION_SUCCESS - Name: {name}, Email: {email}, IP: {client_ip}')
+        log_activity('register', f'New player registered: {name}', 'player', player.id)
         flash('Registration successful! Please wait for admin approval.', 'success')
         return redirect(url_for('login'))
 
@@ -626,6 +652,7 @@ def player_profile():
                 player.email = email if email else None
                 player.phone = phone if phone else None
                 db.session.commit()
+                log_activity('update_profile', f'Player {player.name} updated profile', 'player', player.id)
                 flash('Profile updated successfully!', 'success')
 
         elif action == 'update_zelle':
@@ -649,6 +676,7 @@ def player_profile():
             else:
                 player.set_password(new_password)
                 db.session.commit()
+                log_activity('change_password', f'Player {player.name} changed password', 'player', player.id)
                 flash('Password changed successfully!', 'success')
 
         elif action == 'update_photo':
@@ -797,6 +825,7 @@ def player_payments():
         db.session.commit()
 
         target_player = Player.query.get(target_player_id)
+        log_activity('player_payment', f'{target_player.name} recorded ${amount:.2f} payment', 'payment', payment.id)
         flash(f'Payment of ${amount:.2f} for {target_player.name} recorded successfully!', 'success')
         return redirect(url_for('player_payments'))
 
@@ -849,6 +878,9 @@ def update_player_attendance():
         db.session.add(attendance)
 
     db.session.commit()
+
+    target_player = Player.query.get(target_player_id)
+    log_activity('vote', f'{target_player.name} voted {status} for session {session_id}', 'attendance', attendance.id)
 
     # Return updated session info
     sess = Session.query.get(session_id)
@@ -993,6 +1025,7 @@ def add_player():
 
         db.session.add(player)
         db.session.commit()
+        log_activity('add_player', f'Added player {name}', 'player', player.id)
         flash(f'Player {name} added successfully!', 'success')
         return redirect(url_for('players'))
 
@@ -1046,6 +1079,7 @@ def edit_player(id):
                     player.profile_photo = filename
 
         db.session.commit()
+        log_activity('edit_player', f'Updated player {player.name}', 'player', player.id)
         flash(f'Player {player.name} updated successfully!', 'success')
         return redirect(url_for('player_detail', id=id))
 
@@ -1115,6 +1149,7 @@ def approve_player(id):
     db.session.commit()
     admin_info = f"Admin" if session.get('user_type') == 'admin' else f"Player Admin (ID: {session.get('player_id')})"
     security_logger.info(f'PLAYER_APPROVED - Player: {player.name} (ID: {player.id}), By: {admin_info}, IP: {request.remote_addr}')
+    log_activity('approve_player', f'Approved player {player.name}', 'player', player.id)
     flash(f'{player.name} has been approved!', 'success')
     return redirect(url_for('dashboard'))
 
@@ -1129,6 +1164,7 @@ def reject_player(id):
     security_logger.info(f'PLAYER_REJECTED - Player: {name}, Email: {email}, By: {admin_info}, IP: {request.remote_addr}')
     db.session.delete(player)
     db.session.commit()
+    log_activity('reject_player', f'Rejected player registration: {name}', 'player', id)
     flash(f'Registration for {name} has been rejected and removed.', 'success')
     return redirect(url_for('dashboard'))
 
@@ -1418,6 +1454,7 @@ def add_session():
 
         db.session.commit()
         clear_session_cache()
+        log_activity('create_session', f'Created {len(created_sessions)} session(s)', 'session')
 
         if len(created_sessions) == 1:
             flash('Session created! Edit the session to add courts.', 'success')
@@ -1565,6 +1602,7 @@ def edit_session(id):
 
         db.session.commit()
         clear_session_cache()
+        log_activity('edit_session', f'Updated session {sess.date}', 'session', id)
         flash('Session updated successfully!', 'success')
         return redirect(url_for('session_detail', id=id))
 
@@ -1583,6 +1621,7 @@ def delete_session(id):
 
     db.session.delete(sess)
     db.session.commit()
+    log_activity('delete_session', f'Deleted session {sess.date}', 'session', id)
     flash('Session deleted successfully!', 'success')
     return redirect(url_for('sessions'))
 
@@ -1595,6 +1634,7 @@ def toggle_archive(id):
     db.session.commit()
     clear_session_cache()  # Invalidate cached monthly summary
     status = 'archived' if sess.is_archived else 'unarchived'
+    log_activity('toggle_archive', f'Session {sess.date} {status}', 'session', id)
     flash(f'Session {status} successfully!', 'success')
     return redirect(url_for('session_detail', id=id))
 
@@ -1606,6 +1646,7 @@ def toggle_voting_freeze(id):
     sess.voting_frozen = not sess.voting_frozen
     db.session.commit()
     status = 'frozen' if sess.voting_frozen else 'unfrozen'
+    log_activity('toggle_freeze', f'Voting {status} for session {sess.date}', 'session', id)
     flash(f'Voting {status} for this session!', 'success')
     return redirect(url_for('session_detail', id=id))
 
@@ -1627,6 +1668,7 @@ def bulk_archive_sessions():
 
     db.session.commit()
     clear_session_cache()  # Invalidate cached monthly summary
+    log_activity('bulk_archive', f'Archived {count} session(s)')
     flash(f'{count} session(s) archived successfully!', 'success')
     return redirect(url_for('sessions'))
 
@@ -1648,6 +1690,7 @@ def bulk_unarchive_sessions():
 
     db.session.commit()
     clear_session_cache()  # Invalidate cached monthly summary
+    log_activity('bulk_unarchive', f'Unarchived {count} session(s)')
     flash(f'{count} session(s) unarchived successfully!', 'success')
     return redirect(url_for('sessions'))
 
@@ -1675,6 +1718,7 @@ def bulk_delete_sessions():
 
     db.session.commit()
     clear_session_cache()  # Invalidate cached monthly summary
+    log_activity('bulk_delete', f'Deleted {count} session(s)')
     flash(f'{count} session(s) permanently deleted!', 'success')
     return redirect(url_for('sessions'))
 
@@ -1700,6 +1744,7 @@ def api_update_court(court_id):
 
     db.session.commit()
     clear_session_cache()
+    log_activity('update_court', f'Updated court {court.name} (session {court.session_id})', 'court', court_id)
     return jsonify({'success': True, 'court': court.to_dict()})
 
 
@@ -1722,6 +1767,7 @@ def api_add_court(session_id):
     db.session.add(court)
     db.session.commit()
     clear_session_cache()
+    log_activity('add_court', f'Added court to session {session_id}', 'court', court.id)
     return jsonify({'success': True, 'court': court.to_dict()})
 
 
@@ -1731,9 +1777,12 @@ def api_add_court(session_id):
 def api_delete_court(court_id):
     """Delete a court from a session."""
     court = Court.query.get_or_404(court_id)
+    court_name = court.name
+    court_session_id = court.session_id
     db.session.delete(court)
     db.session.commit()
     clear_session_cache()
+    log_activity('delete_court', f'Deleted court {court_name} from session {court_session_id}', 'court', court_id)
     return jsonify({'success': True})
 
 
@@ -1802,6 +1851,7 @@ def bulk_assign_courts():
 
     db.session.commit()
     clear_session_cache()
+    log_activity('bulk_assign_courts', f'Assigned courts to {len(session_ids)} session(s)')
     return jsonify({'success': True, 'updated': updated, 'skipped': skipped})
 
 
@@ -2002,6 +2052,7 @@ def add_dropout_refund(id):
     db.session.commit()
 
     player = Player.query.get(player_id)
+    log_activity('add_refund', f'Created refund ${refund_amount:.2f} for {player.name}', 'refund', refund.id)
     flash(f'Refund of ${refund_amount:.2f} created for {player.name}', 'success')
     return redirect(url_for('session_refunds', id=id))
 
@@ -2083,6 +2134,10 @@ def update_dropout_refund(id):
         refund.status = 'cancelled'
 
     db.session.commit()
+    if action == 'process':
+        log_activity('process_refund', f'Processed refund ${refund.refund_amount:.2f} for {refund.player.name}', 'refund', refund.id)
+    elif action == 'cancel':
+        log_activity('cancel_refund', f'Cancelled refund for {refund.player.name}', 'refund', refund.id)
     if request.form.get('from_session'):
         return redirect(url_for('session_detail', id=session_id))
     return redirect(url_for('session_refunds', id=session_id))
@@ -2095,6 +2150,7 @@ def delete_dropout_refund(id):
     session_id = refund.session_id
     db.session.delete(refund)
     db.session.commit()
+    log_activity('delete_refund', f'Deleted refund #{id}', 'refund', id)
     flash('Refund deleted successfully!', 'success')
     return redirect(url_for('session_refunds', id=session_id))
 
@@ -2274,6 +2330,10 @@ def update_attendance():
     db.session.commit()
     clear_session_cache()  # Invalidate cached data
 
+    att_player = Player.query.get(player_id)
+    att_name = att_player.name if att_player else str(player_id)
+    log_activity('update_attendance', f'{att_name} → {status} for session {session_id}', 'attendance')
+
     # Return updated session costs
     return jsonify({
         'success': True,
@@ -2356,6 +2416,7 @@ def process_dropout():
 
     db.session.commit()
     clear_session_cache()
+    log_activity('process_dropout', f'{dropout_name} dropped out of session {session_id}', 'attendance')
 
     return jsonify({
         'success': True,
@@ -2387,6 +2448,7 @@ def update_attendance_category():
         db.session.add(attendance)
 
     db.session.commit()
+    log_activity('update_category', f'{attendance.player.name} category → {category} for session {session_id}', 'attendance', attendance.id)
 
     return jsonify({
         'success': True,
@@ -2478,6 +2540,7 @@ def update_attendance_payment_status():
     if attendance:
         attendance.payment_status = payment_status
         db.session.commit()
+        log_activity('update_payment_status', f'Payment status updated for session {session_id}', 'attendance', attendance.id)
         return jsonify({'success': True})
 
     return jsonify({'error': 'Attendance record not found'}), 404
@@ -2593,6 +2656,7 @@ def bulk_session_payment():
         count += 1
 
     db.session.commit()
+    log_activity('bulk_payment', f'Bulk payment recorded for session {session_id}', 'session', session_id)
     return jsonify({'success': True, 'count': count})
 
 
@@ -2714,6 +2778,7 @@ def add_payment():
         db.session.commit()
 
         player = Player.query.get(player_id)
+        log_activity('add_payment', f'Payment ${amount:.2f} from {player.name}', 'payment', payment.id)
         flash(f'Payment of ${amount:.2f} from {player.name} recorded!', 'success')
         return redirect(url_for('payments'))
 
@@ -2727,6 +2792,7 @@ def delete_payment(id):
     payment = Payment.query.get_or_404(id)
     db.session.delete(payment)
     db.session.commit()
+    log_activity('delete_payment', f'Deleted payment #{id}', 'payment', id)
     flash('Payment deleted successfully!', 'success')
     return redirect(url_for('payments'))
 
@@ -2772,6 +2838,7 @@ def add_birdie_transaction():
     )
     db.session.add(transaction)
     db.session.commit()
+    log_activity('birdie_transaction', f'{transaction_type}: {quantity} birdies', 'birdie')
 
     if transaction_type == 'purchase':
         flash(f'Added {quantity} birdies to inventory (${cost:.2f})', 'success')
@@ -2787,6 +2854,7 @@ def delete_birdie_transaction(id):
     transaction = BirdieBank.query.get_or_404(id)
     db.session.delete(transaction)
     db.session.commit()
+    log_activity('delete_birdie', f'Deleted birdie transaction #{id}', 'birdie', id)
     flash('Transaction deleted successfully!', 'success')
     return redirect(url_for('birdie_bank'))
 
@@ -2851,6 +2919,7 @@ def ezfacility_settings():
         if cookie:
             rec.session_cookie = cookie
         db.session.commit()
+        log_activity('update_settings', 'Updated Royal Facility settings')
 
         flash('Royal Facility settings saved (encrypted).', 'success')
         return redirect(url_for('ezfacility_settings'))
@@ -3233,6 +3302,7 @@ def api_ezfacility_sync():
 
     db.session.commit()
     clear_session_cache()
+    log_activity('sync_courts', f'Synced courts from Royal Facility', 'session')
 
     return jsonify({'success': True, 'created_sessions': created_sessions,
                     'added_courts': added_courts, 'skipped': skipped})
@@ -3244,6 +3314,45 @@ def ratelimit_handler(e):
     security_logger.warning(f'RATE_LIMIT_EXCEEDED - IP: {request.remote_addr}, Path: {request.path}')
     flash('Too many requests. Please try again later.', 'error')
     return redirect(url_for('login'))
+
+
+@app.route('/activity-logs')
+@admin_required
+def activity_logs():
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    action_filter = request.args.get('action', '')
+    user_filter = request.args.get('user', '')
+
+    query = ActivityLog.query
+    if action_filter:
+        query = query.filter(ActivityLog.action == action_filter)
+    if user_filter:
+        query = query.filter(ActivityLog.user_name.ilike(f'%{user_filter}%'))
+
+    logs = query.order_by(ActivityLog.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    # Get distinct actions for filter dropdown
+    actions = db.session.query(ActivityLog.action).distinct().order_by(ActivityLog.action).all()
+    actions = [a[0] for a in actions]
+
+    return render_template('activity_logs.html', logs=logs, actions=actions,
+                           action_filter=action_filter, user_filter=user_filter)
+
+
+@app.route('/activity-logs/delete', methods=['POST'])
+@admin_required
+def delete_activity_logs():
+    before_date = request.form.get('before_date')
+    if not before_date:
+        flash('Please select a date', 'error')
+        return redirect(url_for('activity_logs'))
+    cutoff = datetime.strptime(before_date, '%Y-%m-%d')
+    count = ActivityLog.query.filter(ActivityLog.timestamp < cutoff).delete()
+    db.session.commit()
+    flash(f'{count} log(s) older than {before_date} deleted.', 'success')
+    log_activity('delete_logs', f'Deleted {count} logs older than {before_date}')
+    return redirect(url_for('activity_logs'))
 
 
 if __name__ == '__main__':
