@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from werkzeug.security import generate_password_hash, check_password_hash
 import base64
 import hashlib
@@ -544,7 +545,7 @@ class ActivityLog(db.Model):
     __tablename__ = 'activity_logs'
 
     id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(ZoneInfo('America/New_York')).replace(tzinfo=None), index=True)
     user_type = db.Column(db.String(20), nullable=False)  # 'admin', 'player', 'player_admin'
     user_name = db.Column(db.String(100), nullable=False)  # Display name or 'Admin'
     action = db.Column(db.String(50), nullable=False, index=True)  # e.g. 'login', 'create_session', 'update_attendance'

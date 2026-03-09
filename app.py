@@ -164,7 +164,7 @@ def log_activity(action, description, entity_type=None, entity_id=None):
             entity_type=entity_type,
             entity_id=entity_id,
             description=description,
-            ip_address=request.remote_addr
+            ip_address=request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
         )
         db.session.add(log)
         db.session.commit()
@@ -413,6 +413,7 @@ def login():
 
 @app.route('/logout')
 def logout():
+    log_activity('logout', f'{session.get("player_name", "Admin")} logged out')
     session.pop('authenticated', None)
     session.pop('user_type', None)
     session.pop('player_id', None)
