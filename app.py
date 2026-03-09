@@ -146,7 +146,7 @@ def admin_required(f):
             return redirect(url_for('login'))
         if session.get('user_type') not in ['admin', 'player_admin']:
             flash('Admin access required', 'error')
-            return redirect(url_for('player_profile'))
+            return redirect(url_for('player_payments'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -355,7 +355,7 @@ def master_admin_required(f):
             return redirect(url_for('login'))
         if session.get('user_type') not in ['admin', 'player_admin']:
             flash('Admin access required', 'error')
-            return redirect(url_for('player_profile'))
+            return redirect(url_for('player_payments'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -412,7 +412,7 @@ def login():
                     security_logger.info(f'PLAYER_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
                     flash(f'Welcome back, {player.name}!', 'success')
                     log_activity('login', f'Player {player.name} logged in')
-                    return redirect(url_for('player_profile'))
+                    return redirect(url_for('player_payments'))
             security_logger.warning(f'PLAYER_LOGIN_FAILED - Email: {email}, IP: {client_ip}')
             flash('Invalid email or password', 'error')
 
@@ -545,9 +545,9 @@ def get_guidelines():
 @app.route('/')
 @login_required
 def dashboard():
-    # Redirect non-admin players to their profile
+    # Redirect non-admin players to their payments page
     if session.get('user_type') == 'player':
-        return redirect(url_for('player_profile'))
+        return redirect(url_for('player_payments'))
     # Admin and player_admin can access dashboard
 
     total_players = Player.query.filter_by(is_approved=True).count()
@@ -834,7 +834,21 @@ def player_payments():
             notes=notes
         )
         db.session.add(payment)
+
+        # Mark attendance as paid for active sessions where player is charged
+        active_session_ids = [s.id for s in Session.query.filter_by(is_archived=False).all()]
+        if active_session_ids:
+            unpaid_atts = Attendance.query.filter(
+                Attendance.player_id == target_player_id,
+                Attendance.session_id.in_(active_session_ids),
+                Attendance.status.in_(['YES', 'FILLIN']),
+                Attendance.payment_status == 'unpaid'
+            ).all()
+            for att in unpaid_atts:
+                att.payment_status = 'paid'
+
         db.session.commit()
+        clear_session_cache()
 
         target_player = Player.query.get(target_player_id)
         log_activity('player_payment', f'{target_player.name} recorded ${amount:.2f} payment', 'payment', payment.id)
@@ -2818,7 +2832,21 @@ def add_payment():
             notes=notes
         )
         db.session.add(payment)
+
+        # Mark attendance as paid for active sessions where player is charged
+        active_session_ids = [s.id for s in Session.query.filter_by(is_archived=False).all()]
+        if active_session_ids:
+            unpaid_atts = Attendance.query.filter(
+                Attendance.player_id == player_id,
+                Attendance.session_id.in_(active_session_ids),
+                Attendance.status.in_(['YES', 'FILLIN']),
+                Attendance.payment_status == 'unpaid'
+            ).all()
+            for att in unpaid_atts:
+                att.payment_status = 'paid'
+
         db.session.commit()
+        clear_session_cache()
 
         player = Player.query.get(player_id)
         log_activity('add_payment', f'Payment ${amount:.2f} from {player.name}', 'payment', payment.id)

@@ -149,7 +149,7 @@
                         <div class="flex items-center gap-2 text-sm p-2 rounded-lg bg-green-50" id="player-{{ sess.id }}-{{ p.id }}">
                             <span class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
                             <span class="truncate {% if p.id == player.id %}font-semibold text-wimbledon-purple{% else %}text-gray-700{% endif %}">
-                                {{ p.name.split()[0] }}{% if p.id == player.id %} (You){% endif %}
+                                {{ p.name }}{% if p.id == player.id %} (You){% endif %}
                             </span>
                         </div>
                         {% endif %}
@@ -258,7 +258,7 @@
                         <div class="flex items-center gap-2 text-sm p-2 rounded-lg bg-green-50">
                             <span class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
                             <span class="truncate {% if p.id == player.id %}font-semibold text-wimbledon-purple{% else %}text-gray-700{% endif %}">
-                                {{ p.name.split()[0] }}{% if p.id == player.id %} (You){% endif %}
+                                {{ p.name }}{% if p.id == player.id %} (You){% endif %}
                             </span>
                         </div>
                         {% endif %}
@@ -334,7 +334,7 @@
                                 <div class="flex items-center gap-2 text-sm p-2 rounded-lg bg-green-50">
                                     <span class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
                                     <span class="truncate {% if p.id == player.id %}font-semibold text-wimbledon-purple{% else %}text-gray-700{% endif %}">
-                                        {{ p.name.split()[0] }}{% if p.id == player.id %} (You){% endif %}
+                                        {{ p.name }}{% if p.id == player.id %} (You){% endif %}
                                     </span>
                                 </div>
                                 {% endif %}
