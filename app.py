@@ -303,6 +303,7 @@ def get_cached_player_stats():
 
     player_charges = {}
     player_fillin_amount = {}
+    player_fillin_paid = {}
     for att in all_chargeable_att:
         pid = att.player_id
         costs = session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
@@ -310,6 +311,8 @@ def get_cached_player_stats():
         player_charges[pid] = player_charges.get(pid, 0.0) + costs[cat]
         if att.status == 'FILLIN':
             player_fillin_amount[pid] = player_fillin_amount.get(pid, 0.0) + costs[cat]
+            if att.payment_status == 'paid':
+                player_fillin_paid[pid] = player_fillin_paid.get(pid, 0.0) + costs[cat]
 
     all_players = Player.query.filter_by(is_active=True, is_approved=True).all()
     player_stats = {}
@@ -323,7 +326,8 @@ def get_cached_player_stats():
             'pending_refunds': refund_data['pending'],
             'pending_refund_amount': refund_data['pending_amount'],
             'total_refunded': refund_data['refunded'],
-            'fillin_amount': round(player_fillin_amount.get(player.id, 0.0), 2)
+            'fillin_amount': round(player_fillin_amount.get(player.id, 0.0), 2),
+            'fillin_paid': round(player_fillin_paid.get(player.id, 0.0), 2)
         }
     return player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts
 
@@ -846,6 +850,13 @@ def player_payments():
             ).all()
             for att in unpaid_atts:
                 att.payment_status = 'paid'
+                if att.status == 'FILLIN':
+                    sess_costs = get_cached_session_costs(att.session_id)
+                    cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+                    fillin_cost = sess_costs.get(cat, 0)
+                    today = date.today().strftime('%m/%d')
+                    comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today}'
+                    att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
         db.session.commit()
         clear_session_cache()
@@ -1076,15 +1087,7 @@ def edit_player(id):
     if request.method == 'POST':
         player.name = request.form.get('name')
         new_category = request.form.get('category', 'regular')
-        if new_category != player.category:
-            player.category = new_category
-            # Sync attendance records in non-archived sessions
-            Attendance.query.filter(
-                Attendance.player_id == id,
-                Attendance.session_id.in_(
-                    db.session.query(Session.id).filter_by(is_archived=False)
-                )
-            ).update({Attendance.category: new_category}, synchronize_session='fetch')
+        player.category = new_category
         player.phone = request.form.get('phone')
         player.email = request.form.get('email')
         player.zelle_preference = request.form.get('zelle_preference', 'email')
@@ -1157,14 +1160,6 @@ def update_player_category(id):
 
     old_category = player.category
     player.category = category
-    if category != old_category:
-        # Sync attendance records in non-archived sessions
-        Attendance.query.filter(
-            Attendance.player_id == id,
-            Attendance.session_id.in_(
-                db.session.query(Session.id).filter_by(is_archived=False)
-            )
-        ).update({Attendance.category: category}, synchronize_session='fetch')
     db.session.commit()
 
     return jsonify({
@@ -1238,7 +1233,8 @@ def sessions():
                 'status': att.status,
                 'payment_status': att.payment_status or 'unpaid',
                 'additional_cost': att.additional_cost or 0,
-                'comments': att.comments or ''
+                'comments': att.comments or '',
+                'category': att.category or 'regular'
             }
 
     # Get cached monthly summary (expensive calculation)
@@ -1263,9 +1259,20 @@ def sessions():
     # Get all active players
     all_players = Player.query.filter_by(is_active=True, is_approved=True).order_by(Player.name).all()
 
-    regular_players = [p for p in all_players if p.category == 'regular']
-    adhoc_players = [p for p in all_players if p.category == 'adhoc']
-    kid_players = [p for p in all_players if p.category == 'kid']
+    # Build player category from attendance records (same source as session_detail)
+    # Use the most recent attendance category; fall back to player.category if no attendance
+    player_session_category = {}
+    for att in all_attendances:
+        # Only consider active attendance (not NO/cleared)
+        if att.status and att.status != 'NO':
+            player_session_category[att.player_id] = att.category or 'regular'
+
+    def _effective_category(player):
+        return player_session_category.get(player.id, player.category or 'regular')
+
+    regular_players = [p for p in all_players if _effective_category(p) == 'regular']
+    adhoc_players = [p for p in all_players if _effective_category(p) == 'adhoc']
+    kid_players = [p for p in all_players if _effective_category(p) == 'kid']
 
     # Load pre-computed player stats from cache (60s TTL)
     _player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts = get_cached_player_stats()
@@ -1314,11 +1321,14 @@ def sessions():
     # Scope refund/fillin amounts to active sessions only (clean slate each month)
     # Fillin amounts: only from active sessions
     month_fillin = {}
+    month_fillin_paid = {}
     for att in all_attendances:
         if att.status == 'FILLIN':
             costs = active_session_costs.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
             cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
             month_fillin[att.player_id] = month_fillin.get(att.player_id, 0.0) + costs[cat]
+            if att.payment_status == 'paid':
+                month_fillin_paid[att.player_id] = month_fillin_paid.get(att.player_id, 0.0) + costs[cat]
     # Refund amounts: only from active sessions
     month_refund_pending = {}
     month_refund_settled = {}
@@ -1335,6 +1345,7 @@ def sessions():
     # Override all-time values with month-scoped values
     for pid in player_stats:
         player_stats[pid]['fillin_amount'] = round(month_fillin.get(pid, 0.0), 2)
+        player_stats[pid]['fillin_paid'] = round(month_fillin_paid.get(pid, 0.0), 2)
         player_stats[pid]['pending_refund_amount'] = round(month_refund_pending.get(pid, 0.0), 2)
         player_stats[pid]['total_refunded'] = round(month_refund_settled.get(pid, 0.0), 2)
         player_stats[pid]['pending_refunds'] = 1 if pid in month_refund_pending else 0
@@ -2556,6 +2567,13 @@ def bulk_update_payment_status():
 
     for att in records:
         att.payment_status = payment_status
+        if payment_status == 'paid' and att.status == 'FILLIN':
+            sess_costs = get_cached_session_costs(att.session_id)
+            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+            fillin_cost = sess_costs.get(cat, 0)
+            today_str = date.today().strftime('%m/%d')
+            comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today_str}'
+            att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
     # Optionally record payment entries when marking as paid
     if payment_status == 'paid':
@@ -2844,6 +2862,13 @@ def add_payment():
             ).all()
             for att in unpaid_atts:
                 att.payment_status = 'paid'
+                if att.status == 'FILLIN':
+                    sess_costs = get_cached_session_costs(att.session_id)
+                    cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+                    fillin_cost = sess_costs.get(cat, 0)
+                    today_str = date.today().strftime('%m/%d')
+                    comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today_str}'
+                    att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
         db.session.commit()
         clear_session_cache()
@@ -3390,25 +3415,31 @@ def ratelimit_handler(e):
 @app.route('/activity-logs')
 @admin_required
 def activity_logs():
-    page = request.args.get('page', 1, type=int)
-    per_page = 50
-    action_filter = request.args.get('action', '')
-    user_filter = request.args.get('user', '')
+    all_logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).all()
 
-    query = ActivityLog.query
-    if action_filter:
-        query = query.filter(ActivityLog.action == action_filter)
-    if user_filter:
-        query = query.filter(ActivityLog.user_name.ilike(f'%{user_filter}%'))
-
-    logs = query.order_by(ActivityLog.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    # Build JSON for client-side filtering
+    import json
+    logs_json = json.dumps([{
+        'id': log.id,
+        'timestamp': log.timestamp.strftime('%b %d, %Y %I:%M %p') if log.timestamp else '',
+        'date_iso': log.timestamp.strftime('%Y-%m-%d') if log.timestamp else '',
+        'date_sort': log.timestamp.isoformat() if log.timestamp else '',
+        'user_name': log.user_name,
+        'user_type': log.user_type,
+        'action': log.action,
+        'description': log.description,
+        'ip': log.ip_address or ''
+    } for log in all_logs])
 
     # Get distinct actions for filter dropdown
     actions = db.session.query(ActivityLog.action).distinct().order_by(ActivityLog.action).all()
     actions = [a[0] for a in actions]
 
-    return render_template('activity_logs.html', logs=logs, actions=actions,
-                           action_filter=action_filter, user_filter=user_filter)
+    # Fake paginator for total count in template
+    class LogsInfo:
+        total = len(all_logs)
+
+    return render_template('activity_logs.html', logs=LogsInfo(), actions=actions, logs_json=logs_json)
 
 
 @app.route('/activity-logs/delete', methods=['POST'])
