@@ -12,6 +12,22 @@
 </div>
 
 {% set start_time, end_time = session.get_time_range() %}
+
+<!-- Floating Save/Discard Bar -->
+<div id="detail-save-bar" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl border-2 border-wimbledon-purple px-6 py-3 flex items-center gap-4 z-50 hidden">
+    <span class="text-sm font-medium text-gray-700">
+        <span id="detail-change-count">0</span> unsaved changes
+    </span>
+    <button onclick="saveAllDetailChanges()" class="px-4 py-2 bg-wimbledon-green text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        Save
+    </button>
+    <button onclick="discardAllDetailChanges()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-300 transition-all flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        Discard
+    </button>
+</div>
+
 <!-- Page Header -->
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
     <div class="flex items-center space-x-4">
@@ -513,7 +529,7 @@
                         </select>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-center">
-                        <select data-prev="{{ current_status }}" data-player-name="{{ player.name | e }}"
+                        <select data-prev="{{ current_status }}" data-original="{{ current_status }}" data-player-name="{{ player.name | e }}"
                             onchange="handleStatusChange({{ player.id }}, {{ session.id }}, this)"
                             class="px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all
                             {% if current_status == 'YES' %}bg-green-100 border-green-300 text-green-700
@@ -773,6 +789,56 @@ function bulkPayment() {
 }
 
 
+// ── Batch changes tracking ────────────────────────────────────────────────────
+const detailPendingChanges = new Map();
+
+function updateDetailSaveBar() {
+    const saveBar = document.getElementById('detail-save-bar');
+    const countSpan = document.getElementById('detail-change-count');
+    if (detailPendingChanges.size > 0) {
+        countSpan.textContent = detailPendingChanges.size;
+        saveBar.classList.remove('hidden');
+    } else {
+        saveBar.classList.add('hidden');
+    }
+}
+
+async function saveAllDetailChanges() {
+    if (detailPendingChanges.size === 0) return;
+    const updates = Array.from(detailPendingChanges.values());
+    try {
+        const response = await fetch('/api/attendance/batch', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ updates: updates })
+        });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            const errorMsg = data.errors && data.errors.length > 0
+                ? data.errors.join('\n')
+                : 'Some updates failed';
+            alert(errorMsg);
+            if (data.updated > 0) location.reload();
+        }
+    } catch (error) {
+        console.error('Error saving changes:', error);
+        alert('Failed to save changes. Please try again.');
+    }
+}
+
+function discardAllDetailChanges() {
+    document.querySelectorAll('select[data-original]').forEach(select => {
+        const original = select.dataset.original || '';
+        select.value = original;
+        applySelectStyling(select, original);
+        select.classList.remove('ring-2', 'ring-wimbledon-purple');
+    });
+    detailPendingChanges.clear();
+    updateDetailSaveBar();
+}
+
 // ── Dropout modal state ───────────────────────────────────────────────────────
 let _dropout = { playerId: null, sessionId: null, playerName: null, selectEl: null };
 
@@ -782,10 +848,25 @@ function handleStatusChange(playerId, sessionId, selectEl) {
     if (newStatus === 'DROPOUT') {
         _dropout = { playerId, sessionId, playerName, selectEl };
         openDropoutModal();
-    } else {
-        selectEl.dataset.prev = newStatus;
-        updateAttendance(playerId, sessionId, newStatus, selectEl);
+        return;
     }
+    const originalStatus = selectEl.dataset.original || '';
+    const key = `${sessionId}-${playerId}`;
+
+    if (newStatus === originalStatus) {
+        detailPendingChanges.delete(key);
+        selectEl.classList.remove('ring-2', 'ring-wimbledon-purple');
+    } else {
+        detailPendingChanges.set(key, {
+            session_id: sessionId,
+            player_id: playerId,
+            status: newStatus
+        });
+        selectEl.classList.add('ring-2', 'ring-wimbledon-purple');
+    }
+    applySelectStyling(selectEl, newStatus);
+    selectEl.dataset.prev = newStatus;
+    updateDetailSaveBar();
 }
 
 function openDropoutModal() {
@@ -879,48 +960,6 @@ function applySelectStyling(el, status) {
     else if (status === 'FILLIN')    el.className += 'bg-blue-100 border-blue-300 text-blue-700';
     else if (status === 'STANDBY')   el.className += 'bg-teal-100 border-teal-300 text-teal-700';
     else                             el.className += 'bg-gray-100 border-gray-300 text-gray-600';
-}
-
-function updateAttendance(playerId, sessionId, status, selectElement) {
-    fetch('/api/attendance', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            player_id: playerId,
-            session_id: sessionId,
-            status: status
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const prevStatus = selectElement.dataset.prev || '';
-            // Reload page when status change moves player between sections
-            const sectionChanges = ['STANDBY', 'FILLIN', 'DROPOUT', 'NO'];
-            if (sectionChanges.includes(status) || sectionChanges.includes(prevStatus)) {
-                window.location.reload();
-                return;
-            }
-            // Update select styling based on new status
-            applySelectStyling(selectElement, status);
-            selectElement.dataset.prev = status;
-
-            document.getElementById('attendee-count').textContent = data.attendee_count;
-            document.getElementById('cost-per-player').textContent = '$' + data.cost_per_player.toFixed(2);
-        } else {
-            alert('Error: ' + (data.error || 'Failed to update'));
-            selectElement.value = selectElement.dataset.prev || '';
-            applySelectStyling(selectElement, selectElement.dataset.prev || '');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Failed to update attendance');
-        selectElement.value = selectElement.dataset.prev || '';
-        applySelectStyling(selectElement, selectElement.dataset.prev || '');
-    });
 }
 
 function updateCategory(playerId, sessionId, category, selectElement) {
