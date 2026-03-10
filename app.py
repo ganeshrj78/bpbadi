@@ -3095,6 +3095,51 @@ def add_birdie_transaction():
     return redirect(url_for('birdie_bank'))
 
 
+@app.route('/api/birdie-bank/adjust-owed', methods=['POST'])
+@admin_required
+@csrf.exempt
+def adjust_birdie_owed():
+    data = request.get_json()
+    player_id = data.get('player_id')
+    new_owed = data.get('new_owed')
+    if player_id is None or new_owed is None:
+        return jsonify(success=False, error='Missing player_id or new_owed'), 400
+    new_owed = round(float(new_owed), 2)
+    # Compute current owed: purchases - reimbursements for this player
+    transactions = BirdieBank.query.filter_by(purchased_by=player_id).all()
+    current_owed = 0.0
+    for t in transactions:
+        if t.transaction_type == 'purchase':
+            current_owed += (t.cost or 0)
+        elif t.transaction_type == 'reimbursement':
+            current_owed -= (t.cost or 0)
+    current_owed = round(current_owed, 2)
+    diff = round(new_owed - current_owed, 2)
+    if diff == 0:
+        return jsonify(success=True, owed=current_owed)
+    # Create an adjustment transaction
+    if diff > 0:
+        # Increase owed = add a purchase adjustment
+        adj = BirdieBank(
+            transaction_type='purchase', quantity=0, cost=diff,
+            notes='Owed amount adjustment', date=datetime.utcnow(),
+            purchased_by=player_id
+        )
+    else:
+        # Decrease owed = add a reimbursement adjustment
+        adj = BirdieBank(
+            transaction_type='reimbursement', quantity=0, cost=abs(diff),
+            notes='Owed amount adjustment', date=datetime.utcnow(),
+            purchased_by=player_id
+        )
+    db.session.add(adj)
+    db.session.commit()
+    player = Player.query.get(player_id)
+    name = player.name if player else 'Unknown'
+    log_activity('birdie_adjust', f'Adjusted owed for {name}: ${current_owed:.2f} → ${new_owed:.2f}', 'birdie')
+    return jsonify(success=True, owed=new_owed)
+
+
 @app.route('/birdie-bank/<int:id>/update', methods=['POST'])
 @admin_required
 @csrf.exempt

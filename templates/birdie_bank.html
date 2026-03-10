@@ -49,7 +49,7 @@
 
     <!-- Admin Owed Table -->
     {% if admin_owed_list %}
-    <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20 mb-6">
+    <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20 mb-6" x-data="owedTable()">
         <h2 class="text-xl font-serif font-bold text-wimbledon-purple mb-4 flex items-center">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -69,29 +69,52 @@
                     {% for entry in admin_owed_list %}
                     <tr class="border-b border-gray-100">
                         <td class="py-3 px-4 font-medium text-gray-800">{{ entry.name }}</td>
-                        <td class="py-3 px-4 text-right font-bold {% if entry.owed > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                            ${{ '%.2f'|format(entry.owed) }}
+                        <td class="py-3 px-4 text-right font-bold">
+                            <template x-if="editingId !== {{ entry.id }}">
+                                <span class="inline-flex items-center gap-1 {% if entry.owed > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                                    $<span x-text="owed[{{ entry.id }}].toFixed(2)"></span>
+                                    <button @click="startEdit({{ entry.id }})" class="text-gray-400 hover:text-wimbledon-purple p-0.5" title="Edit owed amount">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                        </svg>
+                                    </button>
+                                </span>
+                            </template>
+                            <template x-if="editingId === {{ entry.id }}">
+                                <form @submit.prevent="saveEdit({{ entry.id }}, '{{ entry.name | e }}')" class="inline-flex items-center gap-1 justify-end">
+                                    <span class="text-gray-500">$</span>
+                                    <input type="number" step="0.01" min="0" x-model="editVal"
+                                        class="w-20 px-1.5 py-0.5 border border-wimbledon-green rounded text-sm text-right focus:outline-none">
+                                    <button type="submit" class="text-green-600 hover:text-green-800 p-0.5" title="Save">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    </button>
+                                    <button type="button" @click="editingId = null" class="text-gray-400 hover:text-red-500 p-0.5" title="Cancel">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </form>
+                            </template>
                         </td>
                         <td class="py-3 px-4">
-                            {% if entry.owed > 0 %}
-                            <form method="POST" action="{{ url_for('add_birdie_transaction') }}" class="flex items-center justify-end gap-2"
-                                onsubmit="return confirm('Reimburse {{ entry.name }} $' + this.cost.value + '?')">
-                                <input type="hidden" name="transaction_type" value="reimbursement">
-                                <input type="hidden" name="quantity" value="0">
-                                <input type="hidden" name="purchased_by" value="{{ entry.id }}">
-                                <input type="hidden" name="date" value="{{ today }}">
-                                <input type="hidden" name="notes" value="Reimbursement for birdie purchases">
-                                <input type="number" step="0.01" min="0.01" max="{{ '%.2f'|format(entry.owed) }}" name="cost"
-                                    value="{{ '%.2f'|format(entry.owed) }}"
-                                    class="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-right focus:outline-none focus:border-wimbledon-green">
-                                <button type="submit"
-                                    class="px-3 py-1.5 bg-wimbledon-green text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-all whitespace-nowrap">
-                                    Reimburse
-                                </button>
-                            </form>
-                            {% else %}
-                            <div class="text-right"><span class="text-xs text-gray-400">Settled</span></div>
-                            {% endif %}
+                            <template x-if="owed[{{ entry.id }}] > 0">
+                                <form method="POST" action="{{ url_for('add_birdie_transaction') }}" class="flex items-center justify-end gap-2"
+                                    onsubmit="return confirm('Reimburse {{ entry.name }} $' + this.cost.value + '?')">
+                                    <input type="hidden" name="transaction_type" value="reimbursement">
+                                    <input type="hidden" name="quantity" value="0">
+                                    <input type="hidden" name="purchased_by" value="{{ entry.id }}">
+                                    <input type="hidden" name="date" value="{{ today }}">
+                                    <input type="hidden" name="notes" value="Reimbursement for birdie purchases">
+                                    <input type="number" step="0.01" min="0.01" :max="owed[{{ entry.id }}].toFixed(2)" name="cost"
+                                        :value="owed[{{ entry.id }}].toFixed(2)"
+                                        class="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-right focus:outline-none focus:border-wimbledon-green">
+                                    <button type="submit"
+                                        class="px-3 py-1.5 bg-wimbledon-green text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-all whitespace-nowrap">
+                                        Reimburse
+                                    </button>
+                                </form>
+                            </template>
+                            <template x-if="owed[{{ entry.id }}] <= 0">
+                                <div class="text-right"><span class="text-xs text-gray-400">Settled</span></div>
+                            </template>
                         </td>
                     </tr>
                     {% endfor %}
@@ -330,6 +353,36 @@
 
 {% block scripts %}
 <script>
+function owedTable() {
+    return {
+        owed: { {% for entry in admin_owed_list %}{{ entry.id }}: {{ entry.owed }},{% endfor %} },
+        editingId: null,
+        editVal: 0,
+        startEdit(id) {
+            this.editingId = id;
+            this.editVal = this.owed[id].toFixed(2);
+        },
+        saveEdit(id, name) {
+            const newOwed = parseFloat(this.editVal);
+            if (isNaN(newOwed) || newOwed < 0) { alert('Invalid amount'); return; }
+            fetch('/api/birdie-bank/adjust-owed', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({player_id: id, new_owed: newOwed})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    this.owed[id] = data.owed;
+                    this.editingId = null;
+                } else {
+                    alert(data.error || 'Update failed');
+                }
+            })
+            .catch(() => alert('Update failed'));
+        }
+    };
+}
 function birdieHistory() {
     return {
         typeFilter: '',
