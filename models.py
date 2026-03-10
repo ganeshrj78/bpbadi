@@ -502,11 +502,12 @@ class BirdieBank(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime, default=datetime.utcnow)
-    transaction_type = db.Column(db.String(20), nullable=False)  # 'purchase' or 'usage'
-    quantity = db.Column(db.Integer, nullable=False)  # positive for purchase, positive for usage (stored as positive, type determines direction)
-    cost = db.Column(db.Float, default=0)  # cost for purchases
+    transaction_type = db.Column(db.String(20), nullable=False)  # 'purchase', 'usage', or 'reimbursement'
+    quantity = db.Column(db.Integer, nullable=False)  # positive for purchase, positive for usage
+    cost = db.Column(db.Float, default=0)  # cost for purchases, reimbursement amount
     notes = db.Column(db.Text)
     session_id = db.Column(db.Integer, db.ForeignKey('sessions.id'), nullable=True)  # link to session for usage
+    purchased_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)  # who paid for purchase/who gets reimbursed
 
     # Audit fields
     created_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)
@@ -515,6 +516,7 @@ class BirdieBank(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     session = db.relationship('Session', backref='birdie_transactions')
+    purchaser = db.relationship('Player', foreign_keys=[purchased_by])
 
     def to_dict(self):
         return {

@@ -1341,9 +1341,15 @@ def sessions():
                 return True
         return False
 
-    regular_players.sort(key=lambda p: (not _is_participating(p.id), p.name))
-    adhoc_players.sort(key=lambda p: (not _is_participating(p.id), p.name))
-    kid_players.sort(key=lambda p: (not _is_participating(p.id), p.name))
+    # Separate not-playing players into their own group at the bottom
+    not_playing_players = sorted(
+        [p for p in regular_players + adhoc_players + kid_players if not _is_participating(p.id)],
+        key=lambda p: p.name
+    )
+    not_playing_ids = {p.id for p in not_playing_players}
+    regular_players = sorted([p for p in regular_players if p.id not in not_playing_ids], key=lambda p: p.name)
+    adhoc_players = sorted([p for p in adhoc_players if p.id not in not_playing_ids], key=lambda p: p.name)
+    kid_players = sorted([p for p in kid_players if p.id not in not_playing_ids], key=lambda p: p.name)
 
     # Pre-compute per-player cost for active sessions using unified pool model (no extra DB calls)
     active_session_costs = {}
@@ -1425,6 +1431,7 @@ def sessions():
                           regular_players=regular_players,
                           adhoc_players=adhoc_players,
                           kid_players=kid_players,
+                          not_playing_players=not_playing_players,
                           attendance_map=attendance_map,
                           attendance_details=attendance_details,
                           player_stats=player_stats,
@@ -1627,15 +1634,19 @@ def session_detail(id):
             else:
                 player_session_costs[player.id] = 0
 
-    # Sort active players for display: YES/FILLIN/DROPOUT first, then STANDBY (waitlisted) — both sub-groups by name
+    # Sort active players for display: Regular first, then Adhoc, then STANDBY (waitlisted) — sub-groups by name
     def _display_priority(p):
         s = attendance_map.get(p.id, 'NO')
-        if s in ['YES', 'FILLIN', 'DROPOUT']: return 0
-        if s == 'STANDBY': return 1
-        return 2
+        cat = category_map.get(p.id, p.category or 'regular')
+        if s in ['YES', 'FILLIN', 'DROPOUT']:
+            if cat == 'regular': return 0
+            if cat == 'adhoc': return 1
+            return 0  # kid or other → group with regular
+        if s == 'STANDBY': return 2
+        return 3
 
     players_display = sorted(
-        [p for p in players if p.is_active and attendance_map.get(p.id, 'NO') in ['YES', 'FILLIN', 'STANDBY', 'DROPOUT']],
+        [p for p in players if p.is_active],
         key=lambda p: (_display_priority(p), p.name)
     )
 
@@ -2971,11 +2982,70 @@ def birdie_bank():
     # Get sessions for linking usage
     sessions_list = Session.query.order_by(Session.date.desc()).limit(20).all()
 
+    # Admin list for purchased_by dropdown
+    admins = Player.query.filter_by(is_admin=True, is_active=True, is_approved=True).order_by(Player.name).all()
+
+    # Compute per-admin owed: purchases - reimbursements
+    admin_owed = {}
+    for t in transactions:
+        if t.purchased_by and t.transaction_type == 'purchase':
+            admin_owed[t.purchased_by] = admin_owed.get(t.purchased_by, 0.0) + (t.cost or 0)
+        elif t.purchased_by and t.transaction_type == 'reimbursement':
+            admin_owed[t.purchased_by] = admin_owed.get(t.purchased_by, 0.0) - (t.cost or 0)
+    # Build display list: {player_id: {name, owed}}
+    admin_owed_list = []
+    admin_name_map = {a.id: a.name for a in admins}
+    for pid, amount in sorted(admin_owed.items(), key=lambda x: -x[1]):
+        name = admin_name_map.get(pid)
+        if not name:
+            p = Player.query.get(pid)
+            name = p.name if p else 'Unknown'
+        admin_owed_list.append({'id': pid, 'name': name, 'owed': round(amount, 2)})
+
+    # Birdie cost collected from players: birdie_cost * charged_players per session
+    all_sessions_with_birdie = Session.query.filter(Session.birdie_cost > 0).all()
+    birdie_session_ids = [s.id for s in all_sessions_with_birdie]
+    # Count charged players per session
+    charged_counts = {}
+    if birdie_session_ids:
+        from sqlalchemy import func
+        counts = db.session.query(
+            Attendance.session_id, func.count(Attendance.id)
+        ).filter(
+            Attendance.session_id.in_(birdie_session_ids),
+            Attendance.status.in_(['YES', 'FILLIN', 'DROPOUT'])
+        ).group_by(Attendance.session_id).all()
+        charged_counts = dict(counts)
+
+    monthly_costs = {}
+    total_birdie_collected = 0.0
+    for s in all_sessions_with_birdie:
+        count = charged_counts.get(s.id, 0)
+        collected = s.birdie_cost * count
+        total_birdie_collected += collected
+        key = s.date.strftime('%Y-%m')
+        label = s.date.strftime('%b %Y')
+        if key not in monthly_costs:
+            monthly_costs[key] = {'label': label, 'cost': 0.0}
+        monthly_costs[key]['cost'] += collected
+    monthly_cost_list = [v for _, v in sorted(monthly_costs.items(), reverse=True)]
+    total_birdie_collected = round(total_birdie_collected, 2)
+
+    # Total reimbursed
+    total_reimbursed = sum(t.cost or 0 for t in transactions if t.transaction_type == 'reimbursement')
+    birdie_fund_balance = round(total_birdie_collected - total_reimbursed, 2)
+
     return render_template('birdie_bank.html',
                          transactions=transactions,
                          current_stock=current_stock,
                          total_spent=total_spent,
+                         total_birdie_collected=total_birdie_collected,
+                         total_reimbursed=round(total_reimbursed, 2),
+                         birdie_fund_balance=birdie_fund_balance,
                          sessions=sessions_list,
+                         admins=admins,
+                         admin_owed_list=admin_owed_list,
+                         monthly_cost_list=monthly_cost_list,
                          today=date.today().isoformat())
 
 
@@ -2983,29 +3053,39 @@ def birdie_bank():
 @admin_required
 def add_birdie_transaction():
     transaction_type = request.form.get('transaction_type')
-    quantity = int(request.form.get('quantity'))
+    quantity = int(request.form.get('quantity', 0))
     cost = float(request.form.get('cost', 0))
     notes = request.form.get('notes')
     date_str = request.form.get('date')
     session_id = request.form.get('session_id')
+    purchased_by = request.form.get('purchased_by')
 
     transaction_date = datetime.strptime(date_str, '%Y-%m-%d') if date_str else datetime.utcnow()
 
     transaction = BirdieBank(
         transaction_type=transaction_type,
         quantity=quantity,
-        cost=cost if transaction_type == 'purchase' else 0,
+        cost=cost if transaction_type in ('purchase', 'reimbursement') else 0,
         notes=notes,
         date=transaction_date,
-        session_id=int(session_id) if session_id else None
+        session_id=int(session_id) if session_id else None,
+        purchased_by=int(purchased_by) if purchased_by else None
     )
     db.session.add(transaction)
     db.session.commit()
-    log_activity('birdie_transaction', f'{transaction_type}: {quantity} birdies', 'birdie')
 
     if transaction_type == 'purchase':
-        flash(f'Added {quantity} birdies to inventory (${cost:.2f})', 'success')
+        purchaser = Player.query.get(int(purchased_by)) if purchased_by else None
+        who = f' (paid by {purchaser.name})' if purchaser else ''
+        log_activity('birdie_transaction', f'Purchase: {quantity} birdies ${cost:.2f}{who}', 'birdie')
+        flash(f'Added {quantity} birdies to inventory (${cost:.2f}){who}', 'success')
+    elif transaction_type == 'reimbursement':
+        purchaser = Player.query.get(int(purchased_by)) if purchased_by else None
+        who = purchaser.name if purchaser else 'Unknown'
+        log_activity('birdie_reimbursement', f'Reimbursed {who} ${cost:.2f} for birdie purchase', 'birdie')
+        flash(f'Reimbursed {who} ${cost:.2f} for birdie purchase', 'success')
     else:
+        log_activity('birdie_transaction', f'Usage: {quantity} birdies', 'birdie')
         flash(f'Recorded usage of {quantity} birdies', 'success')
 
     return redirect(url_for('birdie_bank'))

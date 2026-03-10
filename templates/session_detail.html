@@ -437,7 +437,7 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-wimbledon-gold/10">
-                {% set ns_hdr = namespace(standby_shown=false, participants_shown=false) %}
+                {% set ns_hdr = namespace(standby_shown=false, regular_shown=false, adhoc_shown=false, notplaying_shown=false) %}
                 {% for player in players_display %}
                 {% set att = attendance_records.get(player.id) %}
                 {% set current_status = attendance_map.get(player.id, 'NO') %}
@@ -445,11 +445,21 @@
                 {% set payment_status = att.payment_status if att else 'unpaid' %}
                 {% if player.id in (pending_refund_pids | default([])) %}{% set payment_status = 'pending_refund' %}{% endif %}
                 {% set is_billable = current_status in ['YES', 'FILLIN', 'DROPOUT'] %}
-                {% if current_status != 'STANDBY' and not ns_hdr.participants_shown %}
-                {% set ns_hdr.participants_shown = true %}
+                {% set is_playing = current_status in ['YES', 'FILLIN', 'DROPOUT'] %}
+                {% set player_cat = category_map.get(player.id, player.category or 'regular') %}
+                {% if is_playing and player_cat != 'adhoc' and not ns_hdr.regular_shown %}
+                {% set ns_hdr.regular_shown = true %}
                 <tr class="bg-gray-50/60">
                     <td colspan="10" class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                        Participants
+                        Regular Players
+                    </td>
+                </tr>
+                {% endif %}
+                {% if is_playing and player_cat == 'adhoc' and not ns_hdr.adhoc_shown %}
+                {% set ns_hdr.adhoc_shown = true %}
+                <tr class="bg-purple-50/60">
+                    <td colspan="10" class="px-4 py-2 text-xs font-semibold text-purple-700 uppercase tracking-wider border-b border-purple-200">
+                        Adhoc Players
                     </td>
                 </tr>
                 {% endif %}
@@ -457,7 +467,15 @@
                 {% set ns_hdr.standby_shown = true %}
                 <tr class="bg-teal-50/60">
                     <td colspan="10" class="px-4 py-2 text-xs font-semibold text-teal-700 uppercase tracking-wider border-b border-teal-200">
-                        ⏳ Waitlisted — priority fill-in when a confirmed player drops out
+                        Waitlisted — priority fill-in when a confirmed player drops out
+                    </td>
+                </tr>
+                {% endif %}
+                {% if current_status in ['NO', 'TENTATIVE'] and not ns_hdr.notplaying_shown %}
+                {% set ns_hdr.notplaying_shown = true %}
+                <tr class="bg-gray-100/60">
+                    <td colspan="10" class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-200">
+                        Not Playing
                     </td>
                 </tr>
                 {% endif %}

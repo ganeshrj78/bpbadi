@@ -279,18 +279,9 @@
                         Regular Players ({{ regular_players|length }})
                     </td>
                 </tr>
-                {% set seen_np_reg = namespace(val=false) %}
                 {% for player in regular_players %}
                 {% set stats = player_stats[player.id] %}
-                {% set ns_np = namespace(all_no=true) %}{% for sess in active_sessions %}{% set _s = attendance_map.get(sess.id, {}).get(player.id, '') %}{% if _s and _s != 'NO' %}{% set ns_np.all_no = false %}{% endif %}{% endfor %}
-                {% if ns_np.all_no and active_sessions and not seen_np_reg.val %}
-                {% set seen_np_reg.val = true %}
-                <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
-                        Not Playing
-                    </td>
-                </tr>
-                {% endif %}
+                {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
@@ -475,18 +466,9 @@
                         Adhoc Players ({{ adhoc_players|length }})
                     </td>
                 </tr>
-                {% set seen_np_adhoc = namespace(val=false) %}
                 {% for player in adhoc_players %}
                 {% set stats = player_stats[player.id] %}
-                {% set ns_np = namespace(all_no=true) %}{% for sess in active_sessions %}{% set _s = attendance_map.get(sess.id, {}).get(player.id, '') %}{% if _s and _s != 'NO' %}{% set ns_np.all_no = false %}{% endif %}{% endfor %}
-                {% if ns_np.all_no and active_sessions and not seen_np_adhoc.val %}
-                {% set seen_np_adhoc.val = true %}
-                <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
-                        Not Playing
-                    </td>
-                </tr>
-                {% endif %}
+                {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
@@ -671,18 +653,9 @@
                         Kids ({{ kid_players|length }})
                     </td>
                 </tr>
-                {% set seen_np_kid = namespace(val=false) %}
                 {% for player in kid_players %}
                 {% set stats = player_stats[player.id] %}
-                {% set ns_np = namespace(all_no=true) %}{% for sess in active_sessions %}{% set _s = attendance_map.get(sess.id, {}).get(player.id, '') %}{% if _s and _s != 'NO' %}{% set ns_np.all_no = false %}{% endif %}{% endfor %}
-                {% if ns_np.all_no and active_sessions and not seen_np_kid.val %}
-                {% set seen_np_kid.val = true %}
-                <tr class="bg-gray-50" x-show="paymentFilter !== 'paid' && paymentFilter !== 'unpaid'">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-1.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 pl-8 border-t border-gray-200">
-                        Not Playing
-                    </td>
-                </tr>
-                {% endif %}
+                {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
@@ -839,6 +812,135 @@
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
                         {% endif %}
+                    </td>
+                    <td class="px-2 py-2 text-left">
+                        {% set ns_ac = namespace(val='') %}
+                        {% for _sess in active_sessions %}
+                            {% set _c = attendance_details.get(_sess.id, {}).get(player.id, {}).get('comments', '') %}
+                            {% if _c %}{% if ns_ac.val %}{% set ns_ac.val = ns_ac.val + ' | ' + _c %}{% else %}{% set ns_ac.val = _c %}{% endif %}{% endif %}
+                        {% endfor %}
+                        {% set comment_val = player.admin_comments or ns_ac.val %}
+                        <input type="text"
+                            value="{{ comment_val | e }}"
+                            onchange="updatePlayerComments({{ player.id }}, this.value)"
+                            placeholder="Add comment..."
+                            class="w-full min-w-[140px] px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green">
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+
+                <!-- Not Playing Section -->
+                {% if not_playing_players | default([]) %}
+                <tr class="bg-gray-100" x-show="paymentFilter === 'all' || paymentFilter === 'not_participating'">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-100">
+                        Not Playing ({{ not_playing_players|length }})
+                    </td>
+                </tr>
+                {% for player in not_playing_players %}
+                {% set stats = player_stats[player.id] %}
+                {% set ns_np = namespace(all_no=true) %}
+                <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
+                    x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'not_participating'))">
+                    <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
+                        <div class="flex items-center space-x-2">
+                            <input type="checkbox"
+                                :checked="selectedPlayers.includes({{ player.id }})"
+                                @change="$event.target.checked ? selectedPlayers.push({{ player.id }}) : selectedPlayers = selectedPlayers.filter(id => id !== {{ player.id }})"
+                                class="w-3.5 h-3.5 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple cursor-pointer flex-shrink-0">
+                            <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-2 hover:text-wimbledon-purple">
+                                {% if player.profile_photo %}
+                                <img loading="lazy" src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-8 h-8 rounded-full object-cover border border-wimbledon-gold/30">
+                                {% else %}
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center text-white text-xs font-bold">
+                                    {{ player.name[0] }}
+                                </div>
+                                {% endif %}
+                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>
+                            </a>
+                            <div class="flex gap-1 ml-1">
+                                <button title="Set YES for selected sessions"
+                                    onclick="bulkSetAttendance({{ player.id }}, 'YES')"
+                                    class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-green-100 text-green-700 hover:bg-green-600 hover:text-white transition-all border border-green-300">Y</button>
+                                <button title="Set NO for selected sessions"
+                                    onclick="bulkSetAttendance({{ player.id }}, 'NO')"
+                                    class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-500 hover:bg-gray-500 hover:text-white transition-all border border-gray-300">N</button>
+                            </div>
+                        </div>
+                    </td>
+                    {% for session in active_sessions %}
+                    {% set att_comment = attendance_details.get(session.id, {}).get(player.id, {}).get('comments', '') %}
+                    <td class="px-1 py-1 text-center">
+                        {% set status = attendance_map.get(session.id, {}).get(player.id, '') %}
+                        <select onchange="trackChange(this, {{ session.id }}, {{ player.id }})"
+                            data-session-id="{{ session.id }}"
+                            data-player-id="{{ player.id }}"
+                            data-original="{{ status }}"
+                            data-player-name="{{ player.name | e }}"
+                            class="attendance-select w-20 text-xs py-1 px-1 rounded border
+                            {% if status == 'YES' %}bg-green-100 border-green-500 text-green-700
+                            {% elif status == 'NO' %}bg-gray-100 border-gray-300 text-gray-500
+                            {% elif status == 'TENTATIVE' %}bg-yellow-100 border-yellow-500 text-yellow-700
+                            {% elif status == 'FILLIN' %}bg-blue-100 border-blue-500 text-blue-700
+                            {% elif status == 'DROPOUT' %}bg-orange-100 border-orange-500 text-orange-700
+                            {% elif status == 'STANDBY' %}bg-teal-100 border-teal-500 text-teal-700
+                            {% else %}bg-gray-100 border-gray-300 text-gray-500{% endif %}">
+                            {% if session.voting_frozen %}
+                            {% if status == 'YES' %}
+                            <option value="YES" selected>Yes</option>
+                            <option value="DROPOUT">Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'NO' or not status %}
+                            <option value="" {% if not status %}selected{% endif %}>--</option>
+                            <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'TENTATIVE' %}
+                            <option value="TENTATIVE" selected>Tentative</option>
+                            <option value="DROPOUT">Drop-Out</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'DROPOUT' %}
+                            <option value="YES">Yes</option>
+                            <option value="DROPOUT" selected>Drop-Out</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'FILLIN' %}
+                            <option value="NO">No</option>
+                            <option value="FILLIN" selected>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="YES">Yes</option>
+                            <option value="NO">No</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="STANDBY" selected>Stand By</option>
+                            {% endif %}
+                            {% else %}
+                            <option value="" {% if not status %}selected{% endif %}>--</option>
+                            <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
+                            <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
+                            <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
+                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
+                            <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
+                            <option value="DROPOUT" {% if status == 'DROPOUT' %}selected{% endif %}>Drop-Out</option>
+                            {% endif %}
+                        </select>
+                    </td>
+                    {% endfor %}
+                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <input type="number" step="0.01"
+                            value="{{ player.additional_charges or 0 }}"
+                            onchange="updatePlayerCharges({{ player.id }}, this.value)"
+                            data-player-id="{{ player.id }}"
+                            class="addl-charges-input w-16 px-1 py-0.5 text-xs text-right border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
+                    </td>
+                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <span class="text-sm text-gray-400">—</span>
+                    </td>
+                    <td class="px-2 py-2 text-center whitespace-nowrap">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
+                    </td>
+                    <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <span class="text-gray-300 text-xs">—</span>
                     </td>
                     <td class="px-2 py-2 text-left">
                         {% set ns_ac = namespace(val='') %}
