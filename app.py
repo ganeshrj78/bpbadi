@@ -2326,9 +2326,9 @@ def batch_update_attendance():
                 'YES': ['DROPOUT', 'STANDBY'],
                 'NO': ['FILLIN', 'STANDBY'],
                 'TENTATIVE': ['DROPOUT', 'FILLIN', 'STANDBY'],
-                'DROPOUT': ['YES', 'STANDBY'],
+                'DROPOUT': ['NO', 'FILLIN'],
                 'FILLIN': ['NO', 'STANDBY'],
-                'STANDBY': ['YES', 'NO'],
+                'STANDBY': ['FILLIN', 'DROPOUT'],
                 None: ['FILLIN', 'STANDBY'],
             }
             allowed = allowed_transitions.get(current_status, [])
