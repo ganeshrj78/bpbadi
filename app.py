@@ -816,19 +816,73 @@ def player_payments():
     managed_players = player.managed_players
 
     if request.method == 'POST':
-        target_player_id = int(request.form.get('player_id', player_id))
+        target_value = request.form.get('player_id', str(player_id))
         amount = float(request.form.get('amount'))
         method = request.form.get('method')
         date_str = request.form.get('date')
         notes = request.form.get('notes')
+        payment_date = datetime.strptime(date_str, '%Y-%m-%d') if date_str else datetime.utcnow()
 
-        # Verify target is self or managed player
         managed_player_ids = [p.id for p in managed_players]
+
+        # Family payment: split proportionally across all members with a balance
+        if target_value == 'family':
+            family_ids = [player_id] + managed_player_ids
+            family_players = Player.query.filter(Player.id.in_(family_ids)).all()
+            balances = {p.id: max(p.get_balance(), 0) for p in family_players}
+            total_owed = sum(balances.values())
+
+            if total_owed <= 0:
+                flash('No balance owed for the family', 'error')
+                return redirect(url_for('player_payments'))
+
+            active_session_ids = [s.id for s in Session.query.filter_by(is_archived=False).all()]
+            paid_names = []
+
+            for fp in family_players:
+                if balances[fp.id] <= 0:
+                    continue
+                # Proportional split
+                share = round(amount * balances[fp.id] / total_owed, 2)
+                if share <= 0:
+                    continue
+
+                payment = Payment(
+                    player_id=fp.id, amount=share, method=method,
+                    date=payment_date, notes=notes or f'Family payment (total ${amount:.2f})'
+                )
+                db.session.add(payment)
+                paid_names.append(f'{fp.name} ${share:.2f}')
+
+                # Mark attendance as paid
+                if active_session_ids:
+                    unpaid_atts = Attendance.query.filter(
+                        Attendance.player_id == fp.id,
+                        Attendance.session_id.in_(active_session_ids),
+                        Attendance.status.in_(['YES', 'FILLIN']),
+                        Attendance.payment_status == 'unpaid'
+                    ).all()
+                    for att in unpaid_atts:
+                        att.payment_status = 'paid'
+                        if att.status == 'FILLIN':
+                            sess_costs = get_cached_session_costs(att.session_id)
+                            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+                            fillin_cost = sess_costs.get(cat, 0)
+                            today_str = date.today().strftime('%m/%d')
+                            comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today_str}'
+                            att.comments = (att.comments + ' | ' + comment) if att.comments else comment
+
+            db.session.commit()
+            clear_session_cache()
+            log_activity('player_payment', f'Family payment ${amount:.2f}: {", ".join(paid_names)}', 'payment')
+            flash(f'Family payment of ${amount:.2f} recorded ({", ".join(paid_names)})', 'success')
+            return redirect(url_for('player_payments'))
+
+        # Single player payment
+        target_player_id = int(target_value)
         if target_player_id != player_id and target_player_id not in managed_player_ids:
             flash('You can only record payments for yourself or managed players', 'error')
             return redirect(url_for('player_payments'))
-
-        payment_date = datetime.strptime(date_str, '%Y-%m-%d') if date_str else datetime.utcnow()
 
         payment = Payment(
             player_id=target_player_id,

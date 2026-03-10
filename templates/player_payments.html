@@ -15,8 +15,51 @@
         <p class="text-gray-500 mt-1">Record and view your payments</p>
     </div>
 
+    {% set ns_fb = namespace(val=player.get_balance()) %}
+    {% for mp in managed_players %}{% set ns_fb.val = ns_fb.val + mp.get_balance() %}{% endfor %}
+    {% set family_balance = ns_fb.val %}
+
+    {% if managed_players %}
+    <!-- Family Balance Summary -->
+    <div class="rounded-2xl shadow-lg p-6 border mb-6 {% if family_balance > 0 %}bg-red-50 border-red-200{% else %}bg-green-50 border-green-200{% endif %}">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold {% if family_balance > 0 %}text-red-600{% else %}text-green-600{% endif %} uppercase tracking-wide">Family Balance Due</h3>
+            <p class="text-3xl font-bold {% if family_balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(family_balance) }}</p>
+        </div>
+        <div class="space-y-2 border-t {% if family_balance > 0 %}border-red-200{% else %}border-green-200{% endif %} pt-3">
+            <div class="flex items-center justify-between text-sm">
+                <div class="flex items-center gap-2">
+                    {% if player.profile_photo %}
+                    <img loading="lazy" src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-6 h-6 rounded-full object-cover">
+                    {% else %}
+                    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center">
+                        <span class="text-white font-bold text-[10px]">{{ player.name[0] }}</span>
+                    </div>
+                    {% endif %}
+                    <span class="font-medium text-gray-800">{{ player.name }} (You)</span>
+                </div>
+                <span class="font-bold {% if player.get_balance() > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(player.get_balance()) }}</span>
+            </div>
+            {% for mp in managed_players %}
+            <div class="flex items-center justify-between text-sm">
+                <div class="flex items-center gap-2">
+                    {% if mp.profile_photo %}
+                    <img loading="lazy" src="{{ url_for('static', filename='uploads/' + mp.profile_photo) }}" alt="" class="w-6 h-6 rounded-full object-cover">
+                    {% else %}
+                    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center">
+                        <span class="text-white font-bold text-[10px]">{{ mp.name[0] }}</span>
+                    </div>
+                    {% endif %}
+                    <span class="font-medium text-gray-800">{{ mp.name }}</span>
+                </div>
+                <span class="font-bold {% if mp.get_balance() > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(mp.get_balance()) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <!-- Solo Balance Summary -->
     <div class="grid md:grid-cols-3 gap-6 mb-6">
-        <!-- Balance Summary -->
         <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20">
             <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Total Charges</h3>
             <p class="text-2xl font-bold text-gray-800">${{ '%.2f'|format(player.get_total_charges()) }}</p>
@@ -28,37 +71,6 @@
         <div class="rounded-2xl shadow-lg p-6 border {% if player.get_balance() > 0 %}bg-red-50 border-red-200{% else %}bg-green-50 border-green-200{% endif %}">
             <h3 class="text-sm font-semibold {% if player.get_balance() > 0 %}text-red-600{% else %}text-green-600{% endif %} uppercase tracking-wide mb-2">Balance Due</h3>
             <p class="text-2xl font-bold {% if player.get_balance() > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(player.get_balance()) }}</p>
-        </div>
-    </div>
-
-    {% if managed_players %}
-    <!-- Managed Players Balance Summary -->
-    <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20 mb-6">
-        <h2 class="text-xl font-serif font-bold text-wimbledon-purple mb-4 flex items-center">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
-            Family Members
-        </h2>
-        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {% for mp in managed_players %}
-            <div class="p-4 rounded-xl border {% if mp.get_balance() > 0 %}border-red-200 bg-red-50{% else %}border-green-200 bg-green-50{% endif %}">
-                <div class="flex items-center gap-3 mb-2">
-                    {% if mp.profile_photo %}
-                    <img loading="lazy" src="{{ url_for('static', filename='uploads/' + mp.profile_photo) }}" alt="{{ mp.name }}" class="w-10 h-10 rounded-full object-cover">
-                    {% else %}
-                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center">
-                        <span class="text-white font-bold text-sm">{{ mp.name[0] }}</span>
-                    </div>
-                    {% endif %}
-                    <span class="font-medium text-gray-800">{{ mp.name }}</span>
-                </div>
-                <div class="flex justify-between text-sm">
-                    <span class="text-gray-500">Balance:</span>
-                    <span class="font-bold {% if mp.get_balance() > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(mp.get_balance()) }}</span>
-                </div>
-            </div>
-            {% endfor %}
         </div>
     </div>
     {% endif %}
@@ -78,6 +90,9 @@
                 <select name="player_id" id="player_id" required
                     onchange="updateAmountOwed()"
                     class="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green focus:ring-4 focus:ring-wimbledon-green/20 transition-all">
+                    {% if managed_players %}
+                    <option value="family" data-balance="{{ '%.2f'|format(family_balance) }}">Everyone (Family) {% if family_balance > 0 %}- Owes ${{ '%.2f'|format(family_balance) }}{% endif %}</option>
+                    {% endif %}
                     <option value="{{ player.id }}" data-balance="{{ '%.2f'|format(player.get_balance()) }}">{{ player.name }} (You) {% if player.get_balance() > 0 %}- Owes ${{ '%.2f'|format(player.get_balance()) }}{% endif %}</option>
                     {% for mp in managed_players %}
                     <option value="{{ mp.id }}" data-balance="{{ '%.2f'|format(mp.get_balance()) }}">{{ mp.name }} {% if mp.get_balance() > 0 %}- Owes ${{ '%.2f'|format(mp.get_balance()) }}{% endif %}</option>
@@ -140,6 +155,9 @@
                 <thead>
                     <tr class="border-b border-gray-200">
                         <th class="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                        {% if managed_players %}
+                        <th class="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Player</th>
+                        {% endif %}
                         <th class="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Method</th>
                         <th class="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Notes</th>
                         <th class="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount</th>
@@ -149,6 +167,9 @@
                     {% for payment in payments %}
                     <tr class="border-b border-gray-100 table-row-hover">
                         <td class="py-3 px-4 text-gray-800">{{ payment.date.strftime('%b %d, %Y') }}</td>
+                        {% if managed_players %}
+                        <td class="py-3 px-4 text-gray-800 text-sm">{{ payment.player.name }}</td>
+                        {% endif %}
                         <td class="py-3 px-4">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                 {% if payment.method == 'Zelle' %}bg-blue-100 text-blue-800
