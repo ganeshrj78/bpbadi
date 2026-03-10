@@ -1,15 +1,15 @@
 """Add purchased_by column to birdie_bank
 
-Revision ID: a1b2c3d4e5f6
-Revises: f7a8b9c0d1e2
+Revision ID: c3d4e5f6a7b8
+Revises: b2c3d4e5f6a7
 Create Date: 2026-03-09
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.engine.reflection import Inspector
 
-revision = 'a1b2c3d4e5f6'
-down_revision = 'f7a8b9c0d1e2'
+revision = 'c3d4e5f6a7b8'
+down_revision = 'b2c3d4e5f6a7'
 branch_labels = None
 depends_on = None
 
