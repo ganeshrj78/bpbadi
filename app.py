@@ -2366,6 +2366,11 @@ def batch_update_attendance():
                 ).first()
                 if existing_refund:
                     db.session.delete(existing_refund)
+
+            # Set payment_status to unpaid when moving to a billable status
+            if status in ['FILLIN', 'YES'] and old_status in ['STANDBY', 'NO', 'TENTATIVE', None]:
+                attendance.payment_status = 'unpaid'
+
         else:
             player = Player.query.get(player_id)
             attendance = Attendance(
@@ -2455,6 +2460,11 @@ def update_attendance():
             ).first()
             if existing_refund:
                 db.session.delete(existing_refund)
+
+        # Set payment_status to unpaid when moving to a billable status
+        if status in ['FILLIN', 'YES'] and old_status in ['STANDBY', 'NO', 'TENTATIVE', None]:
+            attendance.payment_status = 'unpaid'
+
     else:
         player = Player.query.get(player_id)
         attendance = Attendance(player_id=player_id, session_id=session_id, status=status, category=player.category if player else 'regular')

@@ -896,17 +896,30 @@ function updateAttendance(playerId, sessionId, status, selectElement) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            const prevStatus = selectElement.dataset.prev || '';
+            // Reload page when status change moves player between sections
+            const sectionChanges = ['STANDBY', 'FILLIN', 'DROPOUT', 'NO'];
+            if (sectionChanges.includes(status) || sectionChanges.includes(prevStatus)) {
+                window.location.reload();
+                return;
+            }
             // Update select styling based on new status
             applySelectStyling(selectElement, status);
             selectElement.dataset.prev = status;
 
             document.getElementById('attendee-count').textContent = data.attendee_count;
             document.getElementById('cost-per-player').textContent = '$' + data.cost_per_player.toFixed(2);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to update'));
+            selectElement.value = selectElement.dataset.prev || '';
+            applySelectStyling(selectElement, selectElement.dataset.prev || '');
         }
     })
     .catch(error => {
         console.error('Error:', error);
         alert('Failed to update attendance');
+        selectElement.value = selectElement.dataset.prev || '';
+        applySelectStyling(selectElement, selectElement.dataset.prev || '');
     });
 }
 
