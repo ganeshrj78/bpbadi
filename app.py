@@ -2589,6 +2589,10 @@ def update_attendance_category():
             attendance = Attendance(player_id=player_id, session_id=sid, status='NO', category=category)
             db.session.add(attendance)
 
+    # Also update player's default category so new attendance records use it
+    if player:
+        player.category = category
+
     db.session.commit()
     clear_session_cache()
 
