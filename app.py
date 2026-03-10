@@ -2414,9 +2414,9 @@ def update_attendance():
             'YES': ['DROPOUT', 'STANDBY'],
             'NO': ['FILLIN', 'STANDBY'],
             'TENTATIVE': ['DROPOUT', 'FILLIN', 'STANDBY'],
-            'DROPOUT': ['YES', 'STANDBY'],
+            'DROPOUT': ['NO', 'FILLIN'],
             'FILLIN': ['NO', 'STANDBY'],
-            'STANDBY': ['YES', 'NO'],
+            'STANDBY': ['FILLIN', 'DROPOUT'],
             None: ['FILLIN', 'STANDBY'],
         }
 
@@ -2696,9 +2696,17 @@ def update_attendance_payment_status():
 
     if attendance:
         attendance.payment_status = payment_status
+        # Auto-update comments when a fill-in payment is marked as paid
+        if payment_status == 'paid' and attendance.status == 'FILLIN':
+            paid_note = f"Payment made {datetime.utcnow().strftime('%m/%d')}"
+            if attendance.comments:
+                if 'Payment made' not in attendance.comments:
+                    attendance.comments = f"{attendance.comments}; {paid_note}"
+            else:
+                attendance.comments = paid_note
         db.session.commit()
         log_activity('update_payment_status', f'Payment status updated for session {session_id}', 'attendance', attendance.id)
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'comments': attendance.comments or ''})
 
     return jsonify({'error': 'Attendance record not found'}), 404
 

@@ -354,16 +354,19 @@
                             <option value="FILLIN" selected>Fill-In</option>
                             <option value="STANDBY">Stand By</option>
                             {% elif status == 'STANDBY' %}
-                            <option value="YES">Yes</option>
-                            <option value="NO">No</option>
-                            <option value="FILLIN">Fill-In</option>
                             <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% else %}
                             {% if status == 'DROPOUT' %}
                             <option value="DROPOUT" selected>Drop-Out</option>
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
@@ -547,16 +550,19 @@
                             <option value="FILLIN" selected>Fill-In</option>
                             <option value="STANDBY">Stand By</option>
                             {% elif status == 'STANDBY' %}
-                            <option value="YES">Yes</option>
-                            <option value="NO">No</option>
-                            <option value="FILLIN">Fill-In</option>
                             <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% else %}
                             {% if status == 'DROPOUT' %}
                             <option value="DROPOUT" selected>Drop-Out</option>
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
@@ -737,16 +743,19 @@
                             <option value="FILLIN" selected>Fill-In</option>
                             <option value="STANDBY">Stand By</option>
                             {% elif status == 'STANDBY' %}
-                            <option value="YES">Yes</option>
-                            <option value="NO">No</option>
-                            <option value="FILLIN">Fill-In</option>
                             <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% else %}
                             {% if status == 'DROPOUT' %}
                             <option value="DROPOUT" selected>Drop-Out</option>
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
@@ -927,16 +936,19 @@
                             <option value="FILLIN" selected>Fill-In</option>
                             <option value="STANDBY">Stand By</option>
                             {% elif status == 'STANDBY' %}
-                            <option value="YES">Yes</option>
-                            <option value="NO">No</option>
-                            <option value="FILLIN">Fill-In</option>
                             <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% else %}
                             {% if status == 'DROPOUT' %}
                             <option value="DROPOUT" selected>Drop-Out</option>
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
+                            {% elif status == 'STANDBY' %}
+                            <option value="STANDBY" selected>Stand By</option>
+                            <option value="FILLIN">Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
