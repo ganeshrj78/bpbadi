@@ -3095,6 +3095,21 @@ def add_birdie_transaction():
     return redirect(url_for('birdie_bank'))
 
 
+@app.route('/birdie-bank/<int:id>/update', methods=['POST'])
+@admin_required
+@csrf.exempt
+def update_birdie_transaction(id):
+    transaction = BirdieBank.query.get_or_404(id)
+    data = request.get_json()
+    if data and 'cost' in data:
+        old_cost = transaction.cost
+        transaction.cost = round(float(data['cost']), 2)
+        db.session.commit()
+        log_activity('update_birdie', f'Updated birdie transaction #{id} cost: ${old_cost:.2f} → ${transaction.cost:.2f}', 'birdie', id)
+        return jsonify(success=True, cost=transaction.cost)
+    return jsonify(success=False, error='No cost provided'), 400
+
+
 @app.route('/birdie-bank/<int:id>/delete', methods=['POST'])
 @admin_required
 def delete_birdie_transaction(id):

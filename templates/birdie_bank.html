@@ -278,7 +278,31 @@
                             <td class="py-3 px-4 text-center font-semibold"
                                 :class="t.type === 'purchase' ? 'text-green-600' : t.type === 'reimbursement' ? 'text-blue-600' : 'text-red-600'"
                                 x-text="t.type === 'reimbursement' ? '-' : (t.type === 'purchase' ? '+' : '-') + t.qty"></td>
-                            <td class="py-3 px-4 text-right" x-text="t.type === 'usage' ? '-' : '$' + t.cost.toFixed(2)"></td>
+                            <td class="py-3 px-4 text-right">
+                                <template x-if="editingId !== t.id">
+                                    <span class="inline-flex items-center gap-1">
+                                        <span x-text="t.type === 'usage' ? '-' : '$' + t.cost.toFixed(2)"></span>
+                                        <button x-show="t.type !== 'usage'" @click="startEdit(t)" class="text-gray-400 hover:text-wimbledon-purple p-0.5" title="Edit cost">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                            </svg>
+                                        </button>
+                                    </span>
+                                </template>
+                                <template x-if="editingId === t.id">
+                                    <form @submit.prevent="saveEdit(t)" class="inline-flex items-center gap-1">
+                                        <span class="text-gray-500">$</span>
+                                        <input type="number" step="0.01" min="0" x-model="editCost" x-ref="editInput"
+                                            class="w-20 px-1.5 py-0.5 border border-wimbledon-green rounded text-sm text-right focus:outline-none">
+                                        <button type="submit" class="text-green-600 hover:text-green-800 p-0.5" title="Save">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                        </button>
+                                        <button type="button" @click="editingId = null" class="text-gray-400 hover:text-red-500 p-0.5" title="Cancel">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        </button>
+                                    </form>
+                                </template>
+                            </td>
                             <td class="py-3 px-4 text-gray-600" x-text="t.notes || '-'"></td>
                             <td class="py-3 px-4 text-center">
                                 <form method="POST" :action="'/birdie-bank/' + t.id + '/delete'" class="inline" onsubmit="return confirm('Delete this transaction?');">
@@ -312,6 +336,8 @@ function birdieHistory() {
         search: '',
         sortCol: 'date_sort',
         sortDir: 'desc',
+        editingId: null,
+        editCost: 0,
         allTxns: [
             {% for t in transactions %}
             {
@@ -333,6 +359,33 @@ function birdieHistory() {
                 this.sortCol = col;
                 this.sortDir = col === 'date_sort' ? 'desc' : 'asc';
             }
+        },
+        startEdit(t) {
+            this.editingId = t.id;
+            this.editCost = t.cost.toFixed(2);
+            this.$nextTick(() => {
+                const input = document.querySelector('input[x-model="editCost"]');
+                if (input) input.focus();
+            });
+        },
+        saveEdit(t) {
+            const newCost = parseFloat(this.editCost);
+            if (isNaN(newCost) || newCost < 0) { alert('Invalid cost'); return; }
+            fetch('/birdie-bank/' + t.id + '/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({cost: newCost})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    t.cost = data.cost;
+                    this.editingId = null;
+                } else {
+                    alert(data.error || 'Update failed');
+                }
+            })
+            .catch(() => alert('Update failed'));
         },
         get filtered() {
             let result = this.allTxns;
