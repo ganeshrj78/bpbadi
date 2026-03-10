@@ -208,6 +208,11 @@
                 class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all flex items-center gap-1">
                 ✗ Mark Unpaid
             </button>
+            <span class="border-l border-gray-300 h-6"></span>
+            <button @click="bulkMoveCategory('regular')"
+                class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-all">&rarr; Regular</button>
+            <button @click="bulkMoveCategory('adhoc')"
+                class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-all">&rarr; Adhoc</button>
             <button @click="selectedPlayers = []"
                 class="px-2 py-1.5 text-gray-500 rounded-lg text-sm hover:bg-gray-200 transition-all">
                 ✕
@@ -311,6 +316,9 @@
                                 <button title="Set NO for selected sessions"
                                     onclick="bulkSetAttendance({{ player.id }}, 'NO')"
                                     class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-500 hover:bg-gray-500 hover:text-white transition-all border border-gray-300">N</button>
+                                <button title="Move to Adhoc"
+                                    onclick="toggleCategory({{ player.id }}, 'adhoc')"
+                                    class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white transition-all border border-purple-300">&rarr;A</button>
                             </div>
                         </div>
                     </td>
@@ -504,6 +512,9 @@
                                 <button title="Set NO for selected sessions"
                                     onclick="bulkSetAttendance({{ player.id }}, 'NO')"
                                     class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gray-100 text-gray-500 hover:bg-gray-500 hover:text-white transition-all border border-gray-300">N</button>
+                                <button title="Move to Regular"
+                                    onclick="toggleCategory({{ player.id }}, 'regular')"
+                                    class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-green-100 text-green-700 hover:bg-green-600 hover:text-white transition-all border border-green-300">&rarr;R</button>
                             </div>
                         </div>
                     </td>
@@ -1022,6 +1033,26 @@ function sessionsMatrix() {
             }
         },
 
+        async bulkMoveCategory(category) {
+            if (this.selectedPlayers.length === 0) return;
+            if (!confirm(`Move ${this.selectedPlayers.length} player(s) to ${category} for all active sessions?`)) return;
+            const allSessionIds = [{% for s in active_sessions %}{{ s.id }},{% endfor %}];
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            try {
+                const promises = this.selectedPlayers.map(pid =>
+                    fetch('/api/attendance/category', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify({player_id: pid, session_ids: allSessionIds, category: category})
+                    }).then(r => r.json())
+                );
+                await Promise.all(promises);
+                location.reload();
+            } catch (err) {
+                alert('Failed to move players: ' + err.message);
+            }
+        },
+
         bulkCourtRate(hours) {
             const h = parseFloat(hours);
             if (h === 2) return 75;
@@ -1088,6 +1119,25 @@ function bulkSetAttendance(playerId, status) {
             trackChange(select, sessionId, playerId);
         }
     });
+}
+
+function toggleCategory(playerId, newCategory) {
+    const allSessionIds = [{% for s in active_sessions %}{{ s.id }},{% endfor %}];
+    if (!allSessionIds.length) return;
+    if (!confirm(`Move this player to ${newCategory} for all active sessions?`)) return;
+
+    fetch('/api/attendance/category', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content},
+        body: JSON.stringify({player_id: playerId, session_ids: allSessionIds, category: newCategory})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert('Failed: ' + (data.error || 'Unknown error'));
+    })
+    .catch(err => alert('Error: ' + err.message));
 }
 
 // Dropout modal data (injected from server)

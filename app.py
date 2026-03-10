@@ -2494,7 +2494,7 @@ def process_dropout():
     })
 
 
-# Attendance category API - update player category for a specific session
+# Attendance category API - update player category for one or all active sessions
 @app.route('/api/attendance/category', methods=['POST'])
 @csrf.exempt  # API endpoint uses JSON
 @admin_required
@@ -2502,26 +2502,39 @@ def update_attendance_category():
     data = request.get_json()
     player_id = data.get('player_id')
     session_id = data.get('session_id')
+    session_ids = data.get('session_ids')  # bulk mode: list of session IDs
     category = data.get('category')
 
     if category not in ['regular', 'adhoc', 'kid']:
         return jsonify({'error': 'Invalid category'}), 400
 
-    attendance = Attendance.query.filter_by(player_id=player_id, session_id=session_id).first()
+    # Support bulk update across multiple sessions (from sessions matrix)
+    ids_to_update = session_ids if session_ids else [session_id] if session_id else []
+    if not ids_to_update:
+        return jsonify({'error': 'No session specified'}), 400
 
-    if attendance:
-        attendance.category = category
-    else:
-        attendance = Attendance(player_id=player_id, session_id=session_id, status='NO', category=category)
-        db.session.add(attendance)
+    player = Player.query.get(player_id)
+    player_name = player.name if player else 'Unknown'
+
+    for sid in ids_to_update:
+        attendance = Attendance.query.filter_by(player_id=player_id, session_id=sid).first()
+        if attendance:
+            attendance.category = category
+        else:
+            attendance = Attendance(player_id=player_id, session_id=sid, status='NO', category=category)
+            db.session.add(attendance)
 
     db.session.commit()
-    log_activity('update_category', f'{attendance.player.name} category → {category} for session {session_id}', 'attendance', attendance.id)
+    clear_session_cache()
+
+    if len(ids_to_update) == 1:
+        log_activity('update_category', f'{player_name} category → {category} for session {ids_to_update[0]}', 'attendance')
+    else:
+        log_activity('update_category', f'{player_name} category → {category} for {len(ids_to_update)} sessions', 'attendance')
 
     return jsonify({
         'success': True,
         'player_id': player_id,
-        'session_id': session_id,
         'category': category
     })
 

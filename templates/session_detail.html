@@ -411,6 +411,11 @@
                         </svg>
                         <span x-text="loading ? 'Saving...' : 'Record (' + selectedCount + ')'"></span>
                     </button>
+                    <span class="border-l border-gray-200 h-5"></span>
+                    <button @click="bulkMoveCategory('regular')" :disabled="selectedCount === 0"
+                        class="px-2.5 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all">&rarr; Regular</button>
+                    <button @click="bulkMoveCategory('adhoc')" :disabled="selectedCount === 0"
+                        class="px-2.5 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all">&rarr; Adhoc</button>
                 </div>
             </div>
         </div>
@@ -717,6 +722,24 @@ function bulkPayment() {
             } catch (e) {
                 alert('Failed to record payments');
                 this.loading = false;
+            }
+        },
+        async bulkMoveCategory(category) {
+            const playerIds = Object.entries(this.selected).filter(([, v]) => v).map(([id]) => parseInt(id));
+            if (playerIds.length === 0) return;
+            if (!confirm(`Move ${playerIds.length} player(s) to ${category} for this session?`)) return;
+            try {
+                const promises = playerIds.map(pid =>
+                    fetch('/api/attendance/category', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({player_id: pid, session_id: SESSION_ID, category: category})
+                    }).then(r => r.json())
+                );
+                await Promise.all(promises);
+                location.reload();
+            } catch (err) {
+                alert('Failed to move players: ' + err.message);
             }
         }
     };
