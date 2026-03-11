@@ -980,13 +980,17 @@
                             class="addl-charges-input w-16 px-1 py-0.5 text-xs text-right border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green">
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
-                        <span class="text-sm text-gray-400">—</span>
+                        <span class="text-sm font-bold text-wimbledon-purple" data-player-total="{{ player.id }}" data-session-cost="0">
+                            $0.00
+                        </span>
                     </td>
                     <td class="px-2 py-2 text-center whitespace-nowrap">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <span data-player-fillin="{{ player.id }}">
                         <span class="text-gray-300 text-xs">—</span>
+                        </span>
                     </td>
                     <td class="px-2 py-2 text-left">
                         {% set ns_ac = namespace(val='') %}
@@ -1418,6 +1422,10 @@ async function saveAllChanges() {
 
 // Discard all pending changes
 function discardAllChanges() {
+    // Collect affected player IDs before reverting
+    const affectedPlayerIds = new Set();
+    pendingChanges.forEach(change => affectedPlayerIds.add(change.playerId));
+
     // Reset all modified dropdowns to their original values
     document.querySelectorAll('.attendance-select').forEach(select => {
         const originalStatus = select.dataset.original || '';
@@ -1427,6 +1435,9 @@ function discardAllChanges() {
 
     pendingChanges.clear();
     updateSaveBar();
+
+    // Recalculate totals for all affected players so amounts revert
+    affectedPlayerIds.forEach(pid => recalcPlayerTotals(pid));
 }
 
 // Update player additional charges
