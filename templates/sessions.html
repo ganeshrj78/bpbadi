@@ -1150,19 +1150,7 @@ function sessionsMatrix() {
                 });
                 const data = await resp.json();
                 if (data.success) {
-                    this.selectedPlayers.forEach(playerId => {
-                        const badge = document.querySelector(`[data-player-status="${playerId}"]`);
-                        if (badge) {
-                            if (status === 'paid') {
-                                badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700';
-                                badge.textContent = 'Paid';
-                            } else {
-                                badge.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700';
-                                badge.textContent = 'Unpaid';
-                            }
-                        }
-                    });
-                    this.selectedPlayers = [];
+                    location.reload();
                 } else {
                     alert(data.error || 'Failed to update payment status');
                 }
