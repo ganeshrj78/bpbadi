@@ -868,8 +868,9 @@ def player_payments():
                             sess_costs = get_cached_session_costs(att.session_id)
                             cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
                             fillin_cost = sess_costs.get(cat, 0)
-                            today_str = date.today().strftime('%m/%d')
-                            comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today_str}'
+                            att_sess = Session.query.get(att.session_id)
+                            s_date = att_sess.date.strftime('%m/%d') if att_sess else date.today().strftime('%m/%d')
+                            comment = f'Fill-in cost ${fillin_cost:.2f} for session {s_date} paid'
                             att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
             db.session.commit()
@@ -908,8 +909,9 @@ def player_payments():
                     sess_costs = get_cached_session_costs(att.session_id)
                     cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
                     fillin_cost = sess_costs.get(cat, 0)
-                    today = date.today().strftime('%m/%d')
-                    comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today}'
+                    att_sess = Session.query.get(att.session_id)
+                    s_date = att_sess.date.strftime('%m/%d') if att_sess else date.today().strftime('%m/%d')
+                    comment = f'Fill-in cost ${fillin_cost:.2f} for session {s_date} paid'
                     att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
         db.session.commit()
@@ -2342,7 +2344,7 @@ def batch_update_attendance():
         elif attendance:
             old_status = attendance.status
             attendance.status = status
-            today_str = date.today().strftime('%m/%d')
+            sess_date_str = sess.date.strftime('%m/%d')
 
             def _batch_append_comment(att, note):
                 existing = (att.comments or '').strip()
@@ -2359,7 +2361,7 @@ def batch_update_attendance():
                     fillin_cost = sess_costs.get(cat, 0)
                     net_owed = round(fillin_cost - suggested_refund, 2)
 
-                    note = f'Dropped out on {today_str} (was Fill-in)'
+                    note = f'Dropout for session {sess_date_str} (was Fill-in)'
                     note += f'\nFill-in cost: ${fillin_cost:.2f}, Refund: ${suggested_refund:.2f}'
                     if net_owed > 0:
                         note += f', Net owed: ${net_owed:.2f}'
@@ -2384,7 +2386,7 @@ def batch_update_attendance():
                 else:
                     # Normal dropout (YES → DROPOUT or paid FILLIN → DROPOUT)
                     attendance.payment_status = 'pending_refund'
-                    _batch_append_comment(attendance, f'Dropped out on {today_str}')
+                    _batch_append_comment(attendance, f'Dropout for session {sess_date_str}')
                     existing_refund = DropoutRefund.query.filter_by(
                         session_id=session_id, player_id=player_id
                     ).first()
@@ -2407,7 +2409,7 @@ def batch_update_attendance():
             if status in ['FILLIN', 'YES'] and old_status in ['STANDBY', 'NO', 'TENTATIVE', None]:
                 attendance.payment_status = 'unpaid'
                 if status == 'FILLIN':
-                    _batch_append_comment(attendance, f'Filled in on {today_str}')
+                    _batch_append_comment(attendance, f'Filled in for session {sess_date_str}')
 
         else:
             player = Player.query.get(player_id)
@@ -2534,9 +2536,8 @@ def process_dropout():
     fillin_player_id  = data.get('fillin_player_id')   # may be None
     refund_amount    = float(data.get('refund_amount', 0))
 
-    from datetime import date as _date
     sess = Session.query.get_or_404(session_id)
-    today = _date.today().strftime('%m/%d')
+    sess_date_str = sess.date.strftime('%m/%d')
 
     # ── Look up player names ──────────────────────────────────────────────────
     dropout_player = Player.query.get(dropout_player_id)
@@ -2567,7 +2568,7 @@ def process_dropout():
         fillin_cost = sess_costs.get(cat, 0)
         net_owed = round(fillin_cost - refund_amount, 2)
 
-        dropout_note = f'Dropped out on {today} (was Fill-in)'
+        dropout_note = f'Dropout for session {sess_date_str} (was Fill-in)'
         dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
         dropout_note += f'\nFill-in cost: ${fillin_cost:.2f}, Refund: ${refund_amount:.2f}'
         if net_owed > 0:
@@ -2600,7 +2601,7 @@ def process_dropout():
     else:
         # Normal dropout (YES → DROPOUT or paid FILLIN → DROPOUT)
         dropout_att.payment_status = 'pending_refund'
-        dropout_note = f'Dropped out on {today}'
+        dropout_note = f'Dropout for session {sess_date_str}'
         dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
         _append_comment(dropout_att, dropout_note)
 
@@ -2636,7 +2637,7 @@ def process_dropout():
                 payment_status='unpaid'
             )
             db.session.add(fillin_att)
-        _append_comment(fillin_att, f'Filled in on {today} for {dropout_name}')
+        _append_comment(fillin_att, f'Filled in for session {sess_date_str} for {dropout_name}')
 
     db.session.commit()
     clear_session_cache()
@@ -2744,8 +2745,9 @@ def bulk_update_payment_status():
             sess_costs = get_cached_session_costs(att.session_id)
             cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
             fillin_cost = sess_costs.get(cat, 0)
-            today_str = date.today().strftime('%m/%d')
-            comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today_str}'
+            att_sess = Session.query.get(att.session_id)
+            sess_date_str = att_sess.date.strftime('%m/%d') if att_sess else date.today().strftime('%m/%d')
+            comment = f'Fill-in cost ${fillin_cost:.2f} for session {sess_date_str} paid'
             att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
     # Optionally record payment entries when marking as paid
@@ -2789,9 +2791,11 @@ def update_attendance_payment_status():
         attendance.payment_status = payment_status
         # Auto-update comments when a fill-in payment is marked as paid
         if payment_status == 'paid' and attendance.status == 'FILLIN':
-            paid_note = f"Payment made {datetime.utcnow().strftime('%m/%d')}"
+            att_sess = Session.query.get(session_id)
+            sess_date_str = att_sess.date.strftime('%m/%d') if att_sess else datetime.utcnow().strftime('%m/%d')
+            paid_note = f"Fill-in payment made for session {sess_date_str}"
             if attendance.comments:
-                if 'Payment made' not in attendance.comments:
+                if 'payment made' not in attendance.comments.lower():
                     attendance.comments = f"{attendance.comments}; {paid_note}"
             else:
                 attendance.comments = paid_note
@@ -3047,8 +3051,9 @@ def add_payment():
                     sess_costs = get_cached_session_costs(att.session_id)
                     cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
                     fillin_cost = sess_costs.get(cat, 0)
-                    today_str = date.today().strftime('%m/%d')
-                    comment = f'Fill-in cost ${fillin_cost:.2f} paid on {today_str}'
+                    att_sess = Session.query.get(att.session_id)
+                    s_date = att_sess.date.strftime('%m/%d') if att_sess else date.today().strftime('%m/%d')
+                    comment = f'Fill-in cost ${fillin_cost:.2f} for session {s_date} paid'
                     att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
         db.session.commit()
