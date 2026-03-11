@@ -432,6 +432,7 @@
                         {% endif %}
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <span data-player-fillin="{{ player.id }}">
                         {% if stats.pending_refund_amount %}
                         <span class="text-sm font-bold text-yellow-600">-${{ "%.2f"|format(stats.pending_refund_amount) }}</span>
                         {% elif stats.total_refunded %}
@@ -451,6 +452,7 @@
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
                         {% endif %}
+                        </span>
                     </td>
                     <td class="px-2 py-2 text-left">
                         {% set ns_ac = namespace(val='') %}
@@ -629,6 +631,7 @@
                         {% endif %}
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <span data-player-fillin="{{ player.id }}">
                         {% if stats.pending_refund_amount %}
                         <span class="text-sm font-bold text-yellow-600">-${{ "%.2f"|format(stats.pending_refund_amount) }}</span>
                         {% elif stats.total_refunded %}
@@ -648,6 +651,7 @@
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
                         {% endif %}
+                        </span>
                     </td>
                     <td class="px-2 py-2 text-left">
                         {% set ns_ac = namespace(val='') %}
@@ -823,6 +827,7 @@
                         {% endif %}
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
+                        <span data-player-fillin="{{ player.id }}">
                         {% if stats.pending_refund_amount %}
                         <span class="text-sm font-bold text-yellow-600">-${{ "%.2f"|format(stats.pending_refund_amount) }}</span>
                         {% elif stats.total_refunded %}
@@ -842,6 +847,7 @@
                         {% else %}
                         <span class="text-gray-300 text-xs">—</span>
                         {% endif %}
+                        </span>
                     </td>
                     <td class="px-2 py-2 text-left">
                         {% set ns_ac = namespace(val='') %}
@@ -1278,6 +1284,55 @@ const SESSION_COST = {
     {{ s.id }}: {{ active_session_costs.get(s.id, {}).get('regular', 0) }},
     {% endfor %}
 };
+const SESSION_KID_COST = {
+    {% for s in active_sessions %}
+    {{ s.id }}: {{ active_session_costs.get(s.id, {}).get('kid', 11.0) }},
+    {% endfor %}
+};
+const PLAYER_CATEGORY = {
+    {% for player in regular_players %}{{ player.id }}: '{{ player.category }}',{% endfor %}
+    {% for player in adhoc_players %}{{ player.id }}: '{{ player.category }}',{% endfor %}
+    {% for player in kid_players %}{{ player.id }}: '{{ player.category }}',{% endfor %}
+    {% for player in not_playing_players | default([]) %}{{ player.id }}: '{{ player.category }}',{% endfor %}
+};
+
+function getSessionCostForPlayer(sessionId, playerId) {
+    return PLAYER_CATEGORY[playerId] === 'kid' ? (SESSION_KID_COST[sessionId] || 0) : (SESSION_COST[sessionId] || 0);
+}
+
+function recalcPlayerTotals(playerId) {
+    // Sum costs for all sessions where this player has a billable status
+    let sessionCostTotal = 0;
+    let fillinTotal = 0;
+    document.querySelectorAll(`select.attendance-select[data-player-id="${playerId}"]`).forEach(sel => {
+        const sid = parseInt(sel.dataset.sessionId);
+        const currentVal = sel.value;
+        const cost = getSessionCostForPlayer(sid, playerId);
+        if (['YES', 'DROPOUT', 'FILLIN'].includes(currentVal)) {
+            sessionCostTotal += cost;
+        }
+        if (currentVal === 'FILLIN') {
+            fillinTotal += cost;
+        }
+    });
+    // Update total
+    const totalSpan = document.querySelector(`[data-player-total="${playerId}"]`);
+    if (totalSpan) {
+        const addlCharges = parseFloat(document.querySelector(`.addl-charges-input[data-player-id="${playerId}"]`)?.value) || 0;
+        const total = sessionCostTotal + addlCharges;
+        totalSpan.textContent = '$' + total.toFixed(2);
+        totalSpan.dataset.sessionCost = sessionCostTotal.toFixed(2);
+    }
+    // Update fillin/refund column
+    const fillinSpan = document.querySelector(`[data-player-fillin="${playerId}"]`);
+    if (fillinSpan) {
+        if (fillinTotal > 0) {
+            fillinSpan.innerHTML = `<span class="text-sm font-bold text-blue-600">+$${fillinTotal.toFixed(2)}</span>`;
+        } else {
+            fillinSpan.innerHTML = `<span class="text-gray-300 text-xs">—</span>`;
+        }
+    }
+}
 
 // Track pending changes: Map of "sessionId-playerId" -> {sessionId, playerId, status, originalStatus}
 const pendingChanges = new Map();
@@ -1307,6 +1362,7 @@ function trackChange(selectElement, sessionId, playerId) {
         selectElement.classList.add('ring-2', 'ring-wimbledon-purple');
     }
 
+    recalcPlayerTotals(playerId);
     updateSaveBar();
 }
 
