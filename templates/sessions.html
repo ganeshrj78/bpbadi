@@ -1285,12 +1285,6 @@ const pendingChanges = new Map();
 // Track a change when dropdown is modified
 function trackChange(selectElement, sessionId, playerId) {
     const newStatus = selectElement.value || 'CLEAR';
-    if (newStatus === 'DROPOUT') {
-        _sdropout = { selectEl: selectElement, sessionId, playerId,
-                      playerName: selectElement.dataset.playerName || '' };
-        openSessionsDropoutModal(sessionId, playerId, selectElement);
-        return;
-    }
     const originalStatus = selectElement.dataset.original || '';
     const key = `${sessionId}-${playerId}`;
 
@@ -1302,9 +1296,10 @@ function trackChange(selectElement, sessionId, playerId) {
         pendingChanges.set(key, {
             session_id: sessionId,
             player_id: playerId,
-            status: newStatus
+            status: newStatus,
+            original_status: originalStatus,
+            player_name: selectElement.dataset.playerName || ''
         });
-        // Visual indicator that this dropdown has unsaved changes
         selectElement.classList.add('ring-2', 'ring-wimbledon-purple');
     }
 

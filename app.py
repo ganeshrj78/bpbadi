@@ -2342,25 +2342,61 @@ def batch_update_attendance():
         elif attendance:
             old_status = attendance.status
             attendance.status = status
+            today_str = date.today().strftime('%m/%d')
 
-            # Auto-create refund when dropping out of a frozen session
-            if sess.voting_frozen and status == 'DROPOUT' and old_status in ['YES', 'FILLIN']:
-                existing_refund = DropoutRefund.query.filter_by(
-                    session_id=session_id, player_id=player_id
-                ).first()
-                if not existing_refund:
-                    suggested_amount = sess.calculate_suggested_refund()
-                    refund = DropoutRefund(
-                        player_id=player_id,
-                        session_id=session_id,
-                        refund_amount=suggested_amount,
-                        suggested_amount=suggested_amount,
-                        status='pending'
-                    )
-                    db.session.add(refund)
+            def _batch_append_comment(att, note):
+                existing = (att.comments or '').strip()
+                att.comments = (existing + '\n' + note).strip() if existing else note
+
+            # Handle dropout
+            if status == 'DROPOUT' and old_status in ['YES', 'FILLIN']:
+                suggested_refund = sess.calculate_suggested_refund()
+
+                if old_status == 'FILLIN' and attendance.payment_status == 'unpaid':
+                    # FILLIN (unpaid) → DROPOUT: net calculation
+                    sess_costs = get_cached_session_costs(session_id)
+                    cat = attendance.category if attendance.category in ('adhoc', 'kid') else 'regular'
+                    fillin_cost = sess_costs.get(cat, 0)
+                    net_owed = round(fillin_cost - suggested_refund, 2)
+
+                    note = f'Dropped out on {today_str} (was Fill-in)'
+                    note += f'\nFill-in cost: ${fillin_cost:.2f}, Refund: ${suggested_refund:.2f}'
+                    if net_owed > 0:
+                        note += f', Net owed: ${net_owed:.2f}'
+                        attendance.payment_status = 'unpaid'
+                        attendance.additional_cost = net_owed - fillin_cost
+                    elif net_owed < 0:
+                        note += f', Net refund: ${abs(net_owed):.2f}'
+                        attendance.payment_status = 'pending_refund'
+                        existing_refund = DropoutRefund.query.filter_by(
+                            session_id=session_id, player_id=player_id
+                        ).first()
+                        if not existing_refund:
+                            db.session.add(DropoutRefund(
+                                player_id=player_id, session_id=session_id,
+                                refund_amount=abs(net_owed), suggested_amount=abs(net_owed),
+                                status='pending'
+                            ))
+                    else:
+                        note += ', Net: $0.00 (settled)'
+                        attendance.payment_status = 'paid'
+                    _batch_append_comment(attendance, note)
+                else:
+                    # Normal dropout (YES → DROPOUT or paid FILLIN → DROPOUT)
+                    attendance.payment_status = 'pending_refund'
+                    _batch_append_comment(attendance, f'Dropped out on {today_str}')
+                    existing_refund = DropoutRefund.query.filter_by(
+                        session_id=session_id, player_id=player_id
+                    ).first()
+                    if not existing_refund:
+                        db.session.add(DropoutRefund(
+                            player_id=player_id, session_id=session_id,
+                            refund_amount=suggested_refund, suggested_amount=suggested_refund,
+                            status='pending'
+                        ))
 
             # Auto-delete refund when reverting from dropout
-            if sess.voting_frozen and old_status == 'DROPOUT' and status == 'YES':
+            elif old_status == 'DROPOUT' and status in ['YES', 'NO', 'FILLIN']:
                 existing_refund = DropoutRefund.query.filter_by(
                     session_id=session_id, player_id=player_id, status='pending'
                 ).first()
@@ -2370,6 +2406,8 @@ def batch_update_attendance():
             # Set payment_status to unpaid when moving to a billable status
             if status in ['FILLIN', 'YES'] and old_status in ['STANDBY', 'NO', 'TENTATIVE', None]:
                 attendance.payment_status = 'unpaid'
+                if status == 'FILLIN':
+                    _batch_append_comment(attendance, f'Filled in on {today_str}')
 
         else:
             player = Player.query.get(player_id)
