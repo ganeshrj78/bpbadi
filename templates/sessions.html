@@ -1424,7 +1424,7 @@ async function saveAllChanges() {
 function discardAllChanges() {
     // Collect affected player IDs before reverting
     const affectedPlayerIds = new Set();
-    pendingChanges.forEach(change => affectedPlayerIds.add(change.playerId));
+    pendingChanges.forEach(change => affectedPlayerIds.add(change.player_id));
 
     // Reset all modified dropdowns to their original values
     document.querySelectorAll('.attendance-select').forEach(select => {
