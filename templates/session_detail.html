@@ -547,9 +547,8 @@
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-in</option>
                             {% elif current_status == 'FILLIN' %}
-                            <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-in</option>
-                            <option value="STANDBY">Stand By</option>
+                            <option value="DROPOUT">Dropout</option>
                             {% elif current_status == 'STANDBY' %}
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-in</option>
@@ -564,6 +563,9 @@
                             <option value="DROPOUT" selected>Dropout</option>
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-in</option>
+                            {% elif current_status == 'FILLIN' %}
+                            <option value="FILLIN" selected>Fill-in</option>
+                            <option value="DROPOUT">Dropout</option>
                             {% elif current_status == 'STANDBY' %}
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-in</option>
@@ -572,9 +574,8 @@
                             <option value="YES" {% if current_status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO">No</option>
                             <option value="TENTATIVE">Tentative</option>
-                            <option value="STANDBY" {% if current_status == 'STANDBY' %}selected{% endif %}>Stand By</option>
+                            <option value="STANDBY">Stand By</option>
                             <option value="DROPOUT">Dropout</option>
-                            <option value="FILLIN" {% if current_status == 'FILLIN' %}selected{% endif %}>Fill-in</option>
                             {% endif %}
                             {% endif %}
                         </select>

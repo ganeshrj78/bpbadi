@@ -2327,7 +2327,7 @@ def batch_update_attendance():
                 'NO': ['FILLIN', 'STANDBY'],
                 'TENTATIVE': ['DROPOUT', 'FILLIN', 'STANDBY'],
                 'DROPOUT': ['NO', 'FILLIN'],
-                'FILLIN': ['NO', 'STANDBY'],
+                'FILLIN': ['DROPOUT'],
                 'STANDBY': ['FILLIN', 'DROPOUT'],
                 None: ['FILLIN', 'STANDBY'],
             }
@@ -2344,7 +2344,7 @@ def batch_update_attendance():
             attendance.status = status
 
             # Auto-create refund when dropping out of a frozen session
-            if sess.voting_frozen and status == 'DROPOUT' and old_status == 'YES':
+            if sess.voting_frozen and status == 'DROPOUT' and old_status in ['YES', 'FILLIN']:
                 existing_refund = DropoutRefund.query.filter_by(
                     session_id=session_id, player_id=player_id
                 ).first()

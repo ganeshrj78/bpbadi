@@ -350,9 +350,8 @@
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
                             {% elif status == 'FILLIN' %}
-                            <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-In</option>
-                            <option value="STANDBY">Stand By</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% elif status == 'STANDBY' %}
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
@@ -367,13 +366,15 @@
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
                             <option value="DROPOUT">Drop-Out</option>
+                            {% elif status == 'FILLIN' %}
+                            <option value="FILLIN" selected>Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
-                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
-                            <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% endif %}
@@ -546,9 +547,8 @@
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
                             {% elif status == 'FILLIN' %}
-                            <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-In</option>
-                            <option value="STANDBY">Stand By</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% elif status == 'STANDBY' %}
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
@@ -563,13 +563,15 @@
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
                             <option value="DROPOUT">Drop-Out</option>
+                            {% elif status == 'FILLIN' %}
+                            <option value="FILLIN" selected>Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
-                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
-                            <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% endif %}
@@ -739,9 +741,8 @@
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
                             {% elif status == 'FILLIN' %}
-                            <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-In</option>
-                            <option value="STANDBY">Stand By</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% elif status == 'STANDBY' %}
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
@@ -756,13 +757,15 @@
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
                             <option value="DROPOUT">Drop-Out</option>
+                            {% elif status == 'FILLIN' %}
+                            <option value="FILLIN" selected>Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
-                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
-                            <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% endif %}
@@ -932,9 +935,8 @@
                             <option value="NO">No</option>
                             <option value="FILLIN">Fill-In</option>
                             {% elif status == 'FILLIN' %}
-                            <option value="NO">No</option>
                             <option value="FILLIN" selected>Fill-In</option>
-                            <option value="STANDBY">Stand By</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% elif status == 'STANDBY' %}
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
@@ -949,13 +951,15 @@
                             <option value="STANDBY" selected>Stand By</option>
                             <option value="FILLIN">Fill-In</option>
                             <option value="DROPOUT">Drop-Out</option>
+                            {% elif status == 'FILLIN' %}
+                            <option value="FILLIN" selected>Fill-In</option>
+                            <option value="DROPOUT">Drop-Out</option>
                             {% else %}
                             <option value="" {% if not status %}selected{% endif %}>--</option>
                             <option value="YES" {% if status == 'YES' %}selected{% endif %}>Yes</option>
                             <option value="NO" {% if status == 'NO' %}selected{% endif %}>No</option>
                             <option value="TENTATIVE" {% if status == 'TENTATIVE' %}selected{% endif %}>Tentative</option>
-                            <option value="STANDBY" {% if status == 'STANDBY' %}selected{% endif %}>Stand By</option>
-                            <option value="FILLIN" {% if status == 'FILLIN' %}selected{% endif %}>Fill-In</option>
+                            <option value="STANDBY">Stand By</option>
                             <option value="DROPOUT">Drop-Out</option>
                             {% endif %}
                             {% endif %}
