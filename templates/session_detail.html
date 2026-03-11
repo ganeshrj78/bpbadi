@@ -594,7 +594,14 @@
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
                         {% if current_status == 'FILLIN' %}
+                        {% if payment_status == 'paid' %}
+                        <span class="text-xs text-gray-400 flex flex-col items-end leading-tight">
+                            <span>+${{ "%.2f"|format(owed) }}</span>
+                            <span>settled</span>
+                        </span>
+                        {% else %}
                         <span class="text-sm font-bold text-blue-600">+${{ "%.2f"|format(owed) }}</span>
+                        {% endif %}
                         {% else %}
                         {% set r = (refund_by_player | default({})).get(player.id) %}
                         {% if r %}
