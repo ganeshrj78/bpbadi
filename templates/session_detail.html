@@ -684,6 +684,16 @@
                 <div class="text-sm font-semibold text-wimbledon-purple mb-2">Assign Fill-in</div>
                 <div id="standby-list" class="space-y-2"></div>
             </div>
+            <!-- Fill-in cost info (shown when dropping out from FILLIN) -->
+            <div id="detail-fillin-info" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <div class="text-sm font-semibold text-blue-700 mb-1">Fill-in Cost (unpaid)</div>
+                <div class="text-xs text-blue-600">
+                    Session cost: $<span id="detail-fillin-cost">0.00</span>
+                </div>
+                <div class="text-xs text-blue-600 mt-1" id="detail-net-line">
+                    Net owed by player: <strong>$<span id="detail-net-owed">0.00</span></strong>
+                </div>
+            </div>
             <!-- Refund amount -->
             <div>
                 <label class="text-sm font-semibold text-wimbledon-purple block mb-1">
@@ -692,7 +702,8 @@
                 <div class="flex items-center gap-2">
                     <span class="text-gray-500 font-medium">$</span>
                     <input type="number" id="refund-amount" step="0.01" min="0"
-                        class="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-wimbledon-green">
+                        class="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-wimbledon-green"
+                        oninput="updateDetailNetOwed()">
                     <span class="text-xs text-gray-400" id="refund-hint"></span>
                 </div>
             </div>
@@ -848,13 +859,28 @@ function discardAllDetailChanges() {
 }
 
 // ── Dropout modal state ───────────────────────────────────────────────────────
-let _dropout = { playerId: null, sessionId: null, playerName: null, selectEl: null };
+let _dropout = { playerId: null, sessionId: null, playerName: null, selectEl: null, wasFillin: false, fillinCost: 0 };
+
+function updateDetailNetOwed() {
+    if (!_dropout.wasFillin) return;
+    const refund = parseFloat(document.getElementById('refund-amount').value) || 0;
+    const net = (_dropout.fillinCost - refund).toFixed(2);
+    const netLine = document.getElementById('detail-net-line');
+    if (parseFloat(net) > 0) {
+        netLine.innerHTML = `Net owed by player: <strong class="text-red-600">$${net}</strong>`;
+    } else if (parseFloat(net) < 0) {
+        netLine.innerHTML = `Net refund to player: <strong class="text-green-600">$${Math.abs(parseFloat(net)).toFixed(2)}</strong>`;
+    } else {
+        netLine.innerHTML = `Net: <strong>$0.00</strong> (settled)`;
+    }
+}
 
 function handleStatusChange(playerId, sessionId, selectEl) {
     const newStatus = selectEl.value;
     const playerName = selectEl.dataset.playerName || '';
     if (newStatus === 'DROPOUT') {
-        _dropout = { playerId, sessionId, playerName, selectEl };
+        const origStatus = selectEl.dataset.original || '';
+        _dropout = { playerId, sessionId, playerName, selectEl, wasFillin: origStatus === 'FILLIN', fillinCost: COST_PER_PLAYER };
         openDropoutModal();
         return;
     }
@@ -911,6 +937,16 @@ function openDropoutModal() {
                 <span class="text-xs font-medium text-teal-600 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">Standby</span>
             </label>`
         )).join('');
+    }
+
+    // Show fill-in cost info if player was FILLIN
+    const fillinInfo = document.getElementById('detail-fillin-info');
+    if (_dropout.wasFillin) {
+        document.getElementById('detail-fillin-cost').textContent = _dropout.fillinCost.toFixed(2);
+        fillinInfo.classList.remove('hidden');
+        updateDetailNetOwed();
+    } else {
+        fillinInfo.classList.add('hidden');
     }
 
     const modal = document.getElementById('dropout-modal');

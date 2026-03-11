@@ -2517,26 +2517,69 @@ def process_dropout():
     if not dropout_att:
         return jsonify({'error': 'Player attendance not found'}), 404
 
-    dropout_att.status = 'DROPOUT'
-    dropout_att.payment_status = 'pending_refund'
-    dropout_note = f'Dropped out on {today}'
-    dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
-    _append_comment(dropout_att, dropout_note)
+    was_fillin = dropout_att.status == 'FILLIN'
+    was_unpaid = dropout_att.payment_status == 'unpaid'
 
-    # Create / update refund record
-    existing_refund = DropoutRefund.query.filter_by(
-        session_id=session_id, player_id=dropout_player_id
-    ).first()
-    if existing_refund:
-        existing_refund.refund_amount = refund_amount
+    dropout_att.status = 'DROPOUT'
+
+    if was_fillin and was_unpaid:
+        # FILLIN (unpaid) → DROPOUT: calculate net amount
+        sess_costs = get_cached_session_costs(session_id)
+        cat = dropout_att.category if dropout_att.category in ('adhoc', 'kid') else 'regular'
+        fillin_cost = sess_costs.get(cat, 0)
+        net_owed = round(fillin_cost - refund_amount, 2)
+
+        dropout_note = f'Dropped out on {today} (was Fill-in)'
+        dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
+        dropout_note += f'\nFill-in cost: ${fillin_cost:.2f}, Refund: ${refund_amount:.2f}'
+        if net_owed > 0:
+            dropout_note += f', Net owed: ${net_owed:.2f}'
+            dropout_att.payment_status = 'unpaid'
+            dropout_att.additional_cost = net_owed - fillin_cost  # Adjust so total = net_owed
+        elif net_owed < 0:
+            dropout_note += f', Net refund: ${abs(net_owed):.2f}'
+            dropout_att.payment_status = 'pending_refund'
+        else:
+            dropout_note += ', Net: $0.00 (settled)'
+            dropout_att.payment_status = 'paid'
+        _append_comment(dropout_att, dropout_note)
+
+        # Only create refund record if there's a net refund
+        if net_owed < 0:
+            existing_refund = DropoutRefund.query.filter_by(
+                session_id=session_id, player_id=dropout_player_id
+            ).first()
+            if existing_refund:
+                existing_refund.refund_amount = abs(net_owed)
+            else:
+                db.session.add(DropoutRefund(
+                    player_id=dropout_player_id,
+                    session_id=session_id,
+                    refund_amount=abs(net_owed),
+                    suggested_amount=abs(net_owed),
+                    status='pending'
+                ))
     else:
-        db.session.add(DropoutRefund(
-            player_id=dropout_player_id,
-            session_id=session_id,
-            refund_amount=refund_amount,
-            suggested_amount=refund_amount,
-            status='pending'
-        ))
+        # Normal dropout (YES → DROPOUT or paid FILLIN → DROPOUT)
+        dropout_att.payment_status = 'pending_refund'
+        dropout_note = f'Dropped out on {today}'
+        dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
+        _append_comment(dropout_att, dropout_note)
+
+        # Create / update refund record
+        existing_refund = DropoutRefund.query.filter_by(
+            session_id=session_id, player_id=dropout_player_id
+        ).first()
+        if existing_refund:
+            existing_refund.refund_amount = refund_amount
+        else:
+            db.session.add(DropoutRefund(
+                player_id=dropout_player_id,
+                session_id=session_id,
+                refund_amount=refund_amount,
+                suggested_amount=refund_amount,
+                status='pending'
+            ))
 
     # ── Assign fill-in (standby → fillin) ────────────────────────────────────
     if fillin_player_id:
