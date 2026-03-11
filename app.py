@@ -2966,7 +2966,7 @@ def payments():
     # Outstanding balances
     players = Player.query.all()
     balances = [(p, p.get_balance()) for p in players if p.get_balance() > 0]
-    balances.sort(key=lambda x: x[1], reverse=True)
+    balances.sort(key=lambda x: x[0].name.lower())
 
     return render_template('payments.html',
                          payments=payment_list,
@@ -3009,6 +3009,22 @@ def bulk_payment_api():
             notes=p_data.get('notes', '')
         )
         db.session.add(payment)
+
+        # Mark unpaid attendance records as paid for this player
+        unpaid_atts = Attendance.query.filter_by(
+            player_id=player_id, payment_status='unpaid'
+        ).filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])).all()
+        for att in unpaid_atts:
+            att.payment_status = 'paid'
+            if att.status == 'FILLIN':
+                sess_costs = get_cached_session_costs(att.session_id)
+                cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+                fillin_cost = sess_costs.get(cat, 0)
+                att_sess = Session.query.get(att.session_id)
+                sess_date_str = att_sess.date.strftime('%m/%d') if att_sess else ''
+                comment = f'Fill-in cost ${fillin_cost:.2f} for session {sess_date_str} paid'
+                att.comments = (att.comments + ' | ' + comment) if att.comments else comment
+
         count += 1
 
     db.session.commit()

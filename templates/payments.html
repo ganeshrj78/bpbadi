@@ -53,12 +53,19 @@
 <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 mb-8 overflow-hidden" x-data="bulkPaymentGlobal()">
     <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-green/10 to-white">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-wimbledon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-                Bulk Payment
-            </h2>
+            <div class="flex items-center gap-3">
+                <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-wimbledon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    Bulk Payment
+                </h2>
+                <div class="relative">
+                    <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" x-model="searchQuery" placeholder="Search player..."
+                        class="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green w-48">
+                </div>
+            </div>
             <div class="flex flex-wrap items-center gap-3">
                 <select x-model="method" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green bg-white">
                     <option value="Zelle">Zelle</option>
@@ -94,7 +101,9 @@
             </thead>
             <tbody class="divide-y divide-wimbledon-gold/10">
                 {% for player, balance in outstanding_balances %}
-                <tr class="hover:bg-wimbledon-cream/50 transition-all" :class="{ 'opacity-50': !selected[{{ player.id }}] }">
+                <tr class="hover:bg-wimbledon-cream/50 transition-all" :class="{ 'opacity-50': !selected[{{ player.id }}] }"
+                    x-show="searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())"
+                    x-cloak>
                     <td class="px-4 py-3 text-center">
                         <input type="checkbox" x-model="selected[{{ player.id }}]" class="rounded border-gray-300 text-wimbledon-green w-4 h-4 cursor-pointer">
                     </td>
@@ -139,21 +148,30 @@
 </div>
 {% endif %}
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8" x-data="{ balanceSearch: '', historySearch: '' }">
     <!-- Outstanding Balances -->
     <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden">
         <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-purple/5 to-wimbledon-cream">
-            <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-wimbledon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                Outstanding Balances
-            </h2>
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-wimbledon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Outstanding Balances
+                </h2>
+                <div class="relative">
+                    <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" x-model="balanceSearch" placeholder="Search..."
+                        class="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green w-40">
+                </div>
+            </div>
         </div>
         <div class="max-h-[400px] overflow-y-auto">
             <div class="divide-y divide-wimbledon-gold/10">
                 {% for player, balance in outstanding_balances %}
-                <div class="px-6 py-4 hover:bg-gradient-to-r hover:from-wimbledon-purple/5 hover:to-wimbledon-cream transition-all">
+                <div class="px-6 py-4 hover:bg-gradient-to-r hover:from-wimbledon-purple/5 hover:to-wimbledon-cream transition-all"
+                    x-show="balanceSearch === '' || '{{ player.name|lower }}'.includes(balanceSearch.toLowerCase())"
+                    x-cloak>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
                             {% if player.profile_photo %}
@@ -193,17 +211,26 @@
     <!-- Payment History -->
     <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden">
         <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-green/5 to-wimbledon-cream">
-            <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-wimbledon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                </svg>
-                Payment History
-            </h2>
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-wimbledon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    Payment History
+                </h2>
+                <div class="relative">
+                    <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" x-model="historySearch" placeholder="Search..."
+                        class="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green w-40">
+                </div>
+            </div>
         </div>
         <div class="max-h-[400px] overflow-y-auto">
             <div class="divide-y divide-wimbledon-gold/10">
                 {% for payment in payments %}
-                <div class="px-6 py-4 hover:bg-gradient-to-r hover:from-wimbledon-green/5 hover:to-wimbledon-cream transition-all">
+                <div class="px-6 py-4 hover:bg-gradient-to-r hover:from-wimbledon-green/5 hover:to-wimbledon-cream transition-all"
+                    x-show="historySearch === '' || '{{ payment.player.name|lower }}'.includes(historySearch.toLowerCase())"
+                    x-cloak>
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
                             <div class="w-10 h-10 gradient-success rounded-full flex items-center justify-center text-white shadow-md border border-wimbledon-gold/30">
@@ -265,6 +292,7 @@ function bulkPaymentGlobal() {
         method: 'Zelle',
         date: new Date().toISOString().split('T')[0],
         loading: false,
+        searchQuery: '',
         get selectedCount() {
             return Object.values(this.selected).filter(Boolean).length;
         },
