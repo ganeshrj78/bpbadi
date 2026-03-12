@@ -18,6 +18,7 @@ from flask_limiter.util import get_remote_address
 from flask_caching import Cache
 from flask_migrate import Migrate
 from flask_compress import Compress
+import bleach
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -67,6 +68,13 @@ def add_cache_headers(response):
             if if_none_match and if_none_match.strip('"') == etag:
                 response.status_code = 304
                 response.data = b''
+
+    # Security headers
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if Config.IS_PRODUCTION:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
 # Logging Configuration
@@ -460,8 +468,8 @@ def register():
                                member_guidelines=SiteSettings.get('member_guidelines', ''),
                                booking_guidelines=SiteSettings.get('booking_guidelines', ''))
 
-        if len(password) < 4:
-            flash('Password must be at least 4 characters', 'error')
+        if len(password) < 8:
+            flash('Password must be at least 8 characters', 'error')
             return render_template('register.html',
                                member_guidelines=SiteSettings.get('member_guidelines', ''),
                                booking_guidelines=SiteSettings.get('booking_guidelines', ''))
@@ -527,13 +535,24 @@ def edit_guidelines():
         member_guidelines = data.get('member_guidelines', '')
         booking_guidelines = data.get('booking_guidelines', '')
 
+        # Sanitize HTML to prevent XSS
+        allowed_tags = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li',
+                        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'img', 'table',
+                        'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'pre', 'code', 'hr']
+        allowed_attrs = {'a': ['href', 'target', 'class'], 'img': ['src', 'alt', 'class'],
+                         'div': ['class'], 'span': ['class'], 'p': ['class'],
+                         'td': ['class', 'colspan', 'rowspan'], 'th': ['class', 'colspan', 'rowspan'],
+                         'h4': ['class'], 'strong': ['class']}
+        member_guidelines = bleach.clean(member_guidelines, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+        booking_guidelines = bleach.clean(booking_guidelines, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+
         SiteSettings.set('member_guidelines', member_guidelines)
         SiteSettings.set('booking_guidelines', booking_guidelines)
 
         return jsonify({'success': True})
     except Exception as e:
         app.logger.error(f'edit_guidelines error: {e}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to save guidelines'}), 500
 
 
 @app.route('/api/guidelines')
@@ -3304,8 +3323,8 @@ def reset_admin_password():
             flash('New passwords do not match', 'error')
             return redirect(url_for('reset_admin_password'))
 
-        if len(new_password) < 4:
-            flash('Password must be at least 4 characters', 'error')
+        if len(new_password) < 8:
+            flash('Password must be at least 8 characters', 'error')
             return redirect(url_for('reset_admin_password'))
 
         # Update the password in config (runtime only - need env var for persistence)
@@ -3399,7 +3418,8 @@ def api_ezfacility_open_browser():
             subprocess.Popen(['xdg-open', url])
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        app.logger.error(f'open_ezfacility error: {e}', exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to open browser'})
 
 
 @app.route('/api/ezfacility/import-browser-cookies', methods=['POST'])
@@ -3469,7 +3489,7 @@ def api_ezfacility_import_browser_cookies():
             logged_in = '/login' not in page.url.lower()
             browser_pw.close()
     except Exception as e:
-        return jsonify({'success': False, 'error': f'Cookie verification failed: {e}'})
+        return jsonify({'success': False, 'error': 'Cookie verification failed'})
 
     if not logged_in:
         return jsonify({'success': False, 'error':
@@ -3562,7 +3582,7 @@ def api_ezfacility_paste_cookie():
                 logged_in = '/login' not in page.url.lower()
                 browser_pw.close()
         except Exception as e:
-            return cors_response({'success': False, 'error': f'Cookie verification failed: {e}'})
+            return cors_response({'success': False, 'error': 'Cookie verification failed'})
 
         if not logged_in:
             return cors_response({'success': False, 'error': 'Cookie is expired or invalid. Please log in to Royal Facility again.'})
@@ -3589,7 +3609,16 @@ def api_ezfacility_fetch_bookings():
     session_cookie = rec.session_cookie if rec else None
 
     data = request.get_json(silent=True) or {}
-    target_dates = sorted(set(data.get('dates', [])))
+    raw_dates = data.get('dates', [])
+    # Validate date format strictly to prevent injection
+    target_dates = []
+    for d in raw_dates:
+        try:
+            datetime.strptime(d, '%Y-%m-%d')
+            target_dates.append(d)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': f'Invalid date format: {d}'}), 400
+    target_dates = sorted(set(target_dates))
     if not target_dates:
         return jsonify({'success': False, 'error': 'No dates provided.'})
 
@@ -3613,19 +3642,19 @@ def api_ezfacility_fetch_bookings():
         app.logger.info(f'ezf_scrape stdout: {proc.stdout[-3000:]}')
         if proc.returncode != 0:
             app.logger.error(f'ezf_scrape stderr: {proc.stderr[-2000:]}')
-            err_detail = (proc.stderr or proc.stdout or 'no output')[-500:]
-            return jsonify({'success': False, 'error': f'Scraper failed: {err_detail}'})
+            app.logger.error(f'ezf_scrape failed: {(proc.stderr or proc.stdout or "no output")[-500:]}')
+            return jsonify({'success': False, 'error': 'Scraper failed. Check server logs for details.'})
     except subprocess.TimeoutExpired:
         return jsonify({'success': False, 'error': 'Scraper timed out (3 min). Try fewer dates.'})
     except Exception as e:
         app.logger.error(f'ezf_scrape launch error: {e}', exc_info=True)
-        return jsonify({'success': False, 'error': f'Could not run scraper: {e}'})
+        return jsonify({'success': False, 'error': 'Could not launch scraper. Check server logs.'})
 
     try:
         with open(out_path) as f:
             raw_bookings = _json.load(f)
     except Exception as e:
-        return jsonify({'success': False, 'error': f'Could not read scraper output: {e}'})
+        return jsonify({'success': False, 'error': 'Could not read scraper output. Check server logs.'})
 
     # Group by date
     bookings_by_date = defaultdict(list)
@@ -3789,4 +3818,4 @@ def delete_activity_logs():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5050, use_reloader=False)  # use_reloader=False prevents Playwright/Chromium conflicts
+    app.run(debug=not Config.IS_PRODUCTION, port=5050, use_reloader=False)  # use_reloader=False prevents Playwright/Chromium conflicts

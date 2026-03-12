@@ -15,13 +15,18 @@ def get_database_url():
     return 'sqlite:///bpbadi.db'
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
     SQLALCHEMY_DATABASE_URI = get_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    APP_PASSWORD = os.environ.get('APP_PASSWORD') or 'bpbadi2024'
+    APP_PASSWORD = os.environ.get('APP_PASSWORD', 'bpbadi2024')
 
     # Environment detection
     IS_PRODUCTION = os.environ.get('RENDER') == 'true'
+
+    # Session cookie security
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = IS_PRODUCTION  # HTTPS only in production
 
     # Jinja2 bytecode caching — compiles templates once, reuses on subsequent requests
     JINJA_BYTECODE_CACHE_DIR = os.path.join(os.path.dirname(__file__), '.jinja_cache')
