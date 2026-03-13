@@ -410,16 +410,20 @@ def login():
                     return render_template('login.html',
                                            member_guidelines=SiteSettings.get('member_guidelines', ''),
                                            booking_guidelines=SiteSettings.get('booking_guidelines', ''))
-                session['authenticated'] = True
-                session['player_id'] = player.id
-                session['player_name'] = player.name
                 if player.is_admin:
-                    session['user_type'] = 'player_admin'
-                    security_logger.info(f'PLAYER_ADMIN_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
-                    flash(f'Welcome back, {player.name}! (Admin)', 'success')
-                    log_activity('login', f'Player {player.name} logged in')
-                    return redirect(url_for('dashboard'))
+                    # Store credentials temporarily; let the user choose role
+                    session['pending_admin_player_id'] = player.id
+                    session['pending_admin_player_name'] = player.name
+                    security_logger.info(f'PLAYER_ADMIN_LOGIN_ROLE_CHOICE - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
+                    return render_template('login.html',
+                                           show_role_modal=True,
+                                           admin_player_name=player.name,
+                                           member_guidelines=SiteSettings.get('member_guidelines', ''),
+                                           booking_guidelines=SiteSettings.get('booking_guidelines', ''))
                 else:
+                    session['authenticated'] = True
+                    session['player_id'] = player.id
+                    session['player_name'] = player.name
                     session['user_type'] = 'player'
                     security_logger.info(f'PLAYER_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
                     flash(f'Welcome back, {player.name}!', 'success')
@@ -433,6 +437,41 @@ def login():
                            booking_guidelines=SiteSettings.get('booking_guidelines', ''))
 
 
+@app.route('/login/choose-role', methods=['POST'])
+@limiter.limit("10 per minute")
+def choose_role():
+    player_id = session.get('pending_admin_player_id')
+    player_name = session.get('pending_admin_player_name')
+    if not player_id:
+        flash('Session expired. Please login again.', 'error')
+        return redirect(url_for('login'))
+
+    role = request.form.get('role', 'player')
+    client_ip = request.remote_addr
+
+    # Clear pending state
+    session.pop('pending_admin_player_id', None)
+    session.pop('pending_admin_player_name', None)
+
+    # Set authenticated session
+    session['authenticated'] = True
+    session['player_id'] = player_id
+    session['player_name'] = player_name
+
+    if role == 'admin':
+        session['user_type'] = 'player_admin'
+        security_logger.info(f'PLAYER_ADMIN_LOGIN_SUCCESS - Player: {player_name} (ID: {player_id}), IP: {client_ip}')
+        flash(f'Welcome back, {player_name}! (Admin)', 'success')
+        log_activity('login', f'Player {player_name} logged in as admin')
+        return redirect(url_for('dashboard'))
+    else:
+        session['user_type'] = 'player'
+        security_logger.info(f'PLAYER_LOGIN_AS_PLAYER - Player: {player_name} (ID: {player_id}), IP: {client_ip}')
+        flash(f'Welcome back, {player_name}!', 'success')
+        log_activity('login', f'Player {player_name} logged in as player')
+        return redirect(url_for('player_payments'))
+
+
 @app.route('/logout')
 def logout():
     log_activity('logout', f'{session.get("player_name", "Admin")} logged out')
@@ -440,6 +479,8 @@ def logout():
     session.pop('user_type', None)
     session.pop('player_id', None)
     session.pop('player_name', None)
+    session.pop('pending_admin_player_id', None)
+    session.pop('pending_admin_player_name', None)
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
 
