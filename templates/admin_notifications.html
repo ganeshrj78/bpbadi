@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Send Notification - BP Badminton{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-2xl sm:text-3xl font-serif font-bold text-wimbledon-purple">Send Notification</h1>
+        <p class="text-gray-500 mt-1 text-sm">Broadcast a message to all players</p>
+    </div>
+
+    <!-- Compose Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 p-6 mb-8">
+        <form method="POST" class="space-y-5">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Title</label>
+                <input type="text" name="title" required maxlength="200" placeholder="e.g., Court Booking Update, Payment Reminder..."
+                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green focus:ring-4 focus:ring-wimbledon-green/20 transition-all">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Message</label>
+                <textarea name="message" required rows="4" placeholder="Write your notification message here..."
+                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green focus:ring-4 focus:ring-wimbledon-green/20 transition-all resize-none"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Send To</label>
+                <div class="flex gap-4">
+                    <label class="flex items-center gap-2 px-4 py-2 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-wimbledon-green transition-all has-[:checked]:border-wimbledon-green has-[:checked]:bg-green-50">
+                        <input type="radio" name="target" value="player" checked class="text-wimbledon-green">
+                        <span class="text-sm font-medium">All Players</span>
+                    </label>
+                    <label class="flex items-center gap-2 px-4 py-2 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-wimbledon-green transition-all has-[:checked]:border-wimbledon-green has-[:checked]:bg-green-50">
+                        <input type="radio" name="target" value="all" class="text-wimbledon-green">
+                        <span class="text-sm font-medium">Everyone (Players + Admins)</span>
+                    </label>
+                </div>
+            </div>
+            <button type="submit"
+                class="w-full sm:w-auto px-8 py-3 bg-wimbledon-purple text-white rounded-xl font-semibold hover:bg-wimbledon-purple/90 transition-all shadow-lg flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                Send Notification
+            </button>
+        </form>
+    </div>
+
+    <!-- Recent Notifications -->
+    {% if recent_notifications %}
+    <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden">
+        <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white">
+            <h2 class="text-lg font-serif font-bold text-wimbledon-purple">Sent Notifications</h2>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for notif in recent_notifications %}
+            <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                    <div class="font-semibold text-gray-800">{{ notif.title }}</div>
+                    <div class="text-sm text-gray-500 mt-0.5 line-clamp-2">{{ notif.message }}</div>
+                    <div class="flex items-center gap-3 mt-1.5">
+                        <span class="text-xs text-gray-400">{{ notif.created_at.strftime('%b %d, %Y at %I:%M %p') if notif.created_at else '' }}</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full {% if notif.target == 'all' %}bg-purple-100 text-purple-700{% else %}bg-green-100 text-green-700{% endif %}">
+                            {{ 'Everyone' if notif.target == 'all' else 'Players' }}
+                        </span>
+                    </div>
+                </div>
+                <button onclick="if(confirm('Delete this notification?')){fetch('/api/notifications/{{ notif.id }}/delete',{method:'POST',headers:{'Content-Type':'application/json'}}).then(()=>location.reload())}"
+                    class="px-3 py-1.5 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-all flex-shrink-0">
+                    Delete
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

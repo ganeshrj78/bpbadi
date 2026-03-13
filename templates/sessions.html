@@ -15,6 +15,34 @@
     </a>
 </div>
 
+<!-- Pending Dropout Requests -->
+{% if pending_dropout_requests | default([]) %}
+<div class="bg-red-50 rounded-2xl shadow-lg p-4 mb-6 border-2 border-red-300">
+    <div class="flex items-center gap-2 mb-3">
+        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 class="font-serif font-bold text-red-700">Pending Dropout Requests</h3>
+        <span class="px-2 py-0.5 bg-red-200 text-red-800 rounded-full text-xs font-bold">{{ pending_dropout_requests|length }}</span>
+    </div>
+    <div class="flex flex-wrap gap-3">
+        {% for att in pending_dropout_requests %}
+        <a href="{{ url_for('session_detail', id=att.session_id) }}"
+            class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-red-200 hover:border-red-400 transition-all text-sm">
+            {% if att.player.profile_photo %}
+            <img src="{{ url_for('static', filename='uploads/' + att.player.profile_photo) }}" class="w-6 h-6 rounded-full object-cover">
+            {% else %}
+            <div class="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-xs font-bold">{{ att.player.name[0].upper() }}</div>
+            {% endif %}
+            <span class="font-medium text-gray-800">{{ att.player.name }}</span>
+            <span class="text-gray-400">|</span>
+            <span class="text-red-600 text-xs">{{ att.session.date.strftime('%b %d') }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Monthly Summary -->
 {% if monthly_summary %}
 <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden mb-8">
@@ -392,7 +420,7 @@
                         {% set cost_total = namespace(total=0) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
                                 {% if player.category == 'kid' %}
                                     {% set cost_total.total = cost_total.total + active_session_costs[session.id]['kid'] %}
                                 {% else %}
@@ -413,7 +441,7 @@
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
                                 {% set ps = att_details.get('payment_status', 'unpaid') %}
                                 {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
                                 {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
@@ -591,7 +619,7 @@
                         {% set cost_total = namespace(total=0) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
                                 {% if player.category == 'kid' %}
                                     {% set cost_total.total = cost_total.total + active_session_costs[session.id]['kid'] %}
                                 {% else %}
@@ -612,7 +640,7 @@
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
                                 {% set ps = att_details.get('payment_status', 'unpaid') %}
                                 {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
                                 {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
@@ -787,7 +815,7 @@
                         {% set cost_total = namespace(total=0) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
                                 {% if player.category == 'kid' %}
                                     {% set cost_total.total = cost_total.total + active_session_costs[session.id]['kid'] %}
                                 {% else %}
@@ -808,7 +836,7 @@
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
-                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN'] %}
+                            {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
                                 {% set ps = att_details.get('payment_status', 'unpaid') %}
                                 {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
                                 {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
@@ -1312,7 +1340,7 @@ function recalcPlayerTotals(playerId) {
         const sid = parseInt(sel.dataset.sessionId);
         const currentVal = sel.value;
         const cost = getSessionCostForPlayer(sid, playerId);
-        if (['YES', 'DROPOUT', 'FILLIN'].includes(currentVal)) {
+        if (['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'].includes(currentVal)) {
             sessionCostTotal += cost;
         }
         if (currentVal === 'FILLIN') {

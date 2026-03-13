@@ -9,7 +9,7 @@ import logging
 from collections import defaultdict
 from logging.handlers import RotatingFileHandler
 from config import Config
-from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, ActivityLog, init_encryption
+from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, ActivityLog, Notification, NotificationRead, init_encryption
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from flask_wtf.csrf import CSRFProtect
@@ -76,6 +76,47 @@ def add_cache_headers(response):
     if Config.IS_PRODUCTION:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
+
+@app.context_processor
+def inject_notification_count():
+    """Make unread notification count available in all templates."""
+    if not session.get('authenticated'):
+        return {'unread_notification_count': 0}
+    try:
+        user_type = session.get('user_type', '')
+        player_id = session.get('player_id')
+
+        if user_type in ('admin', 'player_admin'):
+            # Admin: count pending registrations + pending dropout requests + unread admin notifications
+            from sqlalchemy import and_, or_
+            admin_notif_count = Notification.query.filter(
+                or_(Notification.target == 'admin', Notification.target == 'all')
+            ).outerjoin(
+                NotificationRead,
+                and_(NotificationRead.notification_id == Notification.id,
+                     NotificationRead.player_id == (player_id or 0))
+            ).filter(NotificationRead.id == None).count()
+
+            pending_registrations = Player.query.filter_by(is_approved=False).count()
+            pending_dropouts = Attendance.query.filter_by(status='PENDING_DROPOUT').join(Session).filter(Session.is_archived == False).count()
+            return {'unread_notification_count': admin_notif_count + pending_registrations + pending_dropouts}
+        elif user_type == 'player' and player_id:
+            from sqlalchemy import and_, or_
+            count = Notification.query.filter(
+                or_(
+                    and_(Notification.target.in_(['player', 'all']), Notification.player_id == None),
+                    Notification.player_id == player_id
+                )
+            ).outerjoin(
+                NotificationRead,
+                and_(NotificationRead.notification_id == Notification.id,
+                     NotificationRead.player_id == player_id)
+            ).filter(NotificationRead.id == None).count()
+            return {'unread_notification_count': count}
+    except Exception:
+        pass
+    return {'unread_notification_count': 0}
+
 
 # Logging Configuration
 if not os.path.exists('logs'):
@@ -256,7 +297,7 @@ def get_cached_player_stats():
     all_sessions_all = Session.query.all()
     all_courts_all = Court.query.all()
     all_chargeable_att = Attendance.query.filter(
-        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])
     ).all()
     payment_totals = db.session.query(
         Payment.player_id,
@@ -641,7 +682,7 @@ def dashboard():
         m_attendees = 0
         for sess in m_sessions:
             for att in sess.attendances:
-                if att.status in ['YES', 'DROPOUT', 'FILLIN'] and att.player and att.player.is_active:
+                if att.status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] and att.player and att.player.is_active:
                     m_attendees += 1
                     if att.category == 'kid':
                         m_charges += sess.get_cost_per_kid()
@@ -683,6 +724,14 @@ def dashboard():
     # Pending approvals
     pending_approvals = Player.query.filter_by(is_approved=False).order_by(Player.created_at.desc()).all()
 
+    # Pending dropout requests
+    pending_dropout_requests = db.session.query(Attendance).join(Session).join(
+        Player, Attendance.player_id == Player.id
+    ).filter(
+        Attendance.status == 'PENDING_DROPOUT',
+        Session.is_archived == False
+    ).order_by(Session.date.asc()).all()
+
     return render_template('dashboard.html',
                          total_players=total_players,
                          upcoming_sessions=upcoming_sessions,
@@ -690,6 +739,7 @@ def dashboard():
                          total_collected=total_collected,
                          total_charges=round(total_charges, 2),
                          pending_approvals=pending_approvals,
+                         pending_dropout_requests=pending_dropout_requests,
                          monthly_summary=monthly_summary)
 
 
@@ -778,7 +828,7 @@ def player_profile():
     attendances = player.attendances.join(Session).order_by(Session.date.desc()).all()
     payments = player.payments.order_by(Payment.date.desc()).all()
 
-    return render_template('player_profile.html', player=player, attendances=attendances, payments=payments)
+    return render_template('player_profile.html', player=player, attendances=attendances, payments=payments, today=date.today())
 
 
 # Player sessions view - see all sessions and vote
@@ -1042,6 +1092,78 @@ def update_player_attendance():
         'attendee_count': sess.get_attendee_count(),
         'cost_per_player': sess.get_cost_per_player()
     })
+
+
+@app.route('/api/player/request-dropout', methods=['POST'])
+@csrf.exempt
+@login_required
+def request_player_dropout():
+    """Player requests dropout on a frozen session — sets status to PENDING_DROPOUT for admin approval."""
+    if session.get('user_type') != 'player':
+        return jsonify({'error': 'Player access only'}), 403
+
+    current_player_id = session.get('player_id')
+    current_player = Player.query.get(current_player_id)
+    data = request.get_json()
+    session_id = data.get('session_id')
+    target_player_id = data.get('player_id', current_player_id)
+
+    # Must be self or managed player
+    managed_player_ids = [p.id for p in current_player.managed_players]
+    if target_player_id != current_player_id and target_player_id not in managed_player_ids:
+        return jsonify({'error': 'You can only request dropout for yourself or your managed players'}), 403
+
+    sess = Session.query.get(session_id)
+    if not sess:
+        return jsonify({'error': 'Session not found'}), 404
+    if not sess.voting_frozen:
+        return jsonify({'error': 'Dropout requests are only for frozen sessions'}), 400
+
+    attendance = Attendance.query.filter_by(player_id=target_player_id, session_id=session_id).first()
+    if not attendance or attendance.status not in ['YES', 'FILLIN']:
+        return jsonify({'error': 'Player must be confirmed (YES or FILLIN) to request dropout'}), 400
+
+    attendance.status = 'PENDING_DROPOUT'
+    db.session.commit()
+
+    target_player = Player.query.get(target_player_id)
+    log_activity('dropout_request', f'{target_player.name} requested dropout for session {sess.date}', 'attendance', attendance.id)
+
+    return jsonify({'success': True, 'message': 'Dropout request sent. Admin has been notified.'})
+
+
+@app.route('/api/admin/approve-dropout', methods=['POST'])
+@csrf.exempt
+@admin_required
+def approve_player_dropout():
+    """Admin approves a pending dropout request — changes PENDING_DROPOUT to DROPOUT."""
+    data = request.get_json()
+    attendance_id = data.get('attendance_id')
+    action = data.get('action', 'approve')  # approve or reject
+
+    attendance = Attendance.query.get(attendance_id)
+    if not attendance or attendance.status != 'PENDING_DROPOUT':
+        return jsonify({'error': 'No pending dropout request found'}), 404
+
+    if action == 'approve':
+        if attendance.payment_status == 'unpaid':
+            # Unpaid player — move to Not Playing, no refund needed
+            attendance.status = 'NO'
+            db.session.commit()
+            log_activity('dropout_approved', f'Admin approved dropout for {attendance.player.name} (unpaid, moved to Not Playing) in session {attendance.session.date}', 'attendance', attendance.id)
+            return jsonify({'success': True, 'not_playing': True, 'message': f'Dropout approved for {attendance.player.name}. Player moved to Not Playing (unpaid).'})
+        else:
+            # Paid player — mark as DROPOUT, needs refund processing
+            attendance.status = 'DROPOUT'
+            db.session.commit()
+            log_activity('dropout_approved', f'Admin approved dropout for {attendance.player.name} in session {attendance.session.date}', 'attendance', attendance.id)
+            return jsonify({'success': True, 'not_playing': False, 'message': f'Dropout approved for {attendance.player.name}. You can now process the refund.'})
+    else:
+        # Reject — revert to YES
+        attendance.status = 'YES'
+        db.session.commit()
+        log_activity('dropout_rejected', f'Admin rejected dropout for {attendance.player.name} in session {attendance.session.date}', 'attendance', attendance.id)
+        return jsonify({'success': True, 'message': f'Dropout request rejected for {attendance.player.name}.'})
 
 
 @app.route('/api/player/bulk-attendance', methods=['POST'])
@@ -1486,6 +1608,9 @@ def sessions():
             if sid in attendance_details and pid in attendance_details[sid]:
                 attendance_details[sid][pid]['payment_status'] = 'pending_refund'
 
+    # Pending dropout requests for notification banner
+    pending_dropout_requests = [att for att in all_attendances if att.status == 'PENDING_DROPOUT']
+
     return render_template('sessions.html',
                           active_sessions=active_sessions,
                           archived_groups=archived_sorted,
@@ -1499,7 +1624,8 @@ def sessions():
                           player_stats=player_stats,
                           active_session_costs=active_session_costs,
                           standby_by_session=standby_by_session,
-                          session_birdie_map=session_birdie_map)
+                          session_birdie_map=session_birdie_map,
+                          pending_dropout_requests=pending_dropout_requests)
 
 
 @app.route('/sessions/month/<month_key>')
@@ -1524,7 +1650,7 @@ def sessions_by_month(month_key):
     session_ids = [s.id for s in month_sessions]
     all_month_atts = Attendance.query.filter(
         Attendance.session_id.in_(session_ids),
-        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])
     ).options(joinedload(Attendance.player)).all() if session_ids else []
     fillin_by_session = {}
     attendees_by_session = {}
@@ -1689,7 +1815,7 @@ def session_detail(id):
     for player in players:
         if player.is_active:
             att = attendance_records.get(player.id)
-            if att and att.status in ['YES', 'DROPOUT', 'FILLIN']:
+            if att and att.status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT']:
                 cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
                 base = session_costs[cat]
                 player_session_costs[player.id] = round(base + (att.additional_cost or 0), 2)
@@ -2370,7 +2496,7 @@ def batch_update_attendance():
         session_id = update.get('session_id')
         status = update.get('status')
 
-        if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'STANDBY', 'CLEAR']:
+        if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'STANDBY', 'PENDING_DROPOUT', 'CLEAR']:
             errors.append(f'Invalid status for session {session_id}, player {player_id}')
             continue
 
@@ -2503,7 +2629,7 @@ def update_attendance():
     session_id = data.get('session_id')
     status = data.get('status')
 
-    if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'STANDBY', 'CLEAR']:
+    if status not in ['YES', 'NO', 'TENTATIVE', 'DROPOUT', 'FILLIN', 'STANDBY', 'PENDING_DROPOUT', 'CLEAR']:
         return jsonify({'error': 'Invalid status'}), 400
 
     sess = Session.query.get(session_id)
@@ -2796,7 +2922,7 @@ def bulk_update_payment_status():
     records = Attendance.query.filter(
         Attendance.player_id.in_(player_ids),
         Attendance.session_id.in_(session_ids),
-        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])
     ).all()
 
     for att in records:
@@ -3073,7 +3199,7 @@ def bulk_payment_api():
         # Mark unpaid attendance records as paid for this player
         unpaid_atts = Attendance.query.filter_by(
             player_id=player_id, payment_status='unpaid'
-        ).filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])).all()
+        ).filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])).all()
         for att in unpaid_atts:
             att.payment_status = 'paid'
             if att.status == 'FILLIN':
@@ -3856,6 +3982,198 @@ def delete_activity_logs():
     flash(f'{count} log(s) older than {before_date} deleted.', 'success')
     log_activity('delete_logs', f'Deleted {count} logs older than {before_date}')
     return redirect(url_for('activity_logs'))
+
+
+# ── Notifications ──────────────────────────────────────────────────────────
+@app.route('/notifications')
+@login_required
+def notifications_page():
+    """View all notifications for the current user."""
+    user_type = session.get('user_type', '')
+    player_id = session.get('player_id')
+
+    from sqlalchemy import and_, or_
+
+    if user_type in ('admin', 'player_admin'):
+        notifs = Notification.query.filter(
+            or_(Notification.target == 'admin', Notification.target == 'all')
+        ).order_by(Notification.created_at.desc()).limit(50).all()
+    else:
+        notifs = Notification.query.filter(
+            or_(
+                and_(Notification.target.in_(['player', 'all']), Notification.player_id == None),
+                Notification.player_id == player_id
+            )
+        ).order_by(Notification.created_at.desc()).limit(50).all()
+
+    # Get read status
+    read_ids = set()
+    if player_id:
+        read_ids = {r.notification_id for r in NotificationRead.query.filter_by(player_id=player_id).all()}
+
+    # Mark all as read
+    for n in notifs:
+        if n.id not in read_ids:
+            db.session.add(NotificationRead(notification_id=n.id, player_id=player_id or 0))
+    db.session.commit()
+
+    # For admin, also include system notifications (pending registrations, dropouts)
+    system_alerts = []
+    if user_type in ('admin', 'player_admin'):
+        pending_regs = Player.query.filter_by(is_approved=False).order_by(Player.created_at.desc()).all()
+        for p in pending_regs:
+            system_alerts.append({
+                'title': 'New Registration',
+                'message': f'{p.name} has registered and is awaiting approval.',
+                'type': 'registration',
+                'link': url_for('players'),
+                'created_at': p.created_at,
+            })
+        pending_dropouts = Attendance.query.filter_by(status='PENDING_DROPOUT').join(Session).filter(
+            Session.is_archived == False
+        ).all()
+        for att in pending_dropouts:
+            system_alerts.append({
+                'title': 'Dropout Request',
+                'message': f'{att.player.name} wants to drop out of {att.session.date.strftime("%b %d, %Y")} session.',
+                'type': 'dropout_request',
+                'link': url_for('session_detail', id=att.session_id),
+                'created_at': att.updated_at or att.created_at,
+            })
+
+    return render_template('notifications.html', notifications=notifs, read_ids=read_ids, system_alerts=system_alerts)
+
+
+@app.route('/api/notifications', methods=['GET'])
+@csrf.exempt
+@login_required
+def get_notifications_api():
+    """API to fetch notifications for dropdown."""
+    user_type = session.get('user_type', '')
+    player_id = session.get('player_id')
+    from sqlalchemy import and_, or_
+
+    if user_type in ('admin', 'player_admin'):
+        notifs = Notification.query.filter(
+            or_(Notification.target == 'admin', Notification.target == 'all')
+        ).order_by(Notification.created_at.desc()).limit(10).all()
+    else:
+        notifs = Notification.query.filter(
+            or_(
+                and_(Notification.target.in_(['player', 'all']), Notification.player_id == None),
+                Notification.player_id == player_id
+            )
+        ).order_by(Notification.created_at.desc()).limit(10).all()
+
+    read_ids = set()
+    if player_id:
+        read_ids = {r.notification_id for r in NotificationRead.query.filter_by(player_id=player_id).all()}
+
+    results = []
+    for n in notifs:
+        results.append({
+            'id': n.id,
+            'title': n.title,
+            'message': n.message,
+            'type': n.type,
+            'link': n.link,
+            'is_read': n.id in read_ids,
+            'created_at': n.created_at.strftime('%b %d, %I:%M %p') if n.created_at else '',
+        })
+
+    # Add system alerts for admin
+    if user_type in ('admin', 'player_admin'):
+        pending_reg_count = Player.query.filter_by(is_approved=False).count()
+        if pending_reg_count:
+            results.insert(0, {
+                'id': 'reg', 'title': 'Pending Registrations',
+                'message': f'{pending_reg_count} player(s) awaiting approval',
+                'type': 'registration', 'link': url_for('players'),
+                'is_read': False, 'created_at': ''
+            })
+        pending_dropout_count = Attendance.query.filter_by(status='PENDING_DROPOUT').join(Session).filter(Session.is_archived == False).count()
+        if pending_dropout_count:
+            results.insert(0, {
+                'id': 'dropout', 'title': 'Pending Dropout Requests',
+                'message': f'{pending_dropout_count} player(s) requesting dropout',
+                'type': 'dropout_request', 'link': url_for('sessions'),
+                'is_read': False, 'created_at': ''
+            })
+
+    return jsonify(results)
+
+
+@app.route('/api/notifications/mark-read', methods=['POST'])
+@csrf.exempt
+@login_required
+def mark_notifications_read():
+    """Mark all notifications as read for current user."""
+    player_id = session.get('player_id')
+    if not player_id:
+        return jsonify({'success': True})
+
+    user_type = session.get('user_type', '')
+    from sqlalchemy import and_, or_
+
+    if user_type in ('admin', 'player_admin'):
+        notifs = Notification.query.filter(
+            or_(Notification.target == 'admin', Notification.target == 'all')
+        ).all()
+    else:
+        notifs = Notification.query.filter(
+            or_(
+                and_(Notification.target.in_(['player', 'all']), Notification.player_id == None),
+                Notification.player_id == player_id
+            )
+        ).all()
+
+    existing = {r.notification_id for r in NotificationRead.query.filter_by(player_id=player_id).all()}
+    for n in notifs:
+        if n.id not in existing:
+            db.session.add(NotificationRead(notification_id=n.id, player_id=player_id))
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/notifications', methods=['GET', 'POST'])
+@admin_required
+def admin_notifications():
+    """Admin page to send notifications to all players."""
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        message = request.form.get('message', '').strip()
+        target = request.form.get('target', 'player')
+
+        if not title or not message:
+            flash('Title and message are required', 'error')
+        else:
+            notif = Notification(
+                title=title,
+                message=message,
+                type='general',
+                target=target,
+                created_by=session.get('player_id')
+            )
+            db.session.add(notif)
+            db.session.commit()
+            log_activity('send_notification', f'Sent notification: {title} (target: {target})')
+            flash(f'Notification sent to {"all players" if target == "player" else "everyone"}!', 'success')
+            return redirect(url_for('admin_notifications'))
+
+    # Show recent notifications
+    recent = Notification.query.filter_by(type='general').order_by(Notification.created_at.desc()).limit(20).all()
+    return render_template('admin_notifications.html', recent_notifications=recent)
+
+
+@app.route('/api/notifications/<int:id>/delete', methods=['POST'])
+@csrf.exempt
+@admin_required
+def delete_notification(id):
+    notif = Notification.query.get_or_404(id)
+    NotificationRead.query.filter_by(notification_id=id).delete()
+    db.session.delete(notif)
+    db.session.commit()
+    return jsonify({'success': True})
 
 
 if __name__ == '__main__':

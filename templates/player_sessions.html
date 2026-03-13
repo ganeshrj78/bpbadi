@@ -86,8 +86,41 @@
                         </div>
                         {% endif %}
                         <!-- Self -->
-                        <div class="flex items-center gap-2" x-data="{ status: '{{ attendance_map.get(player.id, {}).get(sess.id, 'NO') }}' }">
+                        {% set self_status = attendance_map.get(player.id, {}).get(sess.id, 'NO') %}
+                        <div class="flex items-center gap-2" x-data="{ status: '{{ self_status }}', showDropoutConfirm: false, dropoutDone: false }">
                             <span class="text-sm font-medium text-gray-600 w-20 truncate">You:</span>
+                            {% if sess.voting_frozen and self_status == 'PENDING_DROPOUT' %}
+                            <span class="px-3 py-1.5 rounded-lg font-bold text-sm border-2 bg-orange-100 border-orange-300 text-orange-700">Pending Admin Approval</span>
+                            {% elif sess.voting_frozen and self_status in ['YES', 'FILLIN'] %}
+                            <select
+                                x-model="status"
+                                disabled
+                                :class="{
+                                    'bg-green-100 border-green-300 text-green-700': status === 'YES',
+                                    'bg-blue-100 border-blue-300 text-blue-700': status === 'FILLIN'
+                                }"
+                                class="px-3 py-1.5 rounded-lg font-bold text-sm border-2 cursor-not-allowed opacity-60 transition-all">
+                                <option value="{{ self_status }}" selected>{{ 'Yes' if self_status == 'YES' else 'Fill-in' }}</option>
+                            </select>
+                            <button @click="showDropoutConfirm = true" x-show="!dropoutDone"
+                                class="px-3 py-1.5 rounded-lg text-xs font-bold border-2 border-red-300 bg-red-50 text-red-700 hover:bg-red-100 transition-all cursor-pointer">
+                                Drop Out
+                            </button>
+                            <!-- Dropout Confirmation Modal -->
+                            <div x-show="showDropoutConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" @keydown.escape.window="showDropoutConfirm = false">
+                                <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showDropoutConfirm = false"></div>
+                                <div class="relative bg-white rounded-2xl shadow-2xl border border-wimbledon-gold/30 p-6 max-w-sm w-full mx-4 z-10">
+                                    <h3 class="text-lg font-serif font-bold text-red-700 mb-2">Confirm Dropout</h3>
+                                    <p class="text-gray-600 text-sm mb-4">Are you sure you want to drop out of this session ({{ sess.date.strftime('%b %d, %Y') }})? An admin will be notified and must approve your request. Please post a message in the WhatsApp channel as well.</p>
+                                    <div class="flex gap-3">
+                                        <button @click="showDropoutConfirm = false"
+                                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Cancel</button>
+                                        <button @click="requestDropout({{ sess.id }}, {{ player.id }}, $el); showDropoutConfirm = false; dropoutDone = true"
+                                            class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">Confirm Dropout</button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
                             <select
                                 @change="updateAttendance({{ sess.id }}, {{ player.id }}, $event.target.value)"
                                 x-model="status"
@@ -98,18 +131,52 @@
                                 :class="{
                                     'bg-green-100 border-green-300 text-green-700': status === 'YES',
                                     'bg-gray-100 border-gray-300 text-gray-600': status === 'NO',
-                                    'bg-yellow-100 border-yellow-300 text-yellow-700': status === 'TENTATIVE'
+                                    'bg-yellow-100 border-yellow-300 text-yellow-700': status === 'TENTATIVE',
+                                    'bg-red-100 border-red-300 text-red-700': status === 'DROPOUT'
                                 }"
                                 class="px-3 py-1.5 rounded-lg font-bold text-sm border-2 {% if sess.voting_frozen %}cursor-not-allowed opacity-60{% else %}cursor-pointer{% endif %} transition-all">
                                 <option value="YES">Yes</option>
                                 <option value="NO">No</option>
                                 <option value="TENTATIVE">Tentative</option>
                             </select>
+                            {% endif %}
                         </div>
                         <!-- Managed Players -->
                         {% for mp in managed_players %}
-                        <div class="flex items-center gap-2" x-data="{ status: '{{ attendance_map.get(mp.id, {}).get(sess.id, 'NO') }}' }">
+                        {% set mp_status = attendance_map.get(mp.id, {}).get(sess.id, 'NO') %}
+                        <div class="flex items-center gap-2" x-data="{ status: '{{ mp_status }}', showDropoutConfirm: false, dropoutDone: false }">
                             <span class="text-sm font-medium text-gray-500 w-20 truncate" title="{{ mp.name }}">{{ mp.name.split()[0] }}:</span>
+                            {% if sess.voting_frozen and mp_status == 'PENDING_DROPOUT' %}
+                            <span class="px-3 py-1.5 rounded-lg font-bold text-sm border-2 bg-orange-100 border-orange-300 text-orange-700">Pending Admin Approval</span>
+                            {% elif sess.voting_frozen and mp_status in ['YES', 'FILLIN'] %}
+                            <select
+                                x-model="status"
+                                disabled
+                                :class="{
+                                    'bg-green-100 border-green-300 text-green-700': status === 'YES',
+                                    'bg-blue-100 border-blue-300 text-blue-700': status === 'FILLIN'
+                                }"
+                                class="px-3 py-1.5 rounded-lg font-bold text-sm border-2 cursor-not-allowed opacity-60 transition-all">
+                                <option value="{{ mp_status }}" selected>{{ 'Yes' if mp_status == 'YES' else 'Fill-in' }}</option>
+                            </select>
+                            <button @click="showDropoutConfirm = true" x-show="!dropoutDone"
+                                class="px-3 py-1.5 rounded-lg text-xs font-bold border-2 border-red-300 bg-red-50 text-red-700 hover:bg-red-100 transition-all cursor-pointer">
+                                Drop Out
+                            </button>
+                            <div x-show="showDropoutConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" @keydown.escape.window="showDropoutConfirm = false">
+                                <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showDropoutConfirm = false"></div>
+                                <div class="relative bg-white rounded-2xl shadow-2xl border border-wimbledon-gold/30 p-6 max-w-sm w-full mx-4 z-10">
+                                    <h3 class="text-lg font-serif font-bold text-red-700 mb-2">Confirm Dropout for {{ mp.name }}</h3>
+                                    <p class="text-gray-600 text-sm mb-4">Are you sure you want to drop out {{ mp.name }} from this session ({{ sess.date.strftime('%b %d, %Y') }})? An admin will be notified and must approve. Please post a message in the WhatsApp channel as well.</p>
+                                    <div class="flex gap-3">
+                                        <button @click="showDropoutConfirm = false"
+                                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Cancel</button>
+                                        <button @click="requestDropout({{ sess.id }}, {{ mp.id }}, $el); showDropoutConfirm = false; dropoutDone = true"
+                                            class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">Confirm Dropout</button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
                             <select
                                 @change="updateAttendance({{ sess.id }}, {{ mp.id }}, $event.target.value)"
                                 x-model="status"
@@ -127,6 +194,7 @@
                                 <option value="NO">No</option>
                                 <option value="TENTATIVE">Tentative</option>
                             </select>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -386,6 +454,38 @@ async function updateAttendance(sessionId, playerId, status) {
     } catch (error) {
         console.error('Error updating attendance:', error);
         alert('Failed to update attendance. Please try again.');
+    }
+}
+
+async function requestDropout(sessionId, playerId, btnEl) {
+    try {
+        const response = await fetch('/api/player/request-dropout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, player_id: playerId })
+        });
+        const data = await response.json();
+        if (data.success) {
+            // Show success popup
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 z-50 flex items-center justify-center';
+            overlay.innerHTML = `
+                <div class="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+                <div class="relative bg-white rounded-2xl shadow-2xl border border-wimbledon-gold/30 p-6 max-w-sm w-full mx-4 z-10 text-center">
+                    <div class="w-14 h-14 mx-auto mb-3 bg-orange-100 rounded-full flex items-center justify-center">
+                        <svg class="w-7 h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-serif font-bold text-wimbledon-purple mb-2">Admin Notified</h3>
+                    <p class="text-gray-600 text-sm mb-4">Your dropout request has been submitted and is pending admin action.</p>
+                    <button onclick="location.reload()" class="px-6 py-2 bg-wimbledon-purple text-white rounded-lg font-medium hover:bg-wimbledon-purple/90 text-sm">OK</button>
+                </div>`;
+            document.body.appendChild(overlay);
+        } else {
+            alert(data.error || 'Failed to submit dropout request.');
+        }
+    } catch (error) {
+        console.error('Error requesting dropout:', error);
+        alert('Failed to submit dropout request. Please try again.');
     }
 }
 

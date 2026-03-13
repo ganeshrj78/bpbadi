@@ -229,6 +229,54 @@
     </div>
 </div>
 
+<!-- Pending Dropout Requests -->
+{% set pending_dropouts = [] %}
+{% for att in attendance_records.values() if att.status == 'PENDING_DROPOUT' %}
+{% if pending_dropouts.append(att) %}{% endif %}
+{% endfor %}
+{% if pending_dropouts %}
+<div class="bg-white rounded-2xl shadow-lg border border-orange-300 mb-6 overflow-hidden">
+    <div class="px-6 py-4 border-b border-orange-200 bg-gradient-to-r from-orange-50 to-white">
+        <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center gap-2">
+            <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Pending Dropout Requests
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500 text-white text-xs font-bold">{{ pending_dropouts|length }}</span>
+        </h2>
+    </div>
+    <div class="divide-y divide-orange-100">
+        {% for att in pending_dropouts %}
+        <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" id="pending-dropout-{{ att.id }}">
+            <div class="flex items-center gap-3">
+                {% if att.player.profile_photo %}
+                <img src="{{ url_for('static', filename='uploads/' + att.player.profile_photo) }}" class="w-9 h-9 rounded-full object-cover border-2 border-orange-300">
+                {% else %}
+                <div class="w-9 h-9 gradient-primary rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {{ att.player.name[0].upper() }}
+                </div>
+                {% endif %}
+                <div>
+                    <div class="font-semibold text-gray-800">{{ att.player.name }}</div>
+                    <div class="text-xs text-orange-600">Requested to drop out · awaiting your approval</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 sm:flex-shrink-0">
+                <button onclick="handleDropoutApproval({{ att.id }}, 'approve', this, {{ att.player_id }}, '{{ att.player.name | e }}')"
+                    class="px-4 py-1.5 bg-wimbledon-green text-white text-sm font-semibold rounded-lg hover:bg-wimbledon-green/90 transition-all">
+                    Approve
+                </button>
+                <button onclick="handleDropoutApproval({{ att.id }}, 'reject', this, {{ att.player_id }}, '{{ att.player.name | e }}')"
+                    class="px-4 py-1.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 border border-gray-300 transition-all">
+                    Reject
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Pending Refunds -->
 {% set pending_refunds = session.dropout_refunds|selectattr('status', 'equalto', 'pending')|list %}
 {% if pending_refunds %}
@@ -467,8 +515,8 @@
                 {% set owed = player_session_costs.get(player.id, 0) %}
                 {% set payment_status = att.payment_status if att else 'unpaid' %}
                 {% if player.id in (pending_refund_pids | default([])) %}{% set payment_status = 'pending_refund' %}{% endif %}
-                {% set is_billable = current_status in ['YES', 'FILLIN', 'DROPOUT'] %}
-                {% set is_playing = current_status in ['YES', 'FILLIN', 'DROPOUT'] %}
+                {% set is_billable = current_status in ['YES', 'FILLIN', 'DROPOUT', 'PENDING_DROPOUT'] %}
+                {% set is_playing = current_status in ['YES', 'FILLIN', 'DROPOUT', 'PENDING_DROPOUT'] %}
                 {% set player_cat = category_map.get(player.id, player.category or 'regular') %}
                 {% if is_playing and player_cat != 'adhoc' and not ns_hdr.regular_shown %}
                 {% set ns_hdr.regular_shown = true %}
@@ -538,6 +586,12 @@
                         </select>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-center">
+                        {% if current_status == 'PENDING_DROPOUT' %}
+                        <span class="px-4 py-2 rounded-lg font-bold text-sm border-2 bg-orange-100 border-orange-300 text-orange-700 inline-flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Pending Dropout
+                        </span>
+                        {% else %}
                         <select data-prev="{{ current_status }}" data-original="{{ current_status }}" data-player-name="{{ player.name | e }}"
                             onchange="handleStatusChange({{ player.id }}, {{ session.id }}, this)"
                             class="px-4 py-2 rounded-lg font-bold text-sm border-2 cursor-pointer transition-all
@@ -588,6 +642,7 @@
                             {% endif %}
                             {% endif %}
                         </select>
+                        {% endif %}
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right">
                         {% if is_billable %}
@@ -745,11 +800,11 @@ const SUGGESTED_REFUND = parseFloat(Math.max(0, COST_PER_PLAYER - BIRDIE_COST).t
 
 function bulkPayment() {
     const selected = {
-        {% for player in players_display %}{% set att = attendance_records.get(player.id) %}{% set s = attendance_map.get(player.id, 'NO') %}{% if s in ['YES', 'DROPOUT', 'FILLIN'] %}{{ player.id }}: {{ 'false' if att and att.payment_status in ('paid', 'pending_refund') else 'true' }},
+        {% for player in players_display %}{% set att = attendance_records.get(player.id) %}{% set s = attendance_map.get(player.id, 'NO') %}{% if s in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}{{ player.id }}: {{ 'false' if att and att.payment_status in ('paid', 'pending_refund') else 'true' }},
         {% endif %}{% endfor %}
     };
     const amounts = {
-        {% for player in players_display %}{% set s = attendance_map.get(player.id, 'NO') %}{% if s in ['YES', 'DROPOUT', 'FILLIN'] %}{{ player.id }}: {{ player_session_costs.get(player.id, 0) }},
+        {% for player in players_display %}{% set s = attendance_map.get(player.id, 'NO') %}{% if s in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}{{ player.id }}: {{ player_session_costs.get(player.id, 0) }},
         {% endif %}{% endfor %}
     };
     return {
@@ -882,6 +937,44 @@ function updateDetailNetOwed() {
         netLine.innerHTML = `Net refund to player: <strong class="text-green-600">$${Math.abs(parseFloat(net)).toFixed(2)}</strong>`;
     } else {
         netLine.innerHTML = `Net: <strong>$0.00</strong> (settled)`;
+    }
+}
+
+async function handleDropoutApproval(attendanceId, action, btnEl, playerId, playerName) {
+    const actionText = action === 'approve' ? 'approve' : 'reject';
+    if (!confirm(`Are you sure you want to ${actionText} this dropout request?`)) return;
+
+    btnEl.disabled = true;
+    btnEl.textContent = action === 'approve' ? 'Approving...' : 'Rejecting...';
+
+    try {
+        const response = await fetch('/api/admin/approve-dropout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attendance_id: attendanceId, action: action })
+        });
+        const data = await response.json();
+        if (data.success) {
+            if (action === 'approve' && !data.not_playing) {
+                // Paid player — open the fill-in / refund modal
+                _dropout = { playerId: playerId, sessionId: {{ session.id }}, playerName: playerName, selectEl: null, wasFillin: false, fillinCost: COST_PER_PLAYER };
+                // Hide the pending dropout card row
+                const row = document.getElementById('pending-dropout-' + attendanceId);
+                if (row) row.style.display = 'none';
+                openDropoutModal();
+            } else {
+                // Unpaid player moved to Not Playing, or rejection — just reload
+                location.reload();
+            }
+        } else {
+            alert(data.error || 'Operation failed');
+            btnEl.disabled = false;
+            btnEl.textContent = action === 'approve' ? 'Approve' : 'Reject';
+        }
+    } catch (error) {
+        alert('Failed to process request. Please try again.');
+        btnEl.disabled = false;
+        btnEl.textContent = action === 'approve' ? 'Approve' : 'Reject';
     }
 }
 

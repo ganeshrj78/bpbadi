@@ -85,7 +85,7 @@ class Player(db.Model):
         """Calculate total charges from attended sessions based on player category.
         Includes YES, DROPOUT, and FILLIN statuses - dropouts and fill-ins are still charged."""
         total = 0
-        for attendance in self.attendances.filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])).all():
+        for attendance in self.attendances.filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])).all():
             session = attendance.session
             if attendance.category == 'kid':
                 # Kids pay flat $11 per session
@@ -303,7 +303,7 @@ class Session(db.Model):
         - Kids: flat $11
         """
         total = 0
-        for attendance in self.attendances.filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN'])).all():
+        for attendance in self.attendances.filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])).all():
             if attendance.category == 'kid':
                 total += self.get_cost_per_kid()
             elif attendance.category == 'adhoc':
@@ -386,7 +386,7 @@ class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     player_id = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=False, index=True)
     session_id = db.Column(db.Integer, db.ForeignKey('sessions.id'), nullable=False, index=True)
-    status = db.Column(db.String(20), nullable=False, default='NO', index=True)  # YES, NO, TENTATIVE, DROPOUT, FILLIN
+    status = db.Column(db.String(20), nullable=False, default='NO', index=True)  # YES, NO, TENTATIVE, DROPOUT, FILLIN, PENDING_DROPOUT
     category = db.Column(db.String(20), default='regular', index=True)  # regular, adhoc, kid - category for this session
 
     # Per-session payment tracking
@@ -409,7 +409,7 @@ class Attendance(db.Model):
     def get_session_cost(self):
         """Calculate total cost for this player in this session (birdie + additional)"""
         session = self.session
-        if self.status not in ['YES', 'DROPOUT', 'FILLIN']:
+        if self.status not in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT']:
             return 0
         base_cost = session.birdie_cost if session else 0
         return round(base_cost + (self.additional_cost or 0), 2)
@@ -588,6 +588,43 @@ class SiteSettings(db.Model):
             db.session.add(setting)
         db.session.commit()
         return setting
+
+
+class Notification(db.Model):
+    """Notifications for players and admins"""
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    type = db.Column(db.String(30), default='general')  # general, dropout_request, registration, system
+    target = db.Column(db.String(20), default='all')  # all, admin, player
+    player_id = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)  # specific player, or NULL for broadcast
+    link = db.Column(db.String(255))  # optional URL to navigate to
+    created_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    player = db.relationship('Player', foreign_keys=[player_id], backref=db.backref('notifications_received', lazy='dynamic'))
+    creator = db.relationship('Player', foreign_keys=[created_by])
+
+    __table_args__ = (
+        db.Index('idx_notification_target_created', 'target', 'created_at'),
+        db.Index('idx_notification_player', 'player_id', 'created_at'),
+    )
+
+
+class NotificationRead(db.Model):
+    """Tracks which notifications a player has read"""
+    __tablename__ = 'notification_reads'
+
+    id = db.Column(db.Integer, primary_key=True)
+    notification_id = db.Column(db.Integer, db.ForeignKey('notifications.id'), nullable=False)
+    player_id = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=False)
+    read_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('notification_id', 'player_id', name='unique_notification_read'),
+    )
 
 
 class ExternalIntegration(db.Model):

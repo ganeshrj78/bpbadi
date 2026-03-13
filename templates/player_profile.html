@@ -183,12 +183,27 @@
                         <td class="py-3 px-4 text-gray-800">{{ attendance.session.date.strftime('%b %d, %Y') }}</td>
                         <td class="py-3 px-4 text-gray-600">{{ sess_start }} - {{ sess_end }}</td>
                         <td class="py-3 px-4 text-center">
-                            {% if attendance.status == 'YES' %}
+                            {% set is_upcoming = attendance.session.date >= today %}
+                            {% if attendance.status == 'YES' and is_upcoming %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Playing</span>
+                            {% elif attendance.status == 'YES' %}
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Attended</span>
                             {% elif attendance.status == 'NO' %}
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Not Attended</span>
-                            {% else %}
+                            {% elif attendance.status == 'PENDING_DROPOUT' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">Pending Admin Approval</span>
+                            {% elif attendance.status == 'DROPOUT' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Dropout</span>
+                            {% elif attendance.status == 'FILLIN' and is_upcoming %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Fill-in</span>
+                            {% elif attendance.status == 'FILLIN' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Attended (Fill-in)</span>
+                            {% elif attendance.status == 'TENTATIVE' %}
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Tentative</span>
+                            {% elif attendance.status == 'STANDBY' %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">Waitlisted</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ attendance.status }}</span>
                             {% endif %}
                         </td>
                         <td class="py-3 px-4 text-right font-medium {% if attendance.status == 'YES' %}text-gray-800{% else %}text-gray-400{% endif %}">
