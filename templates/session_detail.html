@@ -392,14 +392,21 @@
 <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden" x-data="bulkPayment()">
     <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-                <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
-                    <svg class="w-5 h-5 mr-2 text-wimbledon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                    </svg>
-                    Attendance &amp; Payments
-                </h2>
-                <p class="text-sm text-gray-500 mt-1">Showing participating players only</p>
+            <div class="flex items-center gap-3">
+                <div>
+                    <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-wimbledon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                        Attendance &amp; Payments
+                    </h2>
+                    <p class="text-sm text-gray-500 mt-1">Showing participating players only</p>
+                </div>
+                <div class="relative">
+                    <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" x-model="playerSearch" placeholder="Search player..."
+                        class="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-wimbledon-green w-48">
+                </div>
             </div>
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -495,7 +502,9 @@
                     </td>
                 </tr>
                 {% endif %}
-                <tr class="hover:bg-wimbledon-cream/50 transition-all {% if not is_billable %}bg-teal-50/30{% endif %}">
+                <tr class="hover:bg-wimbledon-cream/50 transition-all {% if not is_billable %}bg-teal-50/30{% endif %}"
+                    x-show="playerSearch === '' || '{{ player.name|lower }}'.includes(playerSearch.toLowerCase())"
+                    x-cloak>
                     <td class="px-3 py-3 text-center">
                         {% if is_billable %}
                         <input type="checkbox" x-model="selected[{{ player.id }}]" class="rounded border-gray-300 text-wimbledon-green w-4 h-4 cursor-pointer">
@@ -748,6 +757,7 @@ function bulkPayment() {
         amounts,
         method: 'Zelle',
         loading: false,
+        playerSearch: '',
         get selectedCount() {
             return Object.values(this.selected).filter(Boolean).length;
         },
