@@ -421,9 +421,12 @@ def login():
         login_type = request.form.get('login_type', 'admin')
         client_ip = request.remote_addr
 
+        remember_me = request.form.get('remember_me') == 'on'
+
         if login_type == 'admin':
             password = request.form.get('password')
             if password == app.config['APP_PASSWORD']:
+                session.permanent = remember_me
                 session['authenticated'] = True
                 session['user_type'] = 'admin'
                 session['player_name'] = 'Admin'
@@ -455,6 +458,7 @@ def login():
                     # Store credentials temporarily; let the user choose role
                     session['pending_admin_player_id'] = player.id
                     session['pending_admin_player_name'] = player.name
+                    session['pending_remember_me'] = remember_me
                     security_logger.info(f'PLAYER_ADMIN_LOGIN_ROLE_CHOICE - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
                     return render_template('login.html',
                                            show_role_modal=True,
@@ -462,6 +466,7 @@ def login():
                                            member_guidelines=SiteSettings.get('member_guidelines', ''),
                                            booking_guidelines=SiteSettings.get('booking_guidelines', ''))
                 else:
+                    session.permanent = remember_me
                     session['authenticated'] = True
                     session['player_id'] = player.id
                     session['player_name'] = player.name
@@ -491,10 +496,12 @@ def choose_role():
     client_ip = request.remote_addr
 
     # Clear pending state
+    remember_me = session.pop('pending_remember_me', False)
     session.pop('pending_admin_player_id', None)
     session.pop('pending_admin_player_name', None)
 
     # Set authenticated session
+    session.permanent = remember_me
     session['authenticated'] = True
     session['player_id'] = player_id
     session['player_name'] = player_name
@@ -522,6 +529,8 @@ def logout():
     session.pop('player_name', None)
     session.pop('pending_admin_player_id', None)
     session.pop('pending_admin_player_name', None)
+    session.pop('pending_remember_me', None)
+    session.permanent = False
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
 

@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,6 +28,7 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     SESSION_COOKIE_SECURE = IS_PRODUCTION  # HTTPS only in production
+    PERMANENT_SESSION_LIFETIME = timedelta(days=10)  # Remember me duration
 
     # Jinja2 bytecode caching — compiles templates once, reuses on subsequent requests
     JINJA_BYTECODE_CACHE_DIR = os.path.join(os.path.dirname(__file__), '.jinja_cache')
