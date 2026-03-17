@@ -17,3 +17,4 @@ beautifulsoup4==4.12.3
 playwright>=1.40.0
 browser-cookie3>=0.19.1
 bleach>=6.0.0
+google-auth>=2.29.0

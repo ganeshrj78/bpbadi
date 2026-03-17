@@ -19,6 +19,8 @@ from flask_caching import Cache
 from flask_migrate import Migrate
 from flask_compress import Compress
 import bleach
+from google.oauth2 import id_token as google_id_token
+from google.auth.transport import requests as google_requests
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -478,7 +480,12 @@ def login():
             security_logger.warning(f'PLAYER_LOGIN_FAILED - Email: {email}, IP: {client_ip}')
             flash('Invalid email or password', 'error')
 
+    # Show role modal if pending from Google login
+    show_role_modal = 'pending_admin_player_id' in session
+    admin_player_name = session.get('pending_admin_player_name', '')
     return render_template('login.html',
+                           show_role_modal=show_role_modal,
+                           admin_player_name=admin_player_name,
                            member_guidelines=SiteSettings.get('member_guidelines', ''),
                            booking_guidelines=SiteSettings.get('booking_guidelines', ''))
 
@@ -518,6 +525,61 @@ def choose_role():
         flash(f'Welcome back, {player_name}!', 'success')
         log_activity('login', f'Player {player_name} logged in as player')
         return redirect(url_for('player_payments'))
+
+
+@app.route('/login/google-callback', methods=['POST'])
+@csrf.exempt
+@limiter.limit("10 per minute")
+def google_callback():
+    """Handle Google Sign-In token verification and login"""
+    google_client_id = app.config.get('GOOGLE_CLIENT_ID')
+    if not google_client_id:
+        return jsonify({'success': False, 'error': 'Google login not configured'}), 500
+
+    token = request.json.get('credential') if request.is_json else request.form.get('credential')
+    if not token:
+        return jsonify({'success': False, 'error': 'No credential provided'}), 400
+
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            token, google_requests.Request(), google_client_id
+        )
+        email = idinfo.get('email', '').lower()
+        if not email.endswith('@gmail.com'):
+            return jsonify({'success': False, 'error': 'Only Gmail accounts are supported'}), 400
+
+        player = Player.query.filter(db.func.lower(Player.email) == email).first()
+        if not player:
+            return jsonify({'success': False, 'error': 'No account found with this email. Please register first.'}), 404
+
+        if not player.is_approved:
+            return jsonify({'success': False, 'error': 'Your registration is pending approval.'}), 403
+
+        if not player.is_active:
+            return jsonify({'success': False, 'error': 'Your account has been deactivated. Contact an admin.'}), 403
+
+        client_ip = request.remote_addr
+        remember_me = request.json.get('remember_me', False) if request.is_json else False
+
+        if player.is_admin:
+            session['pending_admin_player_id'] = player.id
+            session['pending_admin_player_name'] = player.name
+            session['pending_remember_me'] = remember_me
+            security_logger.info(f'GOOGLE_ADMIN_LOGIN_ROLE_CHOICE - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
+            return jsonify({'success': True, 'show_role_modal': True, 'player_name': player.name})
+
+        session.permanent = remember_me
+        session['authenticated'] = True
+        session['player_id'] = player.id
+        session['player_name'] = player.name
+        session['user_type'] = 'player'
+        security_logger.info(f'GOOGLE_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
+        log_activity('login', f'Player {player.name} logged in via Google')
+        return jsonify({'success': True, 'redirect': url_for('player_payments')})
+
+    except ValueError:
+        security_logger.warning(f'GOOGLE_LOGIN_INVALID_TOKEN - IP: {request.remote_addr}')
+        return jsonify({'success': False, 'error': 'Invalid Google token'}), 400
 
 
 @app.route('/logout')

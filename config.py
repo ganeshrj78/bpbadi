@@ -21,6 +21,9 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     APP_PASSWORD = os.environ.get('APP_PASSWORD', 'bpbadi2024')
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+
     # Environment detection
     IS_PRODUCTION = os.environ.get('RENDER') == 'true'
 
