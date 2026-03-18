@@ -103,8 +103,8 @@ class Player(db.Model):
         return round(sum(p.amount for p in self.payments.filter(Payment.amount > 0).all()), 2)
 
     def get_balance(self):
-        """Calculate outstanding balance (charges - payments)"""
-        return round(self.get_total_charges() - self.get_total_payments(), 2)
+        """Calculate outstanding balance (charges - payments), floor at zero"""
+        return round(max(0, self.get_total_charges() - self.get_total_payments()), 2)
 
     def get_pending_refunds_count(self):
         """Count pending refunds for this player"""

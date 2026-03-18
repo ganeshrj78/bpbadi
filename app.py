@@ -372,7 +372,7 @@ def get_cached_player_stats():
         payments = round(player_payments.get(player.id, 0), 2)
         refund_data = refund_map.get(player.id, {'pending': 0, 'pending_amount': 0.0, 'refunded': 0})
         player_stats[player.id] = {
-            'balance': round(charges - payments, 2),
+            'balance': round(max(0, charges - payments), 2),
             'total_payments': payments,
             'pending_refunds': refund_data['pending'],
             'pending_refund_amount': refund_data['pending_amount'],
