@@ -49,7 +49,9 @@ class Player(db.Model):
     zelle_preference = db.Column(db.String(10), default='email')  # 'email' or 'phone'
     date_of_birth = db.Column(db.Date, nullable=True)  # Optional date of birth
     gender = db.Column(db.String(10), default='male')  # 'male', 'female', 'other'
-    profile_photo = db.Column(db.String(255))  # filename of uploaded photo
+    profile_photo = db.Column(db.String(255))  # filename of uploaded photo (legacy)
+    profile_photo_data = db.Column(db.LargeBinary)  # photo stored as binary in DB
+    profile_photo_mime = db.Column(db.String(50))  # MIME type e.g. image/jpeg
     managed_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)  # Parent player who can vote/pay for this player
     is_admin = db.Column(db.Boolean, default=False)  # Player admin flag
     is_active = db.Column(db.Boolean, default=True, index=True)  # Active/Inactive status

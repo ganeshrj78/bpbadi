@@ -97,14 +97,15 @@ Conventions and guidance for working with templates in BP Badminton.
 ```
 
 ### Profile Photo with Fallback
+Photos are stored in the database (survives Render deploys). Served via `/player-photo/<id>` route:
 ```html
 {% if player.profile_photo %}
-<img src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}"
+<img src="{{ url_for('player_photo', player_id=player.id) }}"
      class="w-8 h-8 rounded-full object-cover">
 {% else %}
 <div class="w-8 h-8 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green
             flex items-center justify-center text-white text-xs font-bold">
-    {{ player.name[0] }}
+    {{ player.name[0].upper() }}
 </div>
 {% endif %}
 ```

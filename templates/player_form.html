@@ -33,7 +33,7 @@
                 <label class="block text-sm font-semibold text-gray-700 mb-3">Profile Photo</label>
                 <div class="flex flex-col items-center gap-4">
                     {% if player and player.profile_photo %}
-                    <img loading="lazy" src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="Profile" class="w-24 h-24 rounded-full object-cover border-4 border-wimbledon-gold/30 shadow-lg">
+                    <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="Profile" class="w-24 h-24 rounded-full object-cover border-4 border-wimbledon-gold/30 shadow-lg">
                     {% else %}
                     <div class="w-24 h-24 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center border-4 border-wimbledon-gold/30 shadow-lg">
                         <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -157,14 +157,22 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def save_profile_photo(file):
-    """Save uploaded profile photo and return filename"""
+MIME_TYPES = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp'}
+
+def save_profile_photo(file, player=None):
+    """Save uploaded profile photo to database and return filename for backwards compat"""
     if file and allowed_file(file.filename):
-        # Generate unique filename
         ext = file.filename.rsplit('.', 1)[1].lower()
         filename = f"{uuid.uuid4().hex}.{ext}"
+        mime = MIME_TYPES.get(ext, 'image/jpeg')
+        photo_data = file.read()
+        if player:
+            player.profile_photo_data = photo_data
+            player.profile_photo_mime = mime
+        # Also save to filesystem as fallback for local dev
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+        with open(filepath, 'wb') as f:
+            f.write(photo_data)
         return filename
     return None
 
@@ -177,6 +185,25 @@ init_encryption(app.config['SECRET_KEY'])
 # Create tables
 with app.app_context():
     db.create_all()
+
+
+@app.route('/player-photo/<int:player_id>')
+def player_photo(player_id):
+    """Serve player profile photo from database, fall back to filesystem, then initials"""
+    player = Player.query.get(player_id)
+    if player and player.profile_photo_data:
+        response = make_response(player.profile_photo_data)
+        response.headers['Content-Type'] = player.profile_photo_mime or 'image/jpeg'
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+        return response
+    # Fall back to filesystem
+    if player and player.profile_photo:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], player.profile_photo)
+        if os.path.exists(filepath):
+            from flask import send_file
+            return send_file(filepath, mimetype=MIME_TYPES.get(player.profile_photo.rsplit('.', 1)[-1].lower(), 'image/jpeg'))
+    # Return 404 — templates handle the initials fallback
+    return '', 404
 
 
 # Authentication decorator
@@ -895,7 +922,7 @@ def player_profile():
                         old_path = os.path.join(app.config['UPLOAD_FOLDER'], player.profile_photo)
                         if os.path.exists(old_path):
                             os.remove(old_path)
-                    filename = save_profile_photo(file)
+                    filename = save_profile_photo(file, player=player)
                     if filename:
                         player.profile_photo = filename
                         db.session.commit()
@@ -1397,7 +1424,7 @@ def add_player():
         if 'profile_photo' in request.files:
             file = request.files['profile_photo']
             if file and file.filename:
-                filename = save_profile_photo(file)
+                filename = save_profile_photo(file, player=player)
                 if filename:
                     player.profile_photo = filename
 
@@ -1453,7 +1480,7 @@ def edit_player(id):
                     old_path = os.path.join(app.config['UPLOAD_FOLDER'], player.profile_photo)
                     if os.path.exists(old_path):
                         os.remove(old_path)
-                filename = save_profile_photo(file)
+                filename = save_profile_photo(file, player=player)
                 if filename:
                     player.profile_photo = filename
 

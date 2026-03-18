@@ -30,7 +30,7 @@
             <div class="flex items-center justify-between text-sm">
                 <div class="flex items-center gap-2">
                     {% if player.profile_photo %}
-                    <img loading="lazy" src="{{ url_for('static', filename='uploads/' + player.profile_photo) }}" alt="" class="w-6 h-6 rounded-full object-cover">
+                    <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-6 h-6 rounded-full object-cover">
                     {% else %}
                     <div class="w-6 h-6 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center">
                         <span class="text-white font-bold text-[10px]">{{ player.name[0] }}</span>
@@ -44,7 +44,7 @@
             <div class="flex items-center justify-between text-sm">
                 <div class="flex items-center gap-2">
                     {% if mp.profile_photo %}
-                    <img loading="lazy" src="{{ url_for('static', filename='uploads/' + mp.profile_photo) }}" alt="" class="w-6 h-6 rounded-full object-cover">
+                    <img loading="lazy" src="{{ url_for('player_photo', player_id=mp.id) }}" alt="" class="w-6 h-6 rounded-full object-cover">
                     {% else %}
                     <div class="w-6 h-6 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center">
                         <span class="text-white font-bold text-[10px]">{{ mp.name[0] }}</span>
