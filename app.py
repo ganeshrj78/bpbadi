@@ -1182,10 +1182,10 @@ def update_player_attendance():
     db.session.commit()
 
     target_player = Player.query.get(target_player_id)
-    log_activity('vote', f'{target_player.name} voted {status} for session {session_id}', 'attendance', attendance.id)
+    sess = Session.query.get(session_id)
+    log_activity('vote', f'{target_player.name} voted {status} for session {sess.date}', 'attendance', attendance.id)
 
     # Return updated session info
-    sess = Session.query.get(session_id)
     return jsonify({
         'success': True,
         'attendee_count': sess.get_attendee_count(),
@@ -2207,7 +2207,8 @@ def api_update_court(court_id):
 
     db.session.commit()
     clear_session_cache()
-    log_activity('update_court', f'Updated court {court.name} (session {court.session_id})', 'court', court_id)
+    court_sess = Session.query.get(court.session_id)
+    log_activity('update_court', f'Updated court {court.name} (session {court_sess.date})', 'court', court_id)
     return jsonify({'success': True, 'court': court.to_dict()})
 
 
@@ -2230,7 +2231,7 @@ def api_add_court(session_id):
     db.session.add(court)
     db.session.commit()
     clear_session_cache()
-    log_activity('add_court', f'Added court to session {session_id}', 'court', court.id)
+    log_activity('add_court', f'Added court to session {sess.date}', 'court', court.id)
     return jsonify({'success': True, 'court': court.to_dict()})
 
 
@@ -2241,11 +2242,12 @@ def api_delete_court(court_id):
     """Delete a court from a session."""
     court = Court.query.get_or_404(court_id)
     court_name = court.name
-    court_session_id = court.session_id
+    court_sess = Session.query.get(court.session_id)
+    court_sess_date = court_sess.date if court_sess else 'unknown'
     db.session.delete(court)
     db.session.commit()
     clear_session_cache()
-    log_activity('delete_court', f'Deleted court {court_name} from session {court_session_id}', 'court', court_id)
+    log_activity('delete_court', f'Deleted court {court_name} from session {court_sess_date}', 'court', court_id)
     return jsonify({'success': True})
 
 
@@ -2957,7 +2959,8 @@ def update_attendance():
 
     att_player = Player.query.get(player_id)
     att_name = att_player.name if att_player else str(player_id)
-    log_activity('update_attendance', f'{att_name} → {status} for session {session_id}', 'attendance')
+    att_sess = Session.query.get(session_id)
+    log_activity('update_attendance', f'{att_name} → {status} for session {att_sess.date}', 'attendance')
 
     # Return updated session costs
     return jsonify({
@@ -3083,7 +3086,7 @@ def process_dropout():
 
     db.session.commit()
     clear_session_cache()
-    log_activity('process_dropout', f'{dropout_name} dropped out of session {session_id}', 'attendance')
+    log_activity('process_dropout', f'{dropout_name} dropped out of session {sess.date}', 'attendance')
 
     return jsonify({
         'success': True,
@@ -3242,7 +3245,7 @@ def update_attendance_payment_status():
             else:
                 attendance.comments = paid_note
         db.session.commit()
-        log_activity('update_payment_status', f'Payment status updated for session {session_id}', 'attendance', attendance.id)
+        log_activity('update_payment_status', f'Payment status updated for session {att_sess.date if att_sess else session_id}', 'attendance', attendance.id)
         return jsonify({'success': True, 'comments': attendance.comments or ''})
 
     return jsonify({'error': 'Attendance record not found'}), 404
@@ -3358,7 +3361,7 @@ def bulk_session_payment():
         count += 1
 
     db.session.commit()
-    log_activity('bulk_payment', f'Bulk payment recorded for session {session_id}', 'session', session_id)
+    log_activity('bulk_payment', f'Bulk payment recorded for session {sess.date}', 'session', session_id)
     return jsonify({'success': True, 'count': count})
 
 

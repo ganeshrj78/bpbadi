@@ -1,12 +1,12 @@
 # Templates Documentation
 
-This file contains conventions and guidance for working with templates in BP Badminton.
+Conventions and guidance for working with templates in BP Badminton.
 
 ## Technology Stack
 
 - **Jinja2** - Server-side templating
 - **Tailwind CSS (CDN)** - Utility-first CSS
-- **Alpine.js** - Lightweight JavaScript reactivity
+- **Alpine.js 3.x** - Lightweight JavaScript reactivity
 
 ## Theme Colors (Wimbledon-Inspired)
 
@@ -21,23 +21,31 @@ This file contains conventions and guidance for working with templates in BP Bad
 
 | Template | Purpose |
 |----------|---------|
-| `base.html` | Base layout with navigation, includes Tailwind/Alpine |
-| `login.html` | Admin and player login |
+| `base.html` | Base layout with navigation, includes Tailwind/Alpine, `{% block head %}` for extra scripts |
+| `login.html` | Admin and player login + Google Sign-In |
 | `register.html` | Player self-registration |
 | `dashboard.html` | Admin dashboard with KPIs |
 | `players.html` | Player list with filters |
 | `player_form.html` | Add/edit player |
 | `player_detail.html` | Player details, attendance, payments |
 | `player_profile.html` | Player self-service profile |
-| `player_sessions.html` | Player session voting |
-| `player_payments.html` | Player payment recording |
-| `sessions.html` | Session matrix with attendance |
+| `player_sessions.html` | Player session voting (grouped by month) |
+| `player_payments.html` | Player payment recording (frozen_only charges) |
+| `sessions.html` | Session matrix with attendance, month filter, bulk actions |
 | `session_form.html` | Add/edit session with courts |
-| `session_detail.html` | Session details with attendance |
+| `session_detail.html` | Session details with attendance, freeze/release/archive toggles |
 | `session_refunds.html` | Dropout refund management |
-| `payments.html` | Payment list |
+| `payments.html` | Payment list with search/sort |
 | `payment_form.html` | Add payment |
 | `birdie_bank.html` | Shuttlecock inventory |
+| `month_sessions.html` | Monthly session summary |
+| `notifications.html` | Player notifications |
+| `admin_notifications.html` | Admin notification management |
+| `activity_logs.html` | Audit log viewer |
+| `guidelines.html` | Club guidelines (editable via SiteSettings) |
+| `ezfacility_settings.html` | EZFacility integration settings |
+| `ezfacility_sync.html` | Court booking sync from EZFacility |
+| `reset_admin_password.html` | Admin password reset |
 
 ## Alpine.js Patterns
 
@@ -73,6 +81,9 @@ This file contains conventions and guidance for working with templates in BP Bad
 
 <!-- Refund Pending -->
 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">Refund Pending</span>
+
+<!-- Payment Released (amber) -->
+<span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">Payment Released</span>
 ```
 
 ### Attendance Dropdown Colors
@@ -126,7 +137,10 @@ player_stats[player.id] = {
     'balance': float,
     'total_payments': float,
     'pending_refunds': int,
-    'total_refunded': float
+    'pending_refund_amount': float,
+    'total_refunded': float,
+    'fillin_amount': float,
+    'fillin_paid': float
 }
 ```
 
@@ -134,6 +148,13 @@ Use in template:
 ```html
 {% set stats = player_stats[player.id] %}
 {{ stats.balance }}
+```
+
+### Player Payments Page (frozen_only)
+Charges and balance use `frozen_only=True` — only sessions with `payment_released=True` or `is_archived=True` are included:
+```html
+{{ player.get_total_charges(frozen_only=True) }}
+{{ player.get_balance(frozen_only=True) }}
 ```
 
 ## Form Patterns
@@ -147,4 +168,14 @@ All forms must include CSRF token (handled by Flask-WTF):
 ### Confirmation Dialog
 ```html
 <form onsubmit="return confirm('Are you sure?')">
+```
+
+### Form alignment in flex containers
+Use `class="flex"` on `<form>` elements inside flex containers (not `class="inline"`):
+```html
+<div class="flex flex-wrap items-center gap-3">
+    <form method="POST" action="..." class="flex">
+        <button type="submit" class="...">Action</button>
+    </form>
+</div>
 ```

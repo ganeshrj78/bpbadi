@@ -52,29 +52,59 @@
 │     notes            │        │    court_type   │  regular | adhoc
 │     is_archived      │        │    cost         │
 │     voting_frozen    │        │    start_time   │
-│     credits          │◄───────│    end_time     │
-│     hours (legacy)   │        │    created/upd  │
-│     start/end_time   │        └─────────────────┘
-│     court_cost       │
-│     created/updated  │        ┌─────────────────┐
-└──────────┬───────────┘◄──1:N──│  BIRDIE_BANK    │
-           │                    ├─────────────────┤
-           └────────────────────│ FK session_id   │
-                                │ transaction_type│  purchase | usage
+│     payment_released │        │    end_time     │
+│     credits          │        │    created/upd  │
+│     apply_credits    │        └─────────────────┘
+│     hours (legacy)   │
+│     start/end_time   │        ┌─────────────────┐
+│     court_cost       │◄──1:N──│  BIRDIE_BANK    │
+│     created/updated  │        ├─────────────────┤
+└──────────────────────┘        │ PK id           │
+                                │ FK session_id   │
+                                │ FK purchased_by │──► players.id
+                                │ transaction_type│  purchase | usage | reimbursement
                                 │    quantity     │
                                 │    cost         │
                                 │    notes        │
                                 │    created/upd  │
                                 └─────────────────┘
 
-┌─────────────────┐
-│  SITE_SETTINGS  │  (standalone key/value store)
-├─────────────────┤
-│ PK id           │
-│    key (unique) │
-│    value        │
-│    updated_at   │
-└─────────────────┘
+┌──────────────────────┐        ┌──────────────────────┐
+│   ACTIVITY_LOGS      │        │    NOTIFICATIONS     │
+├──────────────────────┤        ├──────────────────────┤
+│ PK  id               │        │ PK  id               │
+│     timestamp        │        │     title            │
+│     user_type        │        │     message          │
+│     user_name        │        │     type             │
+│     action           │        │     target           │
+│     entity_type      │        │ FK  player_id        │──► players.id
+│     entity_id        │        │     link             │
+│     description      │        │ FK  created_by       │──► players.id
+│     ip_address       │        │     created_at       │
+└──────────────────────┘        └──────────┬───────────┘
+                                           │ 1:N
+                                           ▼
+                                ┌──────────────────────┐
+                                │  NOTIFICATION_READS  │
+                                ├──────────────────────┤
+                                │ PK  id               │
+                                │ FK  notification_id  │
+                                │ FK  player_id        │──► players.id
+                                │     read_at          │
+                                │  UQ (notif, player)  │
+                                └──────────────────────┘
+
+┌─────────────────────────┐     ┌─────────────────┐
+│ EXTERNAL_INTEGRATIONS   │     │  SITE_SETTINGS  │
+├─────────────────────────┤     ├─────────────────┤
+│ PK  id                  │     │ PK id           │
+│     name (unique)       │     │    key (unique) │
+│     url (encrypted)     │     │    value        │
+│     username (encrypted)│     │    updated_at   │
+│     password (encrypted)│     └─────────────────┘
+│     session_cookie (enc)│
+│     created/updated     │
+└─────────────────────────┘
 ```
 
 ## Relationship Summary
@@ -85,10 +115,13 @@
 | players | attendances | player_id | |
 | players | payments | player_id | |
 | players | dropout_refunds | player_id | |
+| players | notifications | player_id | Target player for notification |
+| players | birdie_bank | purchased_by | Who paid for purchase |
 | sessions | courts | session_id | CASCADE DELETE |
 | sessions | attendances | session_id | CASCADE DELETE |
-| sessions | dropout_refunds | session_id | |
-| sessions | birdie_bank | session_id | optional (usage entries only) |
+| sessions | dropout_refunds | session_id | Manual cleanup on delete |
+| sessions | birdie_bank | session_id | Optional (usage entries only) |
+| notifications | notification_reads | notification_id | |
 
 ---
 
@@ -100,7 +133,7 @@
 | `name` | VARCHAR(100) NN | — | Full name |
 | `category` | VARCHAR(20) NN | `regular` | `regular`, `adhoc`, `kid` |
 | `email` | VARCHAR(100) | NULL | Login email |
-| `password_hash` | VARCHAR(255) | NULL | Bcrypt hash |
+| `password_hash` | VARCHAR(255) | NULL | pbkdf2:sha256 hash |
 | `phone` | VARCHAR(20) | NULL | |
 | `date_of_birth` | DATE | NULL | Optional |
 | `gender` | VARCHAR(10) | `male` | `male`, `female`, `other` |
@@ -129,7 +162,9 @@
 | `notes` | TEXT | NULL | |
 | `is_archived` | BOOLEAN | FALSE | Session closed |
 | `voting_frozen` | BOOLEAN | FALSE | Locks player votes |
-| `credits` | FLOAT | 0 | **Collected from players this session; split across all non-kid players; funds adhoc courts; adjusts next month** |
+| `payment_released` | BOOLEAN | FALSE | When True, charges visible on player payment screen |
+| `credits` | FLOAT | 0 | Collected from players; split across non-kid players |
+| `apply_credits` | BOOLEAN | FALSE | Include credits in per-player cost calculation |
 | `hours` | FLOAT | 3 | Legacy session-level duration |
 | `start_time` | VARCHAR(10) | `06:30` | Legacy HH:MM |
 | `end_time` | VARCHAR(10) | `09:30` | Legacy HH:MM |
@@ -139,13 +174,15 @@
 
 **Indexes:** date, is_archived
 
-**Cost model (key):**
+**Session lifecycle:** Open → Voting Frozen → Payment Released → Archived
+
+**Cost model:**
 ```
-total_pool       = SUM(courts.cost) + session.credits
+total_pool       = SUM(courts.cost WHERE type='regular') + (credits if apply_credits)
 per_player_cost  = total_pool / non_kid_count + birdie_cost
 kids             = flat $11
 ```
-Regular and adhoc players pay the same rate. Adhoc court costs are funded from credits.
+Regular and adhoc players pay the same rate.
 
 ---
 
@@ -171,19 +208,18 @@ Regular and adhoc players pay the same rate. Adhoc court costs are funded from c
 |--------|------|---------|-------------|
 | `id` | INTEGER PK | Auto | |
 | `player_id` | INTEGER FK NN | — | → players.id |
-| `session_id` | INTEGER FK NN | — | → sessions.id |
-| `status` | VARCHAR(20) NN | `NO` | `YES`, `NO`, `TENTATIVE`, `DROPOUT`, `FILLIN`, `STANDBY` |
+| `session_id` | INTEGER FK NN | — | → sessions.id (CASCADE DELETE) |
+| `status` | VARCHAR(20) NN | `NO` | `YES`, `NO`, `TENTATIVE`, `DROPOUT`, `FILLIN`, `STANDBY`, `PENDING_DROPOUT` |
 | `category` | VARCHAR(20) | `regular` | Per-session override: `regular`, `adhoc`, `kid` |
-| `payment_status` | VARCHAR(20) | `unpaid` | `unpaid` or `paid` |
+| `payment_status` | VARCHAR(20) | `unpaid` | `unpaid`, `paid`, `pending_refund` |
 | `additional_cost` | FLOAT | 0 | Extra charge this session |
 | `comments` | TEXT | NULL | Admin notes |
 | `created_by/at` | | | Audit |
 | `updated_by/at` | | | Audit (auto) |
 
 **Unique:** (player_id, session_id)
-**Indexes:** player_id, session_id, status, category, (status, category)
-**Charged:** YES, DROPOUT, FILLIN — owe session cost
-**Shown in session detail:** YES, FILLIN, STANDBY, DROPOUT (NO/TENTATIVE hidden)
+**Indexes:** player_id, session_id, status, category, payment_status, (status, category), (session_id, status, category)
+**Charged statuses:** YES, DROPOUT, FILLIN, PENDING_DROPOUT
 
 ---
 
@@ -193,14 +229,15 @@ Regular and adhoc players pay the same rate. Adhoc court costs are funded from c
 |--------|------|---------|-------------|
 | `id` | INTEGER PK | Auto | |
 | `player_id` | INTEGER FK NN | — | → players.id |
-| `amount` | FLOAT NN | — | Positive = payment; negative = refund |
-| `method` | VARCHAR(20) NN | — | `Zelle`, `Cash`, `Venmo`, `Refund` |
+| `amount` | FLOAT NN | — | Positive = payment; negative = refund credit |
+| `method` | VARCHAR(20) NN | — | `Zelle`, `Cash`, `Venmo`, `Check`, `Other`, `Refund` |
 | `date` | DATETIME | NOW | |
 | `notes` | TEXT | NULL | |
 | `created_by/at` | | | Audit |
 | `updated_by/at` | | | Audit (auto) |
 
-**Note:** Global (not session-specific). Per-session tracking via `attendances.payment_status`.
+**Indexes:** player_id, date
+**Note:** Global (not session-specific). Balance = charges(`frozen_only`) − payments(`amount > 0`). Negative payments are refund credits created by dropout processing.
 
 ---
 
@@ -215,11 +252,12 @@ Regular and adhoc players pay the same rate. Adhoc court costs are funded from c
 | `suggested_amount` | FLOAT | 0 | System suggestion |
 | `instructions` | TEXT | NULL | Admin notes |
 | `status` | VARCHAR(20) | `pending` | `pending`, `processed`, `cancelled` |
-| `processed_date` | DATETIME | NULL | When issued — shown in Financial Summary |
+| `processed_date` | DATETIME | NULL | When issued |
 | `created_by/at` | | | Audit |
 | `updated_by/at` | | | Audit (auto) |
 
 **Indexes:** player_id, session_id, status, (player_id, status)
+**Cleanup:** Manually deleted when parent session is deleted (not cascade).
 
 ---
 
@@ -229,13 +267,80 @@ Regular and adhoc players pay the same rate. Adhoc court costs are funded from c
 |--------|------|---------|-------------|
 | `id` | INTEGER PK | Auto | |
 | `date` | DATETIME | NOW | |
-| `transaction_type` | VARCHAR(20) NN | — | `purchase` or `usage` |
+| `transaction_type` | VARCHAR(20) NN | — | `purchase`, `usage`, or `reimbursement` |
 | `quantity` | INTEGER NN | — | Always positive; direction from type |
 | `cost` | FLOAT | 0 | Purchases only |
 | `notes` | TEXT | NULL | |
 | `session_id` | INTEGER FK | NULL | → sessions.id (usage only) |
+| `purchased_by` | INTEGER FK | NULL | → players.id (who paid/gets reimbursed) |
 | `created_by/at` | | | Audit |
 | `updated_by/at` | | | Audit (auto) |
+
+---
+
+## Table: `activity_logs`
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | INTEGER PK | Auto | |
+| `timestamp` | DATETIME | NOW (ET) | Action timestamp |
+| `user_type` | VARCHAR(20) NN | — | `admin`, `player`, `player_admin` |
+| `user_name` | VARCHAR(100) NN | — | Display name or 'Admin' |
+| `action` | VARCHAR(50) NN | — | e.g. `login`, `create_session`, `update_attendance` |
+| `entity_type` | VARCHAR(50) | NULL | e.g. `session`, `player`, `payment` |
+| `entity_id` | INTEGER | NULL | ID of affected entity |
+| `description` | TEXT NN | — | Human-readable description |
+| `ip_address` | VARCHAR(45) | NULL | IPv4 or IPv6 |
+
+**Indexes:** action, (timestamp, action)
+
+---
+
+## Table: `notifications`
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | INTEGER PK | Auto | |
+| `title` | VARCHAR(200) NN | — | Notification title |
+| `message` | TEXT NN | — | Body text |
+| `type` | VARCHAR(30) | `general` | `general`, `dropout_request`, `registration`, `system` |
+| `target` | VARCHAR(20) | `all` | `all`, `admin`, `player` |
+| `player_id` | INTEGER FK | NULL | → players.id (specific player or NULL for broadcast) |
+| `link` | VARCHAR(255) | NULL | Optional navigation URL |
+| `created_by` | INTEGER FK | NULL | → players.id |
+| `created_at` | DATETIME | NOW | |
+
+**Indexes:** (target, created_at), (player_id, created_at)
+
+---
+
+## Table: `notification_reads`
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | INTEGER PK | Auto | |
+| `notification_id` | INTEGER FK NN | — | → notifications.id |
+| `player_id` | INTEGER FK NN | — | → players.id |
+| `read_at` | DATETIME | NOW | |
+
+**Unique:** (notification_id, player_id)
+
+---
+
+## Table: `external_integrations`
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | INTEGER PK | Auto | |
+| `name` | VARCHAR(50) NN unique | — | e.g. `ezfacility` |
+| `url` | TEXT (encrypted) | NULL | Service URL |
+| `username` | TEXT (encrypted) | NULL | Login username |
+| `password` | TEXT (encrypted) | NULL | Login password |
+| `session_cookie` | TEXT (encrypted) | NULL | Cached session cookie |
+| `created_at` | DATETIME | NOW | |
+| `updated_at` | DATETIME | NOW | Auto-updated |
+
+**Encryption:** Fernet symmetric encryption derived from app `SECRET_KEY`.
 
 ---
 
