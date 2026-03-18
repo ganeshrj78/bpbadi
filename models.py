@@ -104,8 +104,13 @@ class Player(db.Model):
 
     def get_balance(self):
         """Calculate outstanding balance (charges - payments).
-        Negative means overpaid / credit due back to player."""
-        return round(self.get_total_charges() - self.get_total_payments(), 2)
+        Floors at zero unless there is a pending refund owed to the player."""
+        raw = round(self.get_total_charges() - self.get_total_payments(), 2)
+        if raw < 0:
+            pending = self.get_pending_refund_amount()
+            # Only show negative up to the pending refund amount
+            return round(max(raw, -pending), 2) if pending > 0 else 0.0
+        return raw
 
     def get_pending_refunds_count(self):
         """Count pending refunds for this player"""
