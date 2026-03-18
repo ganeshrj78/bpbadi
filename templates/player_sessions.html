@@ -43,7 +43,15 @@
 
         {% if upcoming_sessions %}
         <div class="space-y-6">
-            {% for sess in upcoming_sessions %}
+            {% for month_key, month_data in upcoming_by_month %}
+            {% if upcoming_by_month | length > 1 %}
+            <div class="flex items-center gap-3 mt-2">
+                <div class="h-px bg-wimbledon-gold/30 flex-1"></div>
+                <span class="text-sm font-serif font-bold text-wimbledon-purple bg-wimbledon-cream/50 px-3 py-1 rounded-full">{{ month_data.label }}</span>
+                <div class="h-px bg-wimbledon-gold/30 flex-1"></div>
+            </div>
+            {% endif %}
+            {% for sess in month_data.sessions %}
             <div class="border border-gray-200 rounded-xl p-4 hover:border-wimbledon-green/50 transition-all" x-data="{ showPlayers: false }">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div class="flex-1">
@@ -230,6 +238,7 @@
                 </div>
             </div>
             {% endfor %}
+            {% endfor %}
         </div>
         {% else %}
         <p class="text-gray-500 text-center py-8">No upcoming sessions scheduled.</p>
@@ -248,7 +257,15 @@
         </h2>
 
         <div class="space-y-4">
-            {% for sess in past_sessions %}
+            {% for month_key, month_data in past_by_month %}
+            {% if past_by_month | length > 1 %}
+            <div class="flex items-center gap-3 mt-2">
+                <div class="h-px bg-wimbledon-gold/30 flex-1"></div>
+                <span class="text-sm font-serif font-bold text-wimbledon-purple bg-wimbledon-cream/50 px-3 py-1 rounded-full">{{ month_data.label }}</span>
+                <div class="h-px bg-wimbledon-gold/30 flex-1"></div>
+            </div>
+            {% endif %}
+            {% for sess in month_data.sessions %}
             <div class="border border-gray-200 rounded-xl p-4 bg-gray-50" x-data="{ showPlayers: false }">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div class="flex-1">
@@ -334,6 +351,7 @@
                     </div>
                 </div>
             </div>
+            {% endfor %}
             {% endfor %}
         </div>
     </div>

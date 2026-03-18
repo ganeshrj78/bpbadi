@@ -141,7 +141,7 @@
                 </svg>
                 Active Sessions
             </h2>
-            {% if active_months | default([]) | length > 1 %}
+            {% if active_months | default([]) | length >= 1 %}
             <select onchange="window.location.href='{{ url_for('sessions') }}?month=' + this.value"
                 class="px-3 py-1.5 border border-wimbledon-gold/30 rounded-lg text-sm font-medium text-wimbledon-purple bg-white focus:outline-none focus:border-wimbledon-purple focus:ring-2 focus:ring-wimbledon-purple/20">
                 {% for key, label in active_months %}

@@ -974,11 +974,33 @@ def player_sessions():
                 session_attendance[sess.id][p.id] = 'NO'
     db.session.commit()
 
+    # Group upcoming sessions by month
+    upcoming_grouped = {}
+    for sess in upcoming_sessions:
+        key = sess.date.strftime('%Y-%m')
+        label = sess.date.strftime('%B %Y')
+        if key not in upcoming_grouped:
+            upcoming_grouped[key] = {'label': label, 'sessions': []}
+        upcoming_grouped[key]['sessions'].append(sess)
+    upcoming_by_month = sorted(upcoming_grouped.items())  # chronological
+
+    # Group past sessions by month
+    past_grouped = {}
+    for sess in past_sessions:
+        key = sess.date.strftime('%Y-%m')
+        label = sess.date.strftime('%B %Y')
+        if key not in past_grouped:
+            past_grouped[key] = {'label': label, 'sessions': []}
+        past_grouped[key]['sessions'].append(sess)
+    past_by_month = sorted(past_grouped.items(), reverse=True)  # newest first
+
     return render_template('player_sessions.html',
                          player=player,
                          managed_players=managed_players,
                          upcoming_sessions=upcoming_sessions,
                          past_sessions=past_sessions,
+                         upcoming_by_month=upcoming_by_month,
+                         past_by_month=past_by_month,
                          archived_groups=archived_sorted,
                          attendance_map=attendance_map,
                          all_players=all_players,
