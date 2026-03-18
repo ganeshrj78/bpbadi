@@ -160,7 +160,15 @@
                         {% if sess.credits and sess.credits > 0 %}<span class="text-xs text-blue-600">${{ "%.2f"|format(sess.credits) }}</span>{% else %}<span class="text-xs text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-center">
-                        <span class="text-xs text-gray-400">${{ "%.0f"|format(sess.cost_per_player or sess.birdie_cost) }}/player</span>
+                        {% if sess.is_archived %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-200 text-gray-600">Archived</span>
+                        {% elif sess.payment_released %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">Released</span>
+                        {% elif sess.voting_frozen %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700">Frozen</span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">Active</span>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -399,7 +407,7 @@
                                     {{ player.name[0] }}
                                 </div>
                                 {% endif %}
-                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>
+                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>{% if player.category == 'kid' %}<span class="ml-0.5 text-yellow-500" title="Kid"><svg class="w-3.5 h-3.5 inline" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"></path></svg></span>{% endif %}
                             </a>
                             <div class="flex gap-1 ml-1">
                                 <button title="Set YES for selected sessions"
@@ -601,7 +609,7 @@
                                     {{ player.name[0] }}
                                 </div>
                                 {% endif %}
-                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>
+                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>{% if player.category == 'kid' %}<span class="ml-0.5 text-yellow-500" title="Kid"><svg class="w-3.5 h-3.5 inline" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"></path></svg></span>{% endif %}
                             </a>
                             <div class="flex gap-1 ml-1">
                                 <button title="Set YES for selected sessions"
@@ -803,7 +811,7 @@
                                     {{ player.name[0] }}
                                 </div>
                                 {% endif %}
-                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>
+                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>{% if player.category == 'kid' %}<span class="ml-0.5 text-yellow-500" title="Kid"><svg class="w-3.5 h-3.5 inline" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"></path></svg></span>{% endif %}
                             </a>
                             <div class="flex gap-1 ml-1">
                                 <button title="Set YES for selected sessions"
@@ -1002,7 +1010,7 @@
                                     {{ player.name[0] }}
                                 </div>
                                 {% endif %}
-                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>
+                                <span class="font-medium text-sm text-gray-800">{{ player.name }}</span>{% if player.category == 'kid' %}<span class="ml-0.5 text-yellow-500" title="Kid"><svg class="w-3.5 h-3.5 inline" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"></path></svg></span>{% endif %}
                             </a>
                             <div class="flex gap-1 ml-1">
                                 <button title="Set YES for selected sessions"

@@ -734,6 +734,7 @@ def register():
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip().lower()
         phone = request.form.get('phone', '').strip()
+        gender = request.form.get('gender', 'male').strip().lower()
         password = request.form.get('password', '').strip()
         client_ip = request.remote_addr
 
@@ -756,6 +757,7 @@ def register():
             name=name,
             email=email,
             phone=phone,
+            gender=gender if gender in ('male', 'female') else 'male',
             category='regular',
             is_approved=False,
             is_active=True
@@ -1083,7 +1085,7 @@ def player_sessions():
     for sess in upcoming_sessions + past_sessions:
         for p in players_to_track:
             if sess.id not in attendance_map[p.id]:
-                attendance = Attendance(player_id=p.id, session_id=sess.id, status='NO')
+                attendance = Attendance(player_id=p.id, session_id=sess.id, status='NO', category=p.category or 'regular')
                 db.session.add(attendance)
                 attendance_map[p.id][sess.id] = 'NO'
                 session_attendance[sess.id][p.id] = 'NO'
@@ -1285,7 +1287,8 @@ def update_player_attendance():
     if attendance:
         attendance.status = status
     else:
-        attendance = Attendance(player_id=target_player_id, session_id=session_id, status=status)
+        target_player = Player.query.get(target_player_id)
+        attendance = Attendance(player_id=target_player_id, session_id=session_id, status=status, category=target_player.category if target_player else 'regular')
         db.session.add(attendance)
 
     db.session.commit()
@@ -1417,7 +1420,8 @@ def bulk_update_player_attendance():
         if attendance:
             attendance.status = status
         else:
-            attendance = Attendance(player_id=target_player_id, session_id=session_id, status=status)
+            tp = Player.query.get(target_player_id)
+            attendance = Attendance(player_id=target_player_id, session_id=session_id, status=status, category=tp.category if tp else 'regular')
             db.session.add(attendance)
 
         updated_count += 1

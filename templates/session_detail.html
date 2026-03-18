@@ -615,6 +615,7 @@
                             {% endif %}
                             <div>
                                 <span class="font-semibold text-gray-800 group-hover:text-wimbledon-purple transition-colors">{{ player.name }}</span>
+                                {% if player_cat == 'kid' %}<span class="ml-1 text-yellow-500" title="Kid"><svg class="w-4 h-4 inline" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"></path></svg></span>{% endif %}
                                 {% if player.is_admin %}<span class="ml-1 text-xs text-wimbledon-purple font-medium">Admin</span>{% endif %}
                             </div>
                         </a>
