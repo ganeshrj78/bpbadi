@@ -123,7 +123,7 @@
                         <a href="{{ url_for('session_detail', id=sess.id) }}" class="text-sm text-wimbledon-purple hover:underline">
                             {{ sess.date.strftime('%a, %b %d') }}
                         </a>
-                        <span class="text-[11px] text-gray-500 ml-1">({{ sess.get_regular_player_count() }} Reg / {{ sess.get_adhoc_player_count() }} Adh)</span>
+                        <span class="text-[11px] text-gray-500 ml-1">({{ sess.regular_player_count }} Reg / {{ sess.adhoc_player_count }} Adh)</span>
                         {% if sess.voting_frozen %}
                         <span class="ml-1 inline-flex w-4 h-4 bg-blue-500 rounded-full items-center justify-center" title="Voting Frozen">
                             <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
@@ -142,25 +142,25 @@
                         <span class="text-xs text-yellow-600">${{ "%.2f"|format(sess.birdie_cost) }}</span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-right">
-                        <span class="text-xs text-green-700">${{ "%.2f"|format(sess.get_regular_player_charges()) }}</span>
+                        <span class="text-xs text-green-700">${{ "%.2f"|format(sess.regular_charges) }}</span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-right">
-                        <span class="text-xs text-purple-700">${{ "%.2f"|format(sess.get_adhoc_player_charges()) }}</span>
+                        <span class="text-xs text-purple-700">${{ "%.2f"|format(sess.adhoc_charges) }}</span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-right">
-                        <span class="text-xs text-blue-700">${{ "%.2f"|format(sess.get_kid_player_charges()) }}</span>
+                        <span class="text-xs text-blue-700">${{ "%.2f"|format(sess.kid_charges) }}</span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-right">
-                        <span class="text-xs text-red-600">-${{ "%.2f"|format(sess.get_total_refunds()) }}</span>
+                        <span class="text-xs text-red-600">-${{ "%.2f"|format(sess.total_refunds) }}</span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-right">
-                        <span class="text-xs font-medium text-wimbledon-purple">${{ "%.2f"|format(sess.get_total_collection() - sess.get_total_refunds()) }}</span>
+                        <span class="text-xs font-medium text-wimbledon-purple">${{ "%.2f"|format(sess.total_collection - sess.total_refunds) }}</span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-right">
                         {% if sess.credits and sess.credits > 0 %}<span class="text-xs text-blue-600">${{ "%.2f"|format(sess.credits) }}</span>{% else %}<span class="text-xs text-gray-300">—</span>{% endif %}
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-center">
-                        <span class="text-xs text-gray-400">${{ "%.0f"|format(sess.get_cost_per_player() or sess.birdie_cost) }}/player</span>
+                        <span class="text-xs text-gray-400">${{ "%.0f"|format(sess.cost_per_player or sess.birdie_cost) }}/player</span>
                     </td>
                 </tr>
                 {% endfor %}

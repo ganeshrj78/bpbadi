@@ -288,17 +288,34 @@ def get_cached_monthly_summary():
                 'pending_credits': 0,
                 'session_credits': 0,
             }
-        monthly_summary[key]['sessions'].append(sess)
+        sess_data = {
+            'id': sess.id,
+            'date': sess.date,
+            'is_archived': sess.is_archived,
+            'voting_frozen': sess.voting_frozen,
+            'payment_released': sess.payment_released,
+            'birdie_cost': sess.birdie_cost,
+            'credits': sess.credits or 0,
+            'regular_player_count': sess.get_regular_player_count(),
+            'adhoc_player_count': sess.get_adhoc_player_count(),
+            'regular_charges': sess.get_regular_player_charges(),
+            'adhoc_charges': sess.get_adhoc_player_charges(),
+            'kid_charges': sess.get_kid_player_charges(),
+            'total_refunds': sess.get_total_refunds(),
+            'total_collection': sess.get_total_collection(),
+            'cost_per_player': sess.get_cost_per_player(),
+        }
+        monthly_summary[key]['sessions'].append(sess_data)
         monthly_summary[key]['total_sessions'] += 1
         if sess.is_archived:
             monthly_summary[key]['archived_sessions'] += 1
         monthly_summary[key]['birdie_charges'] += sess.get_birdie_cost_total()
-        monthly_summary[key]['regular_charges'] += sess.get_regular_player_charges()
-        monthly_summary[key]['adhoc_charges'] += sess.get_adhoc_player_charges()
-        monthly_summary[key]['kid_charges'] += sess.get_kid_player_charges()
-        monthly_summary[key]['total_refunds'] += sess.get_total_refunds()
-        monthly_summary[key]['total_collection'] += sess.get_total_collection()
-        monthly_summary[key]['session_credits'] += (sess.credits or 0)
+        monthly_summary[key]['regular_charges'] += sess_data['regular_charges']
+        monthly_summary[key]['adhoc_charges'] += sess_data['adhoc_charges']
+        monthly_summary[key]['kid_charges'] += sess_data['kid_charges']
+        monthly_summary[key]['total_refunds'] += sess_data['total_refunds']
+        monthly_summary[key]['total_collection'] += sess_data['total_collection']
+        monthly_summary[key]['session_credits'] += sess_data['credits']
 
     # Actual payments received, grouped by payment month
     for payment in Payment.query.all():
