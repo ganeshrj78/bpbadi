@@ -202,7 +202,6 @@ function googleLogin() {
     return {
         errorMsg: '',
         init() {
-            // Initialize Google Identity Services once the library loads
             const self = this;
             const initGsi = () => {
                 if (typeof google === 'undefined' || !google.accounts) {
@@ -213,7 +212,6 @@ function googleLogin() {
                     client_id: '{{ config.GOOGLE_CLIENT_ID }}',
                     callback: (response) => self.handleCredentialResponse(response),
                 });
-                // Render a hidden Google button we can programmatically click
                 google.accounts.id.renderButton(
                     document.getElementById('g_btn_hidden'),
                     { theme: 'outline', size: 'large', width: '100%', text: 'signin_with' }
@@ -223,7 +221,6 @@ function googleLogin() {
         },
         signInWithGoogle() {
             this.errorMsg = '';
-            // Click the hidden rendered Google button to trigger the popup
             const gBtn = document.querySelector('#g_btn_hidden div[role="button"]');
             if (gBtn) { gBtn.click(); }
             else { this.errorMsg = 'Google Sign-In is loading. Please try again.'; }

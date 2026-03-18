@@ -1521,8 +1521,27 @@ def reject_player(id):
 @app.route('/sessions')
 @admin_required
 def sessions():
-    # Get active sessions
-    active_sessions = Session.query.filter_by(is_archived=False).order_by(Session.date.asc()).all()
+    # Get all active (non-archived) sessions
+    all_active_sessions = Session.query.filter_by(is_archived=False).order_by(Session.date.asc()).all()
+
+    # Build list of distinct months from active sessions for the dropdown
+    active_months = {}
+    for s in all_active_sessions:
+        key = s.date.strftime('%Y-%m')
+        if key not in active_months:
+            active_months[key] = s.date.strftime('%B %Y')
+    active_months_sorted = sorted(active_months.items())  # chronological
+
+    # Filter by selected month (default: latest month with active sessions)
+    selected_month = request.args.get('month', '')
+    if not selected_month and active_months_sorted:
+        # Default to the latest month
+        selected_month = active_months_sorted[-1][0]
+
+    if selected_month and active_months_sorted:
+        active_sessions = [s for s in all_active_sessions if s.date.strftime('%Y-%m') == selected_month]
+    else:
+        active_sessions = all_active_sessions
 
     # Batch load all attendance records for active sessions to avoid N+1
     active_session_ids = [s.id for s in active_sessions]
@@ -1696,7 +1715,9 @@ def sessions():
                           active_session_costs=active_session_costs,
                           standby_by_session=standby_by_session,
                           session_birdie_map=session_birdie_map,
-                          pending_dropout_requests=pending_dropout_requests)
+                          pending_dropout_requests=pending_dropout_requests,
+                          active_months=active_months_sorted,
+                          selected_month=selected_month)
 
 
 @app.route('/sessions/month/<month_key>')
