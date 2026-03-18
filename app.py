@@ -646,8 +646,8 @@ def register():
         client_ip = request.remote_addr
 
         # Validation
-        if not name or not email or not password:
-            flash('Name, email, and password are required', 'error')
+        if not name or not email or not phone or not password:
+            flash('All fields are required', 'error')
             return render_template('register.html',
                                member_guidelines=SiteSettings.get('member_guidelines', ''),
                                booking_guidelines=SiteSettings.get('booking_guidelines', ''))
