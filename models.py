@@ -99,8 +99,8 @@ class Player(db.Model):
         return round(total, 2)
 
     def get_total_payments(self):
-        """Calculate total payments made"""
-        return round(sum(p.amount for p in self.payments.all()), 2)
+        """Calculate total payments made (excludes negative refund entries)"""
+        return round(sum(p.amount for p in self.payments.filter(Payment.amount > 0).all()), 2)
 
     def get_balance(self):
         """Calculate outstanding balance (charges - payments)"""
