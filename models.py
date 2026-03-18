@@ -81,20 +81,20 @@ class Player(db.Model):
             return False
         return check_password_hash(self.password_hash, password)
 
-    def get_total_charges(self):
+    def get_total_charges(self, frozen_only=False):
         """Calculate total charges from attended sessions based on player category.
-        Includes YES, DROPOUT, and FILLIN statuses - dropouts and fill-ins are still charged."""
+        Includes YES, DROPOUT, and FILLIN statuses - dropouts and fill-ins are still charged.
+        If frozen_only=True, only include charges from frozen or archived sessions."""
         total = 0
         for attendance in self.attendances.filter(Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])).all():
             session = attendance.session
+            if frozen_only and not session.payment_released and not session.is_archived:
+                continue
             if attendance.category == 'kid':
-                # Kids pay flat $11 per session
                 total += session.get_cost_per_kid()
             elif attendance.category == 'adhoc':
-                # Adhoc players: adhoc court cost / adhoc players + birdie
                 total += session.get_cost_per_adhoc_player()
             else:
-                # Regular players: regular court cost / regular players + birdie
                 total += session.get_cost_per_regular_player()
         return round(total, 2)
 
@@ -102,10 +102,10 @@ class Player(db.Model):
         """Calculate total payments made (excludes negative refund entries)"""
         return round(sum(p.amount for p in self.payments.filter(Payment.amount > 0).all()), 2)
 
-    def get_balance(self):
+    def get_balance(self, frozen_only=False):
         """Calculate outstanding balance (charges - payments).
         Floors at zero unless there is a pending refund owed to the player."""
-        raw = round(self.get_total_charges() - self.get_total_payments(), 2)
+        raw = round(self.get_total_charges(frozen_only=frozen_only) - self.get_total_payments(), 2)
         if raw < 0:
             pending = self.get_pending_refund_amount()
             # Only show negative up to the pending refund amount
@@ -153,6 +153,7 @@ class Session(db.Model):
     notes = db.Column(db.Text)
     is_archived = db.Column(db.Boolean, default=False, index=True)
     voting_frozen = db.Column(db.Boolean, default=False)  # If True, players cannot change their votes
+    payment_released = db.Column(db.Boolean, default=False)  # If True, charges visible to players for payment
 
     # Session time configuration (used when creating sessions, courts can override)
     hours = db.Column(db.Float, default=3)  # Duration in hours (2, 3, or 3.5)

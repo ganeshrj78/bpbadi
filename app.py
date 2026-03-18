@@ -2358,6 +2358,120 @@ def bulk_unfreeze_voting():
     return redirect(url_for('sessions'))
 
 
+@app.route('/sessions/bulk-toggle-freeze', methods=['POST'])
+@admin_required
+def bulk_toggle_freeze():
+    session_ids = request.form.getlist('session_ids')
+    if not session_ids:
+        flash('No sessions selected', 'error')
+        return redirect(url_for('sessions'))
+
+    frozen_count = 0
+    unfrozen_count = 0
+    for session_id in session_ids:
+        sess = Session.query.get(int(session_id))
+        if sess:
+            sess.voting_frozen = not sess.voting_frozen
+            if sess.voting_frozen:
+                frozen_count += 1
+            else:
+                unfrozen_count += 1
+
+    db.session.commit()
+    parts = []
+    if frozen_count:
+        parts.append(f'{frozen_count} frozen')
+    if unfrozen_count:
+        parts.append(f'{unfrozen_count} unfrozen')
+    flash(f'Voting toggled: {", ".join(parts)}!', 'success')
+    return redirect(url_for('sessions'))
+
+
+@app.route('/sessions/<int:id>/toggle-payment-release', methods=['POST'])
+@admin_required
+def toggle_payment_release(id):
+    sess = Session.query.get_or_404(id)
+    sess.payment_released = not sess.payment_released
+    db.session.commit()
+    status = 'released' if sess.payment_released else 'unreleased'
+    log_activity('toggle_payment_release', f'Payment {status} for session {sess.date}', 'session', id)
+    flash(f'Payment {status} for this session!', 'success')
+    clear_session_cache()
+    return redirect(url_for('session_detail', id=id))
+
+
+@app.route('/sessions/bulk-release-payment', methods=['POST'])
+@admin_required
+def bulk_release_payment():
+    session_ids = request.form.getlist('session_ids')
+    if not session_ids:
+        flash('No sessions selected', 'error')
+        return redirect(url_for('sessions'))
+
+    count = 0
+    for session_id in session_ids:
+        sess = Session.query.get(int(session_id))
+        if sess and not sess.payment_released:
+            sess.payment_released = True
+            count += 1
+
+    db.session.commit()
+    clear_session_cache()
+    flash(f'Payment released for {count} session(s)!', 'success')
+    return redirect(url_for('sessions'))
+
+
+@app.route('/sessions/bulk-unrelease-payment', methods=['POST'])
+@admin_required
+def bulk_unrelease_payment():
+    session_ids = request.form.getlist('session_ids')
+    if not session_ids:
+        flash('No sessions selected', 'error')
+        return redirect(url_for('sessions'))
+
+    count = 0
+    for session_id in session_ids:
+        sess = Session.query.get(int(session_id))
+        if sess and sess.payment_released:
+            sess.payment_released = False
+            count += 1
+
+    db.session.commit()
+    clear_session_cache()
+    flash(f'Payment unreleased for {count} session(s)!', 'success')
+    return redirect(url_for('sessions'))
+
+
+@app.route('/sessions/bulk-toggle-payment', methods=['POST'])
+@admin_required
+def bulk_toggle_payment():
+    session_ids = request.form.getlist('session_ids')
+    if not session_ids:
+        flash('No sessions selected', 'error')
+        return redirect(url_for('sessions'))
+
+    released_count = 0
+    unreleased_count = 0
+    for session_id in session_ids:
+        sess = Session.query.get(int(session_id))
+        if sess:
+            sess.payment_released = not sess.payment_released
+            if sess.payment_released:
+                released_count += 1
+            else:
+                unreleased_count += 1
+
+    db.session.commit()
+    clear_session_cache()
+    parts = []
+    if released_count:
+        parts.append(f'{released_count} released')
+    if unreleased_count:
+        parts.append(f'{unreleased_count} unreleased')
+    flash(f'Payment toggled: {", ".join(parts)}!', 'success')
+    return redirect(url_for('sessions'))
+
+
 @app.route('/api/bulk-attendance', methods=['POST'])
 @admin_required
 def bulk_attendance():
