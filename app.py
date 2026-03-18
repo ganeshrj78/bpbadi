@@ -465,6 +465,13 @@ def master_admin_required(f):
     return decorated_function
 
 
+# Force password reset guard
+@app.before_request
+def check_forced_password_reset():
+    if session.get('must_reset_password') and request.endpoint not in ('force_reset_password', 'logout', 'static'):
+        return redirect(url_for('force_reset_password'))
+
+
 # Auth routes
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("10 per minute")  # Rate limit: 10 login attempts per minute
@@ -527,8 +534,12 @@ def login():
                     session['player_name'] = player.name
                     session['user_type'] = 'player'
                     security_logger.info(f'PLAYER_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
-                    flash(f'Welcome back, {player.name}!', 'success')
                     log_activity('login', f'Player {player.name} logged in')
+                    if player.check_password('Welcome2BP!'):
+                        session['must_reset_password'] = True
+                        flash('Please set a new password before continuing.', 'warning')
+                        return redirect(url_for('force_reset_password'))
+                    flash(f'Welcome back, {player.name}!', 'success')
                     return redirect(url_for('player_payments'))
             security_logger.warning(f'PLAYER_LOGIN_FAILED - Email: {email}, IP: {client_ip}')
             log_activity('login_failed', f'Failed player login attempt for {email} from {client_ip}')
@@ -570,14 +581,24 @@ def choose_role():
     if role == 'admin':
         session['user_type'] = 'player_admin'
         security_logger.info(f'PLAYER_ADMIN_LOGIN_SUCCESS - Player: {player_name} (ID: {player_id}), IP: {client_ip}')
-        flash(f'Welcome back, {player_name}! (Admin)', 'success')
         log_activity('login', f'Player {player_name} logged in as admin')
+        player = Player.query.get(player_id)
+        if player and player.check_password('Welcome2BP!'):
+            session['must_reset_password'] = True
+            flash('Please set a new password before continuing.', 'warning')
+            return redirect(url_for('force_reset_password'))
+        flash(f'Welcome back, {player_name}! (Admin)', 'success')
         return redirect(url_for('dashboard'))
     else:
         session['user_type'] = 'player'
         security_logger.info(f'PLAYER_LOGIN_AS_PLAYER - Player: {player_name} (ID: {player_id}), IP: {client_ip}')
-        flash(f'Welcome back, {player_name}!', 'success')
         log_activity('login', f'Player {player_name} logged in as player')
+        player = Player.query.get(player_id)
+        if player and player.check_password('Welcome2BP!'):
+            session['must_reset_password'] = True
+            flash('Please set a new password before continuing.', 'warning')
+            return redirect(url_for('force_reset_password'))
+        flash(f'Welcome back, {player_name}!', 'success')
         return redirect(url_for('player_payments'))
 
 
@@ -636,6 +657,60 @@ def google_callback():
         return jsonify({'success': False, 'error': 'Invalid Google token'}), 400
 
 
+@app.route('/force-reset-password', methods=['GET', 'POST'])
+def force_reset_password():
+    if not session.get('must_reset_password') or not session.get('player_id'):
+        return redirect(url_for('login'))
+
+    player = Player.query.get(session['player_id'])
+    if not player:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        new_password = request.form.get('new_password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+
+        import re
+        if not new_password or len(new_password) < 9:
+            flash('Password must be at least 9 characters long.', 'error')
+            return render_template('force_reset_password.html', player=player)
+
+        if not re.search(r'[A-Z]', new_password):
+            flash('Password must contain at least one uppercase letter.', 'error')
+            return render_template('force_reset_password.html', player=player)
+
+        if not re.search(r'[a-z]', new_password):
+            flash('Password must contain at least one lowercase letter.', 'error')
+            return render_template('force_reset_password.html', player=player)
+
+        if not re.search(r'[0-9]', new_password):
+            flash('Password must contain at least one number.', 'error')
+            return render_template('force_reset_password.html', player=player)
+
+        if not re.search(r'[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/~`]', new_password):
+            flash('Password must contain at least one special character.', 'error')
+            return render_template('force_reset_password.html', player=player)
+
+        if new_password == 'Welcome2BP!':
+            flash('Please choose a different password.', 'error')
+            return render_template('force_reset_password.html', player=player)
+
+        if new_password != confirm_password:
+            flash('Passwords do not match.', 'error')
+            return render_template('force_reset_password.html', player=player)
+
+        player.set_password(new_password)
+        db.session.commit()
+        session.pop('must_reset_password', None)
+        log_activity('change_password', f'Player {player.name} reset default password', 'player', player.id)
+        flash(f'Password updated successfully. Welcome, {player.name}!', 'success')
+        if session.get('user_type') == 'player_admin':
+            return redirect(url_for('dashboard'))
+        return redirect(url_for('player_payments'))
+
+    return render_template('force_reset_password.html', player=player)
+
+
 @app.route('/logout')
 def logout():
     log_activity('logout', f'{session.get("player_name", "Admin")} logged out')
@@ -643,6 +718,7 @@ def logout():
     session.pop('user_type', None)
     session.pop('player_id', None)
     session.pop('player_name', None)
+    session.pop('must_reset_password', None)
     session.pop('pending_admin_player_id', None)
     session.pop('pending_admin_player_name', None)
     session.pop('pending_remember_me', None)
@@ -658,25 +734,12 @@ def register():
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip().lower()
         phone = request.form.get('phone', '').strip()
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
+        password = request.form.get('password', '').strip()
         client_ip = request.remote_addr
 
         # Validation
-        if not name or not email or not phone or not password:
+        if not name or not email or not phone:
             flash('All fields are required', 'error')
-            return render_template('register.html',
-                               member_guidelines=SiteSettings.get('member_guidelines', ''),
-                               booking_guidelines=SiteSettings.get('booking_guidelines', ''))
-
-        if password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return render_template('register.html',
-                               member_guidelines=SiteSettings.get('member_guidelines', ''),
-                               booking_guidelines=SiteSettings.get('booking_guidelines', ''))
-
-        if len(password) < 8:
-            flash('Password must be at least 8 characters', 'error')
             return render_template('register.html',
                                member_guidelines=SiteSettings.get('member_guidelines', ''),
                                booking_guidelines=SiteSettings.get('booking_guidelines', ''))
@@ -685,10 +748,8 @@ def register():
         existing_player = Player.query.filter(db.func.lower(Player.email) == email).first()
         if existing_player:
             security_logger.warning(f'REGISTRATION_DUPLICATE_EMAIL - Email: {email}, IP: {client_ip}')
-            flash('An account with this email already exists. Please contact an admin to reset your password.', 'error')
-            return render_template('register.html',
-                               member_guidelines=SiteSettings.get('member_guidelines', ''),
-                               booking_guidelines=SiteSettings.get('booking_guidelines', ''))
+            flash('An account with this email already exists. Please login with your email address. If you forgot your password, please reach out to an admin to reset it.', 'error')
+            return redirect(url_for('login'))
 
         # Create new player (pending approval)
         player = Player(
@@ -699,7 +760,7 @@ def register():
             is_approved=False,
             is_active=True
         )
-        player.set_password(password)
+        player.set_password(password if password else 'Welcome2BP!')
 
         db.session.add(player)
         db.session.commit()
