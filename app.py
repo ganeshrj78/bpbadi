@@ -443,6 +443,7 @@ def login():
                 log_activity('login', 'Admin login')
                 return redirect(url_for('dashboard'))
             security_logger.warning(f'ADMIN_LOGIN_FAILED - IP: {client_ip}')
+            log_activity('login_failed', f'Failed admin login attempt from {client_ip}')
             flash('Invalid password', 'error')
         else:
             # Player login
@@ -452,12 +453,14 @@ def login():
             if player and player.check_password(password):
                 if not player.is_approved:
                     security_logger.info(f'LOGIN_PENDING_APPROVAL - Email: {email}, IP: {client_ip}')
+                    log_activity('login_failed', f'Login attempt by unapproved player {email}')
                     flash('Your registration is pending approval. Please wait for admin approval.', 'error')
                     return render_template('login.html',
                                            member_guidelines=SiteSettings.get('member_guidelines', ''),
                                            booking_guidelines=SiteSettings.get('booking_guidelines', ''))
                 if not player.is_active:
                     security_logger.warning(f'LOGIN_INACTIVE_ACCOUNT - Email: {email}, IP: {client_ip}')
+                    log_activity('login_failed', f'Login attempt by inactive player {email}')
                     flash('Your account has been deactivated. Please contact an admin.', 'error')
                     return render_template('login.html',
                                            member_guidelines=SiteSettings.get('member_guidelines', ''),
@@ -484,6 +487,7 @@ def login():
                     log_activity('login', f'Player {player.name} logged in')
                     return redirect(url_for('player_payments'))
             security_logger.warning(f'PLAYER_LOGIN_FAILED - Email: {email}, IP: {client_ip}')
+            log_activity('login_failed', f'Failed player login attempt for {email} from {client_ip}')
             flash('Invalid email or password', 'error')
 
     # Show role modal if pending from Google login
