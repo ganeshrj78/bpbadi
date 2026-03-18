@@ -372,7 +372,7 @@ def get_cached_player_stats():
         payments = round(player_payments.get(player.id, 0), 2)
         refund_data = refund_map.get(player.id, {'pending': 0, 'pending_amount': 0.0, 'refunded': 0})
         player_stats[player.id] = {
-            'balance': round(max(0, charges - payments), 2),
+            'balance': round(charges - payments, 2),
             'total_payments': payments,
             'pending_refunds': refund_data['pending'],
             'pending_refund_amount': refund_data['pending_amount'],
@@ -2054,8 +2054,23 @@ def delete_session(id):
         flash('Only archived sessions can be deleted. Please archive the session first.', 'error')
         return redirect(url_for('session_detail', id=id))
 
+    # Clean up refund records and their associated refund payments
+    refunds = DropoutRefund.query.filter_by(session_id=id).all()
+    for refund in refunds:
+        # Delete the negative refund payment entry if it exists
+        Payment.query.filter_by(
+            player_id=refund.player_id,
+            method='Refund',
+            amount=-refund.refund_amount
+        ).delete()
+        db.session.delete(refund)
+
+    # Clean up birdie bank transactions
+    BirdieBank.query.filter_by(session_id=id).delete()
+
     db.session.delete(sess)
     db.session.commit()
+    clear_session_cache()
     log_activity('delete_session', f'Deleted session {sess.date}', 'session', id)
     flash('Session deleted successfully!', 'success')
     return redirect(url_for('sessions'))
@@ -2143,8 +2158,15 @@ def bulk_delete_sessions():
         sess = Session.query.get(int(session_id))
         # Only delete archived sessions
         if sess and sess.is_archived:
-            # Delete related dropout refunds first
-            DropoutRefund.query.filter_by(session_id=sess.id).delete()
+            # Delete related dropout refunds and their refund payment entries
+            refunds = DropoutRefund.query.filter_by(session_id=sess.id).all()
+            for refund in refunds:
+                Payment.query.filter_by(
+                    player_id=refund.player_id,
+                    method='Refund',
+                    amount=-refund.refund_amount
+                ).delete()
+                db.session.delete(refund)
             # Delete related birdie bank transactions
             BirdieBank.query.filter_by(session_id=sess.id).delete()
             # Now delete the session (attendances and courts cascade automatically)
