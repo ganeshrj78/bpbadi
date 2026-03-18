@@ -244,7 +244,7 @@ class Session(db.Model):
         """Cost per non-kid player: (regular courts + credits if applied) / regular players + birdie"""
         reg_count = self.get_regular_player_count()
         if reg_count == 0:
-            return 0
+            return self.birdie_cost or 0
         total_shared = self.get_regular_court_cost()
         if self.apply_credits:
             total_shared += (self.credits or 0)
