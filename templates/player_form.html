@@ -32,7 +32,7 @@
             <div class="text-center">
                 <label class="block text-sm font-semibold text-gray-700 mb-3">Profile Photo</label>
                 <div class="flex flex-col items-center gap-4">
-                    {% if player and player.profile_photo %}
+                    {% if player and player.profile_photo_data %}
                     <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="Profile" class="w-24 h-24 rounded-full object-cover border-4 border-wimbledon-gold/30 shadow-lg">
                     {% else %}
                     <div class="w-24 h-24 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center border-4 border-wimbledon-gold/30 shadow-lg">

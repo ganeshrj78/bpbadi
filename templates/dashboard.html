@@ -177,7 +177,7 @@
         {% for att in pending_dropout_requests %}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-red-50 rounded-xl border border-red-200 gap-3">
             <div class="flex items-center space-x-4">
-                {% if att.player.profile_photo %}
+                {% if att.player.profile_photo_data %}
                 <img src="{{ url_for('player_photo', player_id=att.player.id) }}" class="w-12 h-12 rounded-full object-cover border-2 border-red-300">
                 {% else %}
                 <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
