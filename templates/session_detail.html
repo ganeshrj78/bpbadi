@@ -525,7 +525,7 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-wimbledon-gold/10">
-                {% set ns_hdr = namespace(standby_shown=false, regular_shown=false, adhoc_shown=false, notplaying_shown=false) %}
+                {% set ns_hdr = namespace(standby_shown=false, regular_shown=false, adhoc_shown=false, kid_shown=false, notplaying_shown=false) %}
                 {% for player in players_display %}
                 {% set att = attendance_records.get(player.id) %}
                 {% set current_status = attendance_map.get(player.id, 'NO') %}
@@ -535,40 +535,69 @@
                 {% set is_billable = current_status in ['YES', 'FILLIN', 'DROPOUT', 'PENDING_DROPOUT'] %}
                 {% set is_playing = current_status in ['YES', 'FILLIN', 'DROPOUT', 'PENDING_DROPOUT'] %}
                 {% set player_cat = category_map.get(player.id, player.category or 'regular') %}
-                {% if is_playing and player_cat != 'adhoc' and not ns_hdr.regular_shown %}
+                {% if is_playing and player_cat == 'regular' and not ns_hdr.regular_shown %}
                 {% set ns_hdr.regular_shown = true %}
-                <tr class="bg-gray-50/60">
+                <tr class="bg-gray-50/60 cursor-pointer" @click="sectionOpen.regular = !sectionOpen.regular">
                     <td colspan="10" class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                        Regular Players
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.regular ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Regular Players
+                        </div>
                     </td>
                 </tr>
                 {% endif %}
                 {% if is_playing and player_cat == 'adhoc' and not ns_hdr.adhoc_shown %}
                 {% set ns_hdr.adhoc_shown = true %}
-                <tr class="bg-purple-50/60">
+                <tr class="bg-purple-50/60 cursor-pointer" @click="sectionOpen.adhoc = !sectionOpen.adhoc">
                     <td colspan="10" class="px-4 py-2 text-xs font-semibold text-purple-700 uppercase tracking-wider border-b border-purple-200">
-                        Adhoc Players
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.adhoc ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Adhoc Players
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% if is_playing and player_cat == 'kid' and not ns_hdr.kid_shown %}
+                {% set ns_hdr.kid_shown = true %}
+                <tr class="bg-yellow-50/60 cursor-pointer" @click="sectionOpen.kid = !sectionOpen.kid">
+                    <td colspan="10" class="px-4 py-2 text-xs font-semibold text-yellow-700 uppercase tracking-wider border-b border-yellow-200">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.kid ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Kids
+                        </div>
                     </td>
                 </tr>
                 {% endif %}
                 {% if current_status == 'STANDBY' and not ns_hdr.standby_shown %}
                 {% set ns_hdr.standby_shown = true %}
-                <tr class="bg-teal-50/60">
+                <tr class="bg-teal-50/60 cursor-pointer" @click="sectionOpen.standby = !sectionOpen.standby">
                     <td colspan="10" class="px-4 py-2 text-xs font-semibold text-teal-700 uppercase tracking-wider border-b border-teal-200">
-                        Waitlisted — priority fill-in when a confirmed player drops out
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.standby ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Waitlisted — priority fill-in when a confirmed player drops out
+                        </div>
                     </td>
                 </tr>
                 {% endif %}
                 {% if current_status in ['NO', 'TENTATIVE'] and not ns_hdr.notplaying_shown %}
                 {% set ns_hdr.notplaying_shown = true %}
-                <tr class="bg-gray-100/60">
+                <tr class="bg-gray-100/60 cursor-pointer" @click="sectionOpen.notplaying = !sectionOpen.notplaying">
                     <td colspan="10" class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-200">
-                        Not Playing
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.notplaying ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Not Playing
+                        </div>
                     </td>
                 </tr>
                 {% endif %}
+                {% set player_section = 'notplaying' %}
+                {% if is_playing and player_cat == 'regular' %}{% set player_section = 'regular' %}
+                {% elif is_playing and player_cat == 'adhoc' %}{% set player_section = 'adhoc' %}
+                {% elif is_playing and player_cat == 'kid' %}{% set player_section = 'kid' %}
+                {% elif current_status == 'STANDBY' %}{% set player_section = 'standby' %}
+                {% endif %}
                 <tr class="hover:bg-wimbledon-cream/50 transition-all {% if not is_billable %}bg-teal-50/30{% endif %}"
-                    x-show="playerSearch === '' || '{{ player.name|lower }}'.includes(playerSearch.toLowerCase())"
+                    x-show="sectionOpen.{{ player_section }} && (playerSearch === '' || '{{ player.name|lower }}'.includes(playerSearch.toLowerCase()))"
                     x-cloak>
                     <td class="px-3 py-3 text-center">
                         {% if is_billable %}
@@ -830,6 +859,7 @@ function bulkPayment() {
         method: 'Zelle',
         loading: false,
         playerSearch: '',
+        sectionOpen: { regular: true, adhoc: true, kid: true, standby: true, notplaying: false },
         get selectedCount() {
             return Object.values(this.selected).filter(Boolean).length;
         },

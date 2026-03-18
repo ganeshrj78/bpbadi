@@ -372,16 +372,19 @@
             <tbody>
                 <!-- Regular Players Section -->
                 {% if regular_players %}
-                <tr class="bg-green-50">
+                <tr class="bg-green-50 cursor-pointer" @click="sectionOpen.regular = !sectionOpen.regular">
                     <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-green-700 uppercase tracking-wider sticky left-0 bg-green-50">
-                        Regular Players ({{ regular_players|length }})
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.regular ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Regular Players ({{ regular_players|length }})
+                        </div>
                     </td>
                 </tr>
                 {% for player in regular_players %}
                 {% set stats = player_stats[player.id] %}
                 {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
+                    x-show="sectionOpen.regular && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -571,16 +574,19 @@
 
                 <!-- Adhoc Players Section -->
                 {% if adhoc_players %}
-                <tr class="bg-purple-50">
+                <tr class="bg-purple-50 cursor-pointer" @click="sectionOpen.adhoc = !sectionOpen.adhoc">
                     <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-purple-700 uppercase tracking-wider sticky left-0 bg-purple-50">
-                        Adhoc Players ({{ adhoc_players|length }})
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.adhoc ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Adhoc Players ({{ adhoc_players|length }})
+                        </div>
                     </td>
                 </tr>
                 {% for player in adhoc_players %}
                 {% set stats = player_stats[player.id] %}
                 {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
+                    x-show="sectionOpen.adhoc && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -770,16 +776,19 @@
 
                 <!-- Kid Players Section -->
                 {% if kid_players %}
-                <tr class="bg-blue-50">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-blue-700 uppercase tracking-wider sticky left-0 bg-blue-50">
-                        Kids ({{ kid_players|length }})
+                <tr class="bg-yellow-50 cursor-pointer" @click="sectionOpen.kid = !sectionOpen.kid">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-yellow-700 uppercase tracking-wider sticky left-0 bg-yellow-50">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.kid ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Kids ({{ kid_players|length }})
+                        </div>
                     </td>
                 </tr>
                 {% for player in kid_players %}
                 {% set stats = player_stats[player.id] %}
                 {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
+                    x-show="sectionOpen.kid && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -966,16 +975,19 @@
 
                 <!-- Not Playing Section -->
                 {% if not_playing_players | default([]) %}
-                <tr class="bg-gray-100" x-show="paymentFilter === 'all' || paymentFilter === 'not_participating'">
+                <tr class="bg-gray-100 cursor-pointer" x-show="paymentFilter === 'all' || paymentFilter === 'not_participating'" @click="sectionOpen.notplaying = !sectionOpen.notplaying">
                     <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-100">
-                        Not Playing ({{ not_playing_players|length }})
+                        <div class="flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.notplaying ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            Not Playing ({{ not_playing_players|length }})
+                        </div>
                     </td>
                 </tr>
                 {% for player in not_playing_players %}
                 {% set stats = player_stats[player.id] %}
                 {% set ns_np = namespace(all_no=true) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="(searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'not_participating'))">
+                    x-show="sectionOpen.notplaying && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'not_participating'))">
                     <td class="px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -1231,6 +1243,7 @@ function sessionsMatrix() {
         showCourtsModal: false,
         bulkCourts: [{ name: 'Court 1', court_type: 'regular', cost: 105, hours: '3', start_time: '06:30' }],
         overwriteExisting: false,
+        sectionOpen: { regular: true, adhoc: true, kid: true, notplaying: false },
 
         init() {
             this.$watch('paymentFilter', v => localStorage.setItem('bpbadi_sessions_filter', JSON.stringify({paymentFilter: v, searchQuery: this.searchQuery})));

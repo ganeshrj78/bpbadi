@@ -1980,9 +1980,10 @@ def session_detail(id):
         if s in ['YES', 'FILLIN', 'DROPOUT']:
             if cat == 'regular': return 0
             if cat == 'adhoc': return 1
-            return 0  # kid or other → group with regular
-        if s == 'STANDBY': return 2
-        return 3
+            if cat == 'kid': return 2
+            return 0  # other → group with regular
+        if s == 'STANDBY': return 3
+        return 4
 
     players_display = sorted(
         [p for p in players if p.is_active],
