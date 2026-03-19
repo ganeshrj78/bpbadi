@@ -15,8 +15,9 @@
         <p class="text-gray-500 mt-1">Record and view your payments</p>
     </div>
 
-    {% set ns_fb = namespace(val=player.get_balance(frozen_only=True)) %}
-    {% for mp in managed_players %}{% set ns_fb.val = ns_fb.val + mp.get_balance(frozen_only=True) %}{% endfor %}
+    {% set pf = player_financials.get(player.id, {}) if player_financials is defined else {} %}
+    {% set ns_fb = namespace(val=pf.get('balance', 0)) %}
+    {% for mp in managed_players %}{% set ns_fb.val = ns_fb.val + (player_financials.get(mp.id, {}).get('balance', 0) if player_financials is defined else 0) %}{% endfor %}
     {% set family_balance = ns_fb.val %}
 
     {% if managed_players %}
@@ -38,9 +39,10 @@
                     {% endif %}
                     <span class="font-medium text-gray-800">{{ player.name }} (You)</span>
                 </div>
-                <span class="font-bold {% if player.get_balance(frozen_only=True) > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(player.get_balance(frozen_only=True)) }}</span>
+                <span class="font-bold {% if pf.get('balance', 0) > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(pf.get('balance', 0)) }}</span>
             </div>
             {% for mp in managed_players %}
+            {% set mpf = player_financials.get(mp.id, {}) if player_financials is defined else {} %}
             <div class="flex items-center justify-between text-sm">
                 <div class="flex items-center gap-2">
                     {% if mp.profile_photo_data %}
@@ -52,7 +54,7 @@
                     {% endif %}
                     <span class="font-medium text-gray-800">{{ mp.name }}</span>
                 </div>
-                <span class="font-bold {% if mp.get_balance(frozen_only=True) > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(mp.get_balance(frozen_only=True)) }}</span>
+                <span class="font-bold {% if mpf.get('balance', 0) > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(mpf.get('balance', 0)) }}</span>
             </div>
             {% endfor %}
         </div>
@@ -62,15 +64,15 @@
     <div class="grid md:grid-cols-3 gap-6 mb-6">
         <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20">
             <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Total Charges</h3>
-            <p class="text-2xl font-bold text-gray-800">${{ '%.2f'|format(player.get_total_charges(frozen_only=True)) }}</p>
+            <p class="text-2xl font-bold text-gray-800">${{ '%.2f'|format(pf.get('total_charges', 0)) }}</p>
         </div>
         <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20">
             <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Total Paid</h3>
-            <p class="text-2xl font-bold text-wimbledon-green">${{ '%.2f'|format(player.get_total_payments()) }}</p>
+            <p class="text-2xl font-bold text-wimbledon-green">${{ '%.2f'|format(pf.get('total_payments', 0)) }}</p>
         </div>
-        <div class="rounded-2xl shadow-lg p-6 border {% if player.get_balance(frozen_only=True) > 0 %}bg-red-50 border-red-200{% else %}bg-green-50 border-green-200{% endif %}">
-            <h3 class="text-sm font-semibold {% if player.get_balance(frozen_only=True) > 0 %}text-red-600{% else %}text-green-600{% endif %} uppercase tracking-wide mb-2">Balance Due</h3>
-            <p class="text-2xl font-bold {% if player.get_balance(frozen_only=True) > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(player.get_balance(frozen_only=True)) }}</p>
+        <div class="rounded-2xl shadow-lg p-6 border {% if pf.get('balance', 0) > 0 %}bg-red-50 border-red-200{% else %}bg-green-50 border-green-200{% endif %}">
+            <h3 class="text-sm font-semibold {% if pf.get('balance', 0) > 0 %}text-red-600{% else %}text-green-600{% endif %} uppercase tracking-wide mb-2">Balance Due</h3>
+            <p class="text-2xl font-bold {% if pf.get('balance', 0) > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(pf.get('balance', 0)) }}</p>
         </div>
     </div>
     {% endif %}
@@ -93,16 +95,17 @@
                     {% if managed_players %}
                     <option value="family" data-balance="{{ '%.2f'|format(family_balance) }}">Everyone (Family) {% if family_balance > 0 %}- Owes ${{ '%.2f'|format(family_balance) }}{% endif %}</option>
                     {% endif %}
-                    <option value="{{ player.id }}" data-balance="{{ '%.2f'|format(player.get_balance(frozen_only=True)) }}">{{ player.name }} (You) {% if player.get_balance(frozen_only=True) > 0 %}- Owes ${{ '%.2f'|format(player.get_balance(frozen_only=True)) }}{% endif %}</option>
+                    <option value="{{ player.id }}" data-balance="{{ '%.2f'|format(pf.get('balance', 0)) }}">{{ player.name }} (You) {% if pf.get('balance', 0) > 0 %}- Owes ${{ '%.2f'|format(pf.get('balance', 0)) }}{% endif %}</option>
                     {% for mp in managed_players %}
-                    <option value="{{ mp.id }}" data-balance="{{ '%.2f'|format(mp.get_balance(frozen_only=True)) }}">{{ mp.name }} {% if mp.get_balance(frozen_only=True) > 0 %}- Owes ${{ '%.2f'|format(mp.get_balance(frozen_only=True)) }}{% endif %}</option>
+                    {% set mpf2 = player_financials.get(mp.id, {}) if player_financials is defined else {} %}
+                    <option value="{{ mp.id }}" data-balance="{{ '%.2f'|format(mpf2.get('balance', 0)) }}">{{ mp.name }} {% if mpf2.get('balance', 0) > 0 %}- Owes ${{ '%.2f'|format(mpf2.get('balance', 0)) }}{% endif %}</option>
                     {% endfor %}
                 </select>
             </div>
             <div>
                 <label for="amount" class="block text-sm font-semibold text-gray-700 mb-1">Amount ($)</label>
                 <input type="number" step="0.01" min="0.01" name="amount" id="amount" required
-                    value="{% if player.get_balance(frozen_only=True) > 0 %}{{ '%.2f'|format(player.get_balance(frozen_only=True)) }}{% endif %}"
+                    value="{% if pf.get('balance', 0) > 0 %}{{ '%.2f'|format(pf.get('balance', 0)) }}{% endif %}"
                     class="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-wimbledon-green focus:ring-4 focus:ring-wimbledon-green/20 transition-all"
                     placeholder="0.00">
             </div>

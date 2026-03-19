@@ -347,10 +347,11 @@
                                 </div>
                                 <span class="text-[10px] text-gray-500">{{ session.date.strftime('%a') }}</span>
                                 <!-- Session Totals -->
+                                {% set ss = session_summary.get(session.id, {}) if session_summary is defined else {} %}
                                 <div class="flex items-center gap-1 mt-1">
-                                    <span class="text-[10px] font-bold text-wimbledon-green">{{ session.get_attendee_count() }}</span>
+                                    <span class="text-[10px] font-bold text-wimbledon-green">{{ ss.get('attendee_count', 0) }}</span>
                                     <span class="text-[10px] text-gray-400">|</span>
-                                    <span class="text-[10px] text-gray-500">${{ "%.0f"|format(session.get_cost_per_player() or session.birdie_cost) }}</span>
+                                    <span class="text-[10px] text-gray-500">${{ "%.0f"|format(ss.get('cost_per_player', 0) or session.birdie_cost) }}</span>
                                 </div>
                                 <input type="checkbox" value="{{ session.id }}"
                                     @change="$event.target.checked ? selectedSessions.push({{ session.id }}) : selectedSessions = selectedSessions.filter(id => id !== {{ session.id }})"
@@ -1674,7 +1675,7 @@ function updatePlayerComments(playerId, comments) {
         <div x-show="open" x-collapse>
             <div class="divide-y divide-gray-100">
                 {% for session in group.sessions %}
-                {% set start_time, end_time = session.get_time_range() %}
+                {% set ass = session_summary.get(session.id, {}) if session_summary is defined else {} %}
                 <div class="flex items-center px-6 py-4 hover:bg-gray-50 transition-all">
                     <div class="mr-4" @click.stop>
                         <input type="checkbox"
@@ -1690,13 +1691,14 @@ function updatePlayerComments(playerId, comments) {
                             </div>
                             <div>
                                 <div class="font-medium text-gray-700">{{ session.date.strftime('%A') }}</div>
-                                <div class="text-sm text-gray-500">{{ start_time }} - {{ end_time }}</div>
+                                <div class="text-sm text-gray-500">{{ ass.get('start_time', 'TBD') }} - {{ ass.get('end_time', 'TBD') }}</div>
                             </div>
                         </div>
                         <div class="flex items-center gap-4 text-sm text-gray-500">
-                            <span>{{ session.get_court_count() }} court{% if session.get_court_count() > 1 %}s{% endif %}</span>
-                            <span>{{ session.get_attendee_count() }} players</span>
-                            <span class="font-medium text-gray-700">${{ "%.2f"|format(session.get_cost_per_player()) }}/player</span>
+                            {% set cc = ass.get('court_count', 0) %}
+                            <span>{{ cc }} court{% if cc > 1 %}s{% endif %}</span>
+                            <span>{{ ass.get('attendee_count', 0) }} players</span>
+                            <span class="font-medium text-gray-700">${{ "%.2f"|format(ass.get('cost_per_player', 0)) }}/player</span>
                         </div>
                     </a>
                 </div>

@@ -1,3 +1,7 @@
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning, module='google')
+warnings.filterwarnings('ignore', message='.*OpenSSL.*', module='urllib3')
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, make_response
 from functools import wraps
 from datetime import datetime, date
@@ -422,6 +426,7 @@ def get_cached_player_stats():
         else:
             balance = raw_balance
         player_stats[player.id] = {
+            'total_charges': charges,
             'balance': balance,
             'total_payments': payments,
             'pending_refunds': refund_data['pending'],
@@ -1272,10 +1277,51 @@ def player_payments():
     all_player_ids = [player_id] + [p.id for p in managed_players]
     all_payments = Payment.query.filter(Payment.player_id.in_(all_player_ids)).order_by(Payment.date.desc()).all()
 
+    # Pre-compute frozen_only financials for player + managed players (avoids N+1 in template)
+    # frozen_only means only sessions where payment_released=True or is_archived=True
+    _ps, _rm, pp_session_cost_map, _ccbs, _sc = get_cached_player_stats()
+    frozen_session_ids = {s.id for s in Session.query.filter(
+        db.or_(Session.payment_released == True, Session.is_archived == True)
+    ).with_entities(Session.id).all()}
+    frozen_atts = Attendance.query.filter(
+        Attendance.player_id.in_(all_player_ids),
+        Attendance.session_id.in_(frozen_session_ids),
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])
+    ).all() if frozen_session_ids else []
+    # Compute charges per player from frozen sessions
+    pp_charges = defaultdict(float)
+    for att in frozen_atts:
+        costs = pp_session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
+        cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+        pp_charges[att.player_id] += costs[cat]
+    # Payments per player (positive only)
+    pp_payments = defaultdict(float)
+    for p in all_payments:
+        if p.amount > 0:
+            pp_payments[p.player_id] += p.amount
+    # Build financials dict
+    player_financials = {}
+    for pid in all_player_ids:
+        charges = round(pp_charges.get(pid, 0), 2)
+        payments_total = round(pp_payments.get(pid, 0), 2)
+        raw_balance = round(charges - payments_total, 2)
+        # Floor at zero unless pending refund
+        pending_amt = float(_rm.get(pid, {}).get('pending_amount', 0) or 0)
+        if raw_balance < 0:
+            balance = round(max(raw_balance, -pending_amt), 2) if pending_amt > 0 else 0.0
+        else:
+            balance = raw_balance
+        player_financials[pid] = {
+            'total_charges': charges,
+            'total_payments': payments_total,
+            'balance': balance,
+        }
+
     return render_template('player_payments.html',
                          player=player,
                          managed_players=managed_players,
                          payments=all_payments,
+                         player_financials=player_financials,
                          today=date.today().isoformat())
 
 
@@ -1488,11 +1534,15 @@ def players():
     adhoc_players   = [p for p in player_list if p.is_active and p.category == 'adhoc']
     inactive_players = [p for p in player_list if not p.is_active]
 
+    # Pre-compute charges/payments/balance for all players (avoids N+1 in template)
+    player_financials, _rm, _scm, _ccbs, _sc = get_cached_player_stats()
+
     return render_template('players.html',
                            players=player_list,
                            regular_players=regular_players,
                            adhoc_players=adhoc_players,
                            inactive_players=inactive_players,
+                           player_financials=player_financials,
                            current_category=category,
                            search_query=search_query)
 
@@ -1736,8 +1786,73 @@ def sessions():
     monthly_sorted = get_cached_monthly_summary()
 
     # Archived sessions grouped by year and month
-    all_sessions = Session.query.filter_by(is_archived=True).order_by(Session.date.desc()).all()
-    archived_sessions = all_sessions
+    archived_sessions = Session.query.filter_by(is_archived=True).order_by(Session.date.desc()).all()
+
+    # Pre-compute archived session stats (avoids N+1 from template calling model methods)
+    archived_ids = [s.id for s in archived_sessions]
+    if archived_ids:
+        # Batch-load courts for archived sessions
+        archived_courts = Court.query.filter(Court.session_id.in_(archived_ids)).all()
+        arch_courts_by_session = defaultdict(list)
+        for c in archived_courts:
+            arch_courts_by_session[c.session_id].append(c)
+        # Batch-load attendance counts for archived sessions
+        arch_att_counts = db.session.query(
+            Attendance.session_id,
+            func.count(Attendance.id)
+        ).filter(
+            Attendance.session_id.in_(archived_ids),
+            Attendance.status.in_(['YES', 'DROPOUT'])
+        ).group_by(Attendance.session_id).all()
+        arch_attendee_map = dict(arch_att_counts)
+        # Batch-load regular player counts for cost calculation
+        arch_reg_counts = db.session.query(
+            Attendance.session_id,
+            func.count(Attendance.id)
+        ).filter(
+            Attendance.session_id.in_(archived_ids),
+            Attendance.status.in_(['YES', 'DROPOUT']),
+            Attendance.category == 'regular'
+        ).group_by(Attendance.session_id).all()
+        arch_reg_map = dict(arch_reg_counts)
+    else:
+        arch_courts_by_session = {}
+        arch_attendee_map = {}
+        arch_reg_map = {}
+
+    for s in archived_sessions:
+        courts = arch_courts_by_session.get(s.id, [])
+        court_list = courts
+        court_count = len(court_list)
+        attendee_count = arch_attendee_map.get(s.id, 0)
+        reg_count = arch_reg_map.get(s.id, 0)
+        reg_court_cost = sum(c.cost for c in court_list if c.court_type == 'regular')
+        court_pool = reg_court_cost + ((s.credits or 0) if s.apply_credits else 0)
+        cost_per_player = round(court_pool / reg_count + s.birdie_cost, 2) if reg_count > 0 else (s.birdie_cost or 0)
+        # Time range from courts
+        if court_list:
+            start_time = min(c.start_time for c in court_list)
+            end_time = max(c.end_time for c in court_list)
+        elif s.start_time and s.end_time:
+            def _fmt_time(t):
+                try:
+                    h, m = map(int, t.split(':'))
+                    p = 'AM' if h < 12 else 'PM'
+                    dh = h if h <= 12 else h - 12
+                    if dh == 0: dh = 12
+                    return f"{dh}:{m:02d} {p}"
+                except Exception:
+                    return t
+            start_time, end_time = _fmt_time(s.start_time), _fmt_time(s.end_time)
+        else:
+            start_time, end_time = 'TBD', 'TBD'
+        session_summary[s.id] = {
+            'attendee_count': attendee_count,
+            'cost_per_player': cost_per_player,
+            'court_count': court_count,
+            'start_time': start_time,
+            'end_time': end_time,
+        }
 
     # Group archived by year-month
     archived_grouped = {}
@@ -1828,6 +1943,16 @@ def sessions():
 
     session_birdie_map = {s.id: (s.birdie_cost or 0) for s in active_sessions}
 
+    # Pre-compute per-session attendee count and cost_per_player for templates
+    session_summary = {}
+    for s in active_sessions:
+        counts = session_counts.get(s.id, {'regular': 0, 'adhoc': 0})
+        costs = active_session_costs.get(s.id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
+        session_summary[s.id] = {
+            'attendee_count': counts['regular'] + counts['adhoc'],
+            'cost_per_player': costs['regular'],
+        }
+
     # Scope refund/fillin amounts to active sessions only (clean slate each month)
     # Fillin amounts: only from active sessions
     month_fillin = {}
@@ -1889,6 +2014,7 @@ def sessions():
                           attendance_details=attendance_details,
                           player_stats=player_stats,
                           active_session_costs=active_session_costs,
+                          session_summary=session_summary,
                           standby_by_session=standby_by_session,
                           session_birdie_map=session_birdie_map,
                           pending_dropout_requests=pending_dropout_requests,
@@ -3552,15 +3678,19 @@ def update_player_comments():
 @app.route('/payments')
 @admin_required
 def payments():
-    payment_list = Payment.query.order_by(Payment.date.desc()).all()
+    payment_list = Payment.query.options(joinedload(Payment.player)).order_by(Payment.date.desc()).all()
 
     # Calculate totals
     total_collected = sum(p.amount for p in payment_list)
 
-    # Outstanding balances
-    players = Player.query.all()
-    balances = [(p, p.get_balance()) for p in players if p.get_balance() > 0]
-    balances.sort(key=lambda x: x[0].name.lower())
+    # Outstanding balances from cached stats (avoids N+1 per-player queries)
+    player_stats, _rm, _scm, _ccbs, _sc = get_cached_player_stats()
+    players = Player.query.filter_by(is_active=True, is_approved=True).order_by(Player.name).all()
+    balances = []
+    for p in players:
+        bal = player_stats.get(p.id, {}).get('balance', 0)
+        if bal > 0:
+            balances.append((p, bal))
 
     return render_template('payments.html',
                          payments=payment_list,
