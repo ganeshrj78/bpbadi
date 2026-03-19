@@ -32,9 +32,7 @@ if _jinja_cache_dir:
     os.makedirs(_jinja_cache_dir, exist_ok=True)
     app.jinja_env.bytecode_cache = FileSystemBytecodeCache(_jinja_cache_dir)
 
-# Caching Configuration
-app.config['CACHE_TYPE'] = 'SimpleCache'  # In-memory cache (use 'RedisCache' for production with Redis)
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
+# Caching Configuration — FileSystemCache shared across gunicorn workers (set in config.py)
 cache = Cache(app)
 
 # Gzip compression — reduces HTML response size ~70% on slow Render free tier
@@ -318,9 +316,11 @@ def get_cached_monthly_summary():
         monthly_summary[key]['session_credits'] += sess_data['credits']
 
     # Actual payments received, grouped by payment month
-    for payment in Payment.query.all():
+    # Only load payments for months we care about (avoid full table scan)
+    month_keys = set(monthly_summary.keys())
+    for payment in Payment.query.with_entities(Payment.date, Payment.amount).all():
         key = payment.date.strftime('%Y-%m')
-        if key in monthly_summary:
+        if key in month_keys:
             monthly_summary[key]['payments_received'] += payment.amount
 
     # Pending dropout refunds = credits owed back to players, grouped by session month
@@ -450,6 +450,7 @@ def clear_session_cache():
     """Clear session-related cache when data changes"""
     cache.delete_memoized(get_cached_monthly_summary)
     cache.delete_memoized(get_cached_player_stats)
+    cache.delete_memoized(get_cached_session_costs)
 
 
 # Master admin only decorator (for sensitive operations like promoting admins)
@@ -856,43 +857,69 @@ def dashboard():
         reverse=True
     )[:6]
 
+    # Batch-load all chargeable attendances with player eagerly loaded (avoids N+1)
+    all_session_ids = [s.id for s in all_sessions_for_summary]
+    all_att_records = Attendance.query.filter(
+        Attendance.session_id.in_(all_session_ids),
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])
+    ).options(joinedload(Attendance.player)).all() if all_session_ids else []
+    # Group attendances by session_id
+    att_by_session = defaultdict(list)
+    for att in all_att_records:
+        att_by_session[att.session_id].append(att)
+
+    # Batch-load all payments grouped by month
+    all_payments = Payment.query.all()
+    payments_by_month = defaultdict(float)
+    for p in all_payments:
+        payments_by_month[p.date.strftime('%Y-%m')] += p.amount
+
+    # Pre-compute session cost rates using cached player stats (already batch-computed)
+    _ps, _rm, dash_session_cost_map, _ccbs, _sc = get_cached_player_stats()
+
+    # Batch-load all processed refunds grouped by session_id
+    all_refunds = DropoutRefund.query.filter_by(status='processed').all()
+    refunds_by_session = defaultdict(float)
+    for r in all_refunds:
+        refunds_by_session[r.session_id] += r.refund_amount
+
     monthly_summary = []
     for year, month in session_months:
         month_start = date(year, month, 1)
         month_end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        month_key = month_start.strftime('%Y-%m')
 
         m_sessions = [s for s in all_sessions_for_summary
                       if month_start <= s.date < month_end]
-        # Month is "active" if it has at least one non-archived session
         is_active_month = any(not s.is_archived for s in m_sessions)
 
         m_charges = 0
         m_attendees = 0
         for sess in m_sessions:
-            for att in sess.attendances:
-                if att.status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] and att.player and att.player.is_active:
+            costs = dash_session_cost_map.get(sess.id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
+            for att in att_by_session.get(sess.id, []):
+                if att.player and att.player.is_active:
                     m_attendees += 1
-                    if att.category == 'kid':
-                        m_charges += sess.get_cost_per_kid()
-                    elif att.category == 'adhoc':
-                        m_charges += sess.get_cost_per_adhoc_player()
-                    else:
-                        m_charges += sess.get_cost_per_regular_player()
+                    cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+                    m_charges += costs[cat]
                     m_charges += (att.additional_cost or 0)
 
-        m_payments = Payment.query.filter(
-            Payment.date >= datetime.combine(month_start, datetime.min.time()),
-            Payment.date < datetime.combine(month_end, datetime.min.time())
-        ).all()
-        m_collected = sum(p.amount for p in m_payments)
+        m_collected = payments_by_month.get(month_key, 0)
 
-        m_birdie = sum(sess.get_birdie_cost_total() for sess in m_sessions)
-        m_refunds = sum(sess.get_total_refunds() for sess in m_sessions)
-        m_session_credits = sum(sess.credits or 0 for sess in m_sessions)
+        m_birdie = 0
+        m_refunds = 0
+        m_session_credits = 0
+        for sess in m_sessions:
+            # Birdie total: birdie_cost × non-kid attendees (use pre-loaded data)
+            non_kid = sum(1 for a in att_by_session.get(sess.id, [])
+                         if a.category != 'kid' and a.status in ('YES', 'DROPOUT'))
+            m_birdie += sess.birdie_cost * non_kid
+            m_refunds += refunds_by_session.get(sess.id, 0)
+            m_session_credits += sess.credits or 0
 
         monthly_summary.append({
             'month': month_start.strftime('%b %Y'),
-            'month_key': month_start.strftime('%Y-%m'),
+            'month_key': month_key,
             'is_active': is_active_month,
             'sessions': len(m_sessions),
             'attendees': m_attendees,
@@ -1062,13 +1089,12 @@ def player_sessions():
     # Sort by key (year-month) descending
     archived_sorted = sorted(archived_grouped.items(), key=lambda x: x[0], reverse=True)
 
-    # Get attendance map for this player and managed players
-    attendance_map = {}  # {player_id: {session_id: status}}
+    # Get attendance map for this player and managed players (single batch query)
     players_to_track = [player] + list(managed_players)
-    for p in players_to_track:
-        attendance_map[p.id] = {}
-        for att in Attendance.query.filter_by(player_id=p.id).all():
-            attendance_map[p.id][att.session_id] = att.status
+    track_ids = [p.id for p in players_to_track]
+    attendance_map = {pid: {} for pid in track_ids}
+    for att in Attendance.query.filter(Attendance.player_id.in_(track_ids)).all():
+        attendance_map[att.player_id][att.session_id] = att.status
 
     # Get all players for showing attendance
     all_players = Player.query.order_by(Player.name).all()
@@ -1524,7 +1550,7 @@ def add_player():
 @admin_required
 def player_detail(id):
     player = Player.query.get_or_404(id)
-    attendances = player.attendances.join(Session).order_by(Session.date.desc()).all()
+    attendances = player.attendances.join(Session).options(joinedload(Attendance.session)).order_by(Session.date.desc()).all()
     payments = player.payments.order_by(Payment.date.desc()).all()
     return render_template('player_detail.html', player=player, attendances=attendances, payments=payments)
 
@@ -1739,9 +1765,14 @@ def sessions():
     def _effective_category(player):
         return player_session_category.get(player.id, player.category or 'regular')
 
-    regular_players = [p for p in all_players if _effective_category(p) == 'regular']
-    adhoc_players = [p for p in all_players if _effective_category(p) == 'adhoc']
-    kid_players = [p for p in all_players if _effective_category(p) == 'kid']
+    # Single-pass grouping by category
+    _cat_groups = {'regular': [], 'adhoc': [], 'kid': []}
+    for p in all_players:
+        cat = _effective_category(p)
+        _cat_groups.setdefault(cat, _cat_groups['regular']).append(p)
+    regular_players = _cat_groups['regular']
+    adhoc_players = _cat_groups['adhoc']
+    kid_players = _cat_groups['kid']
 
     # Load pre-computed player stats from cache (60s TTL)
     _player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts = get_cached_player_stats()
@@ -1781,15 +1812,19 @@ def sessions():
         active_session_costs[sid] = {'regular': per_player, 'adhoc': per_player, 'kid': 11.0}
 
     # Build standby-players-per-session map for the dropout modal
+    # Query only STANDBY attendances, ordered in SQL
     player_name_map = {p.id: p.name for p in all_players}
     standby_by_session = {}
-    for att in sorted(all_attendances, key=lambda a: a.updated_at or a.created_at):
-        if att.status == 'STANDBY' and att.session_id in attendance_map:
-            standby_by_session.setdefault(att.session_id, []).append({
-                'id': att.player_id,
-                'name': player_name_map.get(att.player_id, ''),
-                'category': att.category or 'regular'
-            })
+    standby_atts_q = Attendance.query.filter(
+        Attendance.session_id.in_(active_session_ids),
+        Attendance.status == 'STANDBY'
+    ).order_by(func.coalesce(Attendance.updated_at, Attendance.created_at)).all() if active_session_ids else []
+    for att in standby_atts_q:
+        standby_by_session.setdefault(att.session_id, []).append({
+            'id': att.player_id,
+            'name': player_name_map.get(att.player_id, ''),
+            'category': att.category or 'regular'
+        })
 
     session_birdie_map = {s.id: (s.birdie_cost or 0) for s in active_sessions}
 

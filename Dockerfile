@@ -11,6 +11,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p instance static/uploads
+RUN mkdir -p instance static/uploads .jinja_cache .flask_cache
 
 CMD ["bash", "start.sh"]

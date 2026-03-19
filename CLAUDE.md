@@ -20,7 +20,8 @@ python3 seed.py                   # Seed database
 - **Frontend:** Jinja2, Tailwind CSS (CDN), Alpine.js 3.x
 - **Auth:** Password login + Google Sign-In (GIS) for @gmail.com accounts
 - **Theme:** Wimbledon — Purple (#44005C), Green (#006633), Gold (#C4A747), Cream (#F5F5DC)
-- **Deploy:** Render (Docker) — `start.sh` runs `flask db upgrade` then gunicorn
+- **Caching:** FileSystemCache (shared across gunicorn workers), memoized expensive queries (60s TTL)
+- **Deploy:** Render (Docker, paid tier) — `start.sh` runs `flask db upgrade` then gunicorn (3 workers, gthread)
 
 ## Key Models
 
@@ -86,6 +87,15 @@ if 'col_name' not in existing_cols:
     op.add_column(...)
 ```
 
+## Performance
+
+- **Gunicorn:** 3 workers × 2 threads (`gthread`), 60s timeout, `max-requests 1000` for memory leak prevention
+- **Caching:** `FileSystemCache` in `.flask_cache/` — shared across workers (not `SimpleCache` which is per-process)
+- **Cache invalidation:** `clear_session_cache()` clears `get_cached_monthly_summary`, `get_cached_player_stats`, `get_cached_session_costs`
+- **N+1 prevention:** Dashboard and sessions routes batch-load attendances with `joinedload(Attendance.player)`, use pre-computed cost maps from `get_cached_player_stats()`
+- **Connection pool:** `pool_size=5, max_overflow=5` per worker — total max 30 connections across 3 workers
+- **Indexes:** Composite indexes on hot query paths (attendance session+status+category, payment date+player, refund player+status)
+
 ## Critical Gotchas
 
 - **DropoutRefund backref expires** after commit → use direct query
@@ -94,6 +104,7 @@ if 'col_name' not in existing_cols:
 - **Template safety** — guard new vars with `| default({})`
 - All JSON APIs use `@csrf.exempt`. Admin APIs use `@admin_required`.
 - **Encryption** — `ExternalIntegration` columns encrypted via Fernet derived from `SECRET_KEY`
+- **Cache sharing** — never use `SimpleCache` with multi-worker gunicorn; use `FileSystemCache` or Redis
 
 ## Environment Variables
 

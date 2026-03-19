@@ -36,10 +36,16 @@ class Config:
     # Jinja2 bytecode caching — compiles templates once, reuses on subsequent requests
     JINJA_BYTECODE_CACHE_DIR = os.path.join(os.path.dirname(__file__), '.jinja_cache')
 
-    # Connection pool tuning — prevents stale connection errors after Render free tier sleep
+    # FileSystemCache — shared across gunicorn workers (SimpleCache is per-process)
+    CACHE_TYPE = 'FileSystemCache'
+    CACHE_DIR = os.path.join(os.path.dirname(__file__), '.flask_cache')
+    CACHE_DEFAULT_TIMEOUT = 300
+
+    # Connection pool tuning — prevents stale connection errors after Render sleep
+    # pool_size × workers (3) should stay within DB connection limit
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,   # test connection before use; reconnects transparently
         'pool_recycle': 300,     # recycle connections every 5 min (before Render closes them)
         'pool_size': 5,
-        'max_overflow': 2,
+        'max_overflow': 5,
     }

@@ -52,7 +52,7 @@ class Player(db.Model):
     profile_photo = db.Column(db.String(255))  # filename of uploaded photo (legacy)
     profile_photo_data = db.Column(db.LargeBinary)  # photo stored as binary in DB
     profile_photo_mime = db.Column(db.String(50))  # MIME type e.g. image/jpeg
-    managed_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)  # Parent player who can vote/pay for this player
+    managed_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True, index=True)  # Parent player who can vote/pay for this player
     is_admin = db.Column(db.Boolean, default=False)  # Player admin flag
     is_active = db.Column(db.Boolean, default=True, index=True)  # Active/Inactive status
     is_approved = db.Column(db.Boolean, default=False, index=True)  # Registration approval status
@@ -154,8 +154,8 @@ class Session(db.Model):
     birdie_cost = db.Column(db.Float, nullable=False, default=0)
     notes = db.Column(db.Text)
     is_archived = db.Column(db.Boolean, default=False, index=True)
-    voting_frozen = db.Column(db.Boolean, default=False)  # If True, players cannot change their votes
-    payment_released = db.Column(db.Boolean, default=False)  # If True, charges visible to players for payment
+    voting_frozen = db.Column(db.Boolean, default=False, index=True)  # If True, players cannot change their votes
+    payment_released = db.Column(db.Boolean, default=False, index=True)  # If True, charges visible to players for payment
 
     # Session time configuration (used when creating sessions, courts can override)
     hours = db.Column(db.Float, default=3)  # Duration in hours (2, 3, or 3.5)
