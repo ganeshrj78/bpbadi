@@ -1142,6 +1142,16 @@ def player_sessions():
         past_grouped[key]['sessions'].append(sess)
     past_by_month = sorted(past_grouped.items(), reverse=True)  # newest first
 
+    # Payment collector per month — show on sessions page regardless of release status
+    collector_by_month = {}
+    all_months = set()
+    for s in upcoming_sessions + past_sessions:
+        all_months.add(s.date.strftime('%Y-%m'))
+    for mk in all_months:
+        cid = SiteSettings.get(f'payment_collector_{mk}', '')
+        if cid:
+            collector_by_month[mk] = Player.query.get(int(cid))
+
     return render_template('player_sessions.html',
                          player=player,
                          managed_players=managed_players,
@@ -1152,7 +1162,8 @@ def player_sessions():
                          archived_groups=archived_sorted,
                          attendance_map=attendance_map,
                          all_players=all_players,
-                         session_attendance=session_attendance)
+                         session_attendance=session_attendance,
+                         collector_by_month=collector_by_month)
 
 
 # Player payment - players can record their own and managed players' payments
@@ -1280,20 +1291,28 @@ def player_payments():
     # Pre-compute frozen_only financials for player + managed players (avoids N+1 in template)
     # frozen_only means only sessions where payment_released=True or is_archived=True
     _ps, _rm, pp_session_cost_map, _ccbs, _sc = get_cached_player_stats()
-    frozen_session_ids = {s.id for s in Session.query.filter(
+    frozen_sessions = Session.query.filter(
         db.or_(Session.payment_released == True, Session.is_archived == True)
-    ).with_entities(Session.id).all()}
+    ).all()
+    frozen_session_ids = {s.id for s in frozen_sessions}
+    frozen_session_month = {s.id: s.date.strftime('%Y-%m') for s in frozen_sessions}
     frozen_atts = Attendance.query.filter(
         Attendance.player_id.in_(all_player_ids),
         Attendance.session_id.in_(frozen_session_ids),
         Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])
     ).all() if frozen_session_ids else []
-    # Compute charges per player from frozen sessions
+    # Compute charges per player — total and per month
     pp_charges = defaultdict(float)
+    # monthly_charges[month_key][player_id] = charge amount
+    monthly_charges = defaultdict(lambda: defaultdict(float))
     for att in frozen_atts:
         costs = pp_session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
         cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
-        pp_charges[att.player_id] += costs[cat]
+        charge = costs[cat]
+        pp_charges[att.player_id] += charge
+        mk = frozen_session_month.get(att.session_id, '')
+        if mk:
+            monthly_charges[mk][att.player_id] += charge
     # Payments per player (positive only)
     pp_payments = defaultdict(float)
     for p in all_payments:
@@ -1316,22 +1335,40 @@ def player_payments():
             'total_payments': payments_total,
             'balance': balance,
         }
+    # Build monthly balance summary (charges per month per player, family total)
+    monthly_summary = {}
+    for mk in sorted(monthly_charges.keys()):
+        month_label = datetime.strptime(mk, '%Y-%m').strftime('%B %Y')
+        month_total = 0.0
+        month_players = {}
+        for pid in all_player_ids:
+            c = round(monthly_charges[mk].get(pid, 0), 2)
+            month_total += c
+            month_players[pid] = c
+        monthly_summary[mk] = {
+            'label': month_label,
+            'total': round(month_total, 2),
+            'players': month_players,
+        }
 
-    # Payment collector — only show when payment has been released for the active month
-    latest_released = Session.query.filter_by(is_archived=False, payment_released=True).order_by(Session.date.desc()).first()
-    payment_collector = None
-    if latest_released:
-        collector_month = latest_released.date.strftime('%Y-%m')
-        collector_id = SiteSettings.get(f'payment_collector_{collector_month}', '')
-        if collector_id:
-            payment_collector = Player.query.get(int(collector_id))
+    # Payment collectors — show for each month that has released sessions
+    released_sessions = Session.query.filter_by(is_archived=False, payment_released=True).all()
+    released_months = set(s.date.strftime('%Y-%m') for s in released_sessions)
+    payment_collectors = {}
+    for mk in sorted(released_months):
+        cid = SiteSettings.get(f'payment_collector_{mk}', '')
+        if cid:
+            collector = Player.query.get(int(cid))
+            if collector:
+                payment_collectors[mk] = collector
 
     return render_template('player_payments.html',
                          player=player,
                          managed_players=managed_players,
                          payments=all_payments,
                          player_financials=player_financials,
-                         payment_collector=payment_collector,
+                         payment_collectors=payment_collectors,
+                         monthly_summary=monthly_summary,
                          today=date.today().isoformat())
 
 

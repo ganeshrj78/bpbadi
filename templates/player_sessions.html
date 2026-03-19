@@ -53,6 +53,14 @@
                     <span class="text-sm text-gray-500">{{ month_data.sessions|length }} session{{ 's' if month_data.sessions|length > 1 else '' }}</span>
                 </button>
                 <div x-show="monthOpen" x-collapse class="space-y-4">
+            {% if collector_by_month is defined and collector_by_month.get(month_key) %}
+            {% set mc = collector_by_month[month_key] %}
+            <div class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-wimbledon-green/10 to-wimbledon-cream rounded-xl border border-wimbledon-green/30">
+                <svg class="w-5 h-5 text-wimbledon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <span class="text-sm text-gray-700">Send payment to <strong class="text-base text-gray-900">{{ mc.name }}</strong>
+                {% if mc.zelle_preference == 'phone' and mc.phone %} / Zelle: <strong class="text-base underline">{{ mc.phone }}</strong>{% elif mc.email %} / Zelle: <strong class="text-base underline">{{ mc.email }}</strong>{% endif %}</span>
+            </div>
+            {% endif %}
             {% for sess in month_data.sessions %}
             <div class="border border-gray-200 rounded-xl p-4 hover:border-wimbledon-green/50 transition-all" x-data="{ showPlayers: false }">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -272,6 +280,14 @@
                 <div class="h-px bg-wimbledon-gold/30 flex-1"></div>
                 <span class="text-sm font-serif font-bold text-wimbledon-purple bg-wimbledon-cream/50 px-3 py-1 rounded-full">{{ month_data.label }}</span>
                 <div class="h-px bg-wimbledon-gold/30 flex-1"></div>
+            </div>
+            {% endif %}
+            {% if collector_by_month is defined and collector_by_month.get(month_key) %}
+            {% set mc = collector_by_month[month_key] %}
+            <div class="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-wimbledon-green/10 to-wimbledon-cream rounded-xl border border-wimbledon-green/30">
+                <svg class="w-5 h-5 text-wimbledon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <span class="text-sm text-gray-700">Send payment to <strong class="text-base text-gray-900">{{ mc.name }}</strong>
+                {% if mc.zelle_preference == 'phone' and mc.phone %} / Zelle: <strong class="text-base underline">{{ mc.phone }}</strong>{% elif mc.email %} / Zelle: <strong class="text-base underline">{{ mc.email }}</strong>{% endif %}</span>
             </div>
             {% endif %}
             {% for sess in month_data.sessions %}
