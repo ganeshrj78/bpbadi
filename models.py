@@ -46,7 +46,7 @@ class Player(db.Model):
     phone = db.Column(db.String(20))
     email = db.Column(db.String(100), index=True)
     password_hash = db.Column(db.String(255))
-    zelle_preference = db.Column(db.String(10), default='email')  # 'email' or 'phone'
+    zelle_preference = db.Column(db.String(10), default='phone')  # 'phone' or 'email'
     date_of_birth = db.Column(db.Date, nullable=True)  # Optional date of birth
     gender = db.Column(db.String(10), default='male')  # 'male', 'female', 'other'
     profile_photo = db.Column(db.String(255))  # filename of uploaded photo (legacy)

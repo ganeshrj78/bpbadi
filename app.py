@@ -1317,9 +1317,11 @@ def player_payments():
             'balance': balance,
         }
 
-    # Payment collector for the current month
-    current_month_key = date.today().strftime('%Y-%m')
-    collector_id = SiteSettings.get(f'payment_collector_{current_month_key}', '')
+    # Payment collector — use the latest active (non-archived) session month
+    # This matches the month the admin selects on the sessions page
+    latest_active = Session.query.filter_by(is_archived=False).order_by(Session.date.desc()).first()
+    collector_month = latest_active.date.strftime('%Y-%m') if latest_active else date.today().strftime('%Y-%m')
+    collector_id = SiteSettings.get(f'payment_collector_{collector_month}', '')
     payment_collector = None
     if collector_id:
         payment_collector = Player.query.get(int(collector_id))
