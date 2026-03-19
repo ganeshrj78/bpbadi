@@ -1,15 +1,15 @@
 """Add missing performance indexes on managed_by, voting_frozen, payment_released
 
-Revision ID: a1b2c3d4e5f6
-Revises: f7a8b9c0d1e2
+Revision ID: g8b9c0d1e2f3
+Revises: 99e749fe71ec
 Create Date: 2026-03-19
 
 """
 from alembic import op
 from sqlalchemy.engine.reflection import Inspector
 
-revision = 'a1b2c3d4e5f6'
-down_revision = 'f7a8b9c0d1e2'
+revision = 'g8b9c0d1e2f3'
+down_revision = '99e749fe71ec'
 branch_labels = None
 depends_on = None
 
