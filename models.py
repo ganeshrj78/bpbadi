@@ -101,18 +101,12 @@ class Player(db.Model):
         return round(total, 2)
 
     def get_total_payments(self):
-        """Calculate total payments made (excludes negative refund entries)"""
-        return round(sum(p.amount for p in self.payments.filter(Payment.amount > 0).all()), 2)
+        """Calculate total payments made (includes refunds as negative amounts)"""
+        return round(sum(p.amount for p in self.payments.all()), 2)
 
     def get_balance(self, frozen_only=False):
-        """Calculate outstanding balance (charges - payments).
-        Floors at zero unless there is a pending refund owed to the player."""
-        raw = round(self.get_total_charges(frozen_only=frozen_only) - self.get_total_payments(), 2)
-        if raw < 0:
-            pending = self.get_pending_refund_amount()
-            # Only show negative up to the pending refund amount
-            return round(max(raw, -pending), 2) if pending > 0 else 0.0
-        return raw
+        """Calculate outstanding balance (charges - payments). Negative = credit/overpayment."""
+        return round(self.get_total_charges(frozen_only=frozen_only) - self.get_total_payments(), 2)
 
     def get_pending_refunds_count(self):
         """Count pending refunds for this player"""

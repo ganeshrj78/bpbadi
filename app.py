@@ -3833,11 +3833,12 @@ def add_payment():
         date_str = request.form.get('date')
         notes = request.form.get('notes', '')
 
-        # For refunds, store as negative amount
+        # For refunds, store as negative amount with reason
         if payment_type == 'refund':
             amount = -abs(amount)
-            if not notes:
-                notes = 'Manual refund'
+            refund_reason = request.form.get('refund_reason', 'Manual refund')
+            notes = f'Adhoc Refund - {refund_reason}' + (f': {notes}' if notes else '')
+            method = 'Refund'
 
         payment_date = datetime.strptime(date_str, '%Y-%m-%d') if date_str else datetime.utcnow()
 
@@ -3884,7 +3885,8 @@ def add_payment():
         return redirect(url_for('payments'))
 
     players = Player.query.order_by(Player.name).all()
-    return render_template('payment_form.html', players=players, payment=None, today=date.today().isoformat())
+    player_stats, _rm, _scm, _ccbs, _sc = get_cached_player_stats()
+    return render_template('payment_form.html', players=players, player_stats=player_stats, payment=None, today=date.today().isoformat())
 
 
 @app.route('/payments/<int:id>/delete', methods=['POST'])
