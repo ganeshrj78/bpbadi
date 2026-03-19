@@ -77,6 +77,32 @@
     </div>
     {% endif %}
 
+    <!-- Payment Collector Banner -->
+    {% if payment_collector is defined and payment_collector %}
+    <div class="bg-gradient-to-r from-wimbledon-green/10 to-wimbledon-cream rounded-2xl shadow-lg p-5 border border-wimbledon-green/30 mb-6">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 gradient-success rounded-xl flex items-center justify-center shadow-md border border-wimbledon-gold/30 flex-shrink-0">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </div>
+            <div>
+                <div class="text-sm font-semibold text-wimbledon-green uppercase tracking-wide">Send Payment To</div>
+                <div class="text-lg font-bold text-gray-800">{{ payment_collector.name }}</div>
+                {% if payment_collector.zelle_preference == 'phone' and payment_collector.phone %}
+                <div class="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                    <span class="font-medium text-wimbledon-purple">Zelle:</span>
+                    <span class="font-mono font-semibold">{{ payment_collector.phone }}</span>
+                </div>
+                {% elif payment_collector.email %}
+                <div class="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                    <span class="font-medium text-wimbledon-purple">Zelle:</span>
+                    <span class="font-mono font-semibold">{{ payment_collector.email }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Record Payment Form -->
     <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20 mb-6">
         <h2 class="text-xl font-serif font-bold text-wimbledon-purple mb-4 flex items-center">

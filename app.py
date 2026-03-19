@@ -1317,11 +1317,19 @@ def player_payments():
             'balance': balance,
         }
 
+    # Payment collector for the current month
+    current_month_key = date.today().strftime('%Y-%m')
+    collector_id = SiteSettings.get(f'payment_collector_{current_month_key}', '')
+    payment_collector = None
+    if collector_id:
+        payment_collector = Player.query.get(int(collector_id))
+
     return render_template('player_payments.html',
                          player=player,
                          managed_players=managed_players,
                          payments=all_payments,
                          player_financials=player_financials,
+                         payment_collector=payment_collector,
                          today=date.today().isoformat())
 
 
@@ -2002,6 +2010,10 @@ def sessions():
     # Pending dropout requests for notification banner
     pending_dropout_requests = [att for att in all_attendances if att.status == 'PENDING_DROPOUT']
 
+    # Payment collector for the selected month (show all admin players as options)
+    admin_players = Player.query.filter_by(is_admin=True, is_active=True, is_approved=True).order_by(Player.name).all()
+    current_collector_id = SiteSettings.get(f'payment_collector_{selected_month}', '')
+
     return render_template('sessions.html',
                           active_sessions=active_sessions,
                           archived_groups=archived_sorted,
@@ -2019,7 +2031,9 @@ def sessions():
                           session_birdie_map=session_birdie_map,
                           pending_dropout_requests=pending_dropout_requests,
                           active_months=active_months_sorted,
-                          selected_month=selected_month)
+                          selected_month=selected_month,
+                          admin_players=admin_players,
+                          current_collector_id=current_collector_id)
 
 
 @app.route('/sessions/month/<month_key>')
@@ -2717,6 +2731,32 @@ def bulk_unrelease_payment():
     clear_session_cache()
     flash(f'Payment unreleased for {count} session(s)!', 'success')
     return redirect(url_for('sessions'))
+
+
+@app.route('/api/payment-collector', methods=['POST'])
+@csrf.exempt
+@admin_required
+def set_payment_collector():
+    """Set which admin collects payments for a given month."""
+    data = request.get_json()
+    month_key = data.get('month_key', '')  # e.g. '2026-03'
+    player_id = data.get('player_id')  # admin player ID or empty to clear
+
+    if not month_key:
+        return jsonify({'error': 'month_key required'}), 400
+
+    setting_key = f'payment_collector_{month_key}'
+    if player_id:
+        player = Player.query.get(player_id)
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
+        SiteSettings.set(setting_key, str(player_id))
+        log_activity('set_payment_collector', f'Set {player.name} as payment collector for {month_key}', 'settings')
+        return jsonify({'success': True, 'name': player.name})
+    else:
+        SiteSettings.set(setting_key, '')
+        log_activity('set_payment_collector', f'Cleared payment collector for {month_key}', 'settings')
+        return jsonify({'success': True, 'name': None})
 
 
 @app.route('/sessions/bulk-toggle-payment', methods=['POST'])

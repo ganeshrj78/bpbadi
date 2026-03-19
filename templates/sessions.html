@@ -211,6 +211,17 @@
                 <option value="{{ key }}" {% if key == selected_month %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
+            <!-- Payment Collector selector -->
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-wimbledon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <select id="payment-collector-select" onchange="setPaymentCollector(this.value)"
+                    class="px-3 py-1.5 border border-wimbledon-gold/30 rounded-lg text-sm font-medium text-gray-700 bg-white focus:outline-none focus:border-wimbledon-green focus:ring-2 focus:ring-wimbledon-green/20">
+                    <option value="">-- Collector --</option>
+                    {% for admin in admin_players | default([]) %}
+                    <option value="{{ admin.id }}" {% if current_collector_id == admin.id|string %}selected{% endif %}>{{ admin.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             {% endif %}
         </div>
         <div x-show="selectedSessions.length > 0" x-cloak class="flex items-center gap-3 flex-wrap">
@@ -1241,6 +1252,25 @@
 
 <!-- JavaScript for attendance management -->
 <script>
+async function setPaymentCollector(playerId) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    try {
+        const res = await fetch('/api/payment-collector', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ month_key: '{{ selected_month }}', player_id: playerId || null })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const sel = document.getElementById('payment-collector-select');
+            sel.style.borderColor = '#006633';
+            setTimeout(() => { sel.style.borderColor = ''; }, 1500);
+        }
+    } catch (e) {
+        alert('Failed to set payment collector');
+    }
+}
+
 function sessionsMatrix() {
     const _saved = JSON.parse(localStorage.getItem('bpbadi_sessions_filter') || '{}');
     return {
