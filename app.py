@@ -419,12 +419,7 @@ def get_cached_player_stats():
         charges = round(player_charges.get(player.id, 0), 2)
         payments = round(player_payments.get(player.id, 0), 2)
         refund_data = refund_map.get(player.id, {'pending': 0, 'pending_amount': 0.0, 'refunded': 0})
-        raw_balance = round(charges - payments, 2)
-        pending_amt = float(refund_data['pending_amount'] or 0)
-        if raw_balance < 0:
-            balance = round(max(raw_balance, -pending_amt), 2) if pending_amt > 0 else 0.0
-        else:
-            balance = raw_balance
+        balance = round(charges - payments, 2)
         player_stats[player.id] = {
             'total_charges': charges,
             'balance': balance,
@@ -1322,13 +1317,7 @@ def player_payments():
     for pid in all_player_ids:
         charges = round(pp_charges.get(pid, 0), 2)
         payments_total = round(pp_payments.get(pid, 0), 2)
-        raw_balance = round(charges - payments_total, 2)
-        # Floor at zero unless pending refund
-        pending_amt = float(_rm.get(pid, {}).get('pending_amount', 0) or 0)
-        if raw_balance < 0:
-            balance = round(max(raw_balance, -pending_amt), 2) if pending_amt > 0 else 0.0
-        else:
-            balance = raw_balance
+        balance = round(charges - payments_total, 2)
         player_financials[pid] = {
             'total_charges': charges,
             'total_payments': payments_total,
