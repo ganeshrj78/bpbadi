@@ -249,7 +249,12 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-4">
+                            {% if payment.amount < 0 %}
+                            <span class="text-xl font-bold text-red-600">-${{ "%.2f"|format(payment.amount|abs) }}</span>
+                            <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Refund</span>
+                            {% else %}
                             <span class="text-xl font-bold text-wimbledon-green">${{ "%.2f"|format(payment.amount) }}</span>
+                            {% endif %}
                             <form method="POST" action="{{ url_for('delete_payment', id=payment.id) }}" class="inline" onsubmit="return confirm('Delete this payment?');">
                                 <button type="submit" class="text-gray-400 hover:text-wimbledon-purple transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

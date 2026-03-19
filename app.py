@@ -352,7 +352,7 @@ def get_cached_player_stats():
     payment_totals = db.session.query(
         Payment.player_id,
         func.sum(Payment.amount).label('total')
-    ).filter(Payment.amount > 0).group_by(Payment.player_id).all()
+    ).group_by(Payment.player_id).all()
     player_payments = {r.player_id: float(r.total or 0) for r in payment_totals}
 
     refund_stats = db.session.query(
@@ -1313,11 +1313,10 @@ def player_payments():
         mk = frozen_session_month.get(att.session_id, '')
         if mk:
             monthly_charges[mk][att.player_id] += charge
-    # Payments per player (positive only)
+    # Payments per player (includes refunds as negative amounts)
     pp_payments = defaultdict(float)
     for p in all_payments:
-        if p.amount > 0:
-            pp_payments[p.player_id] += p.amount
+        pp_payments[p.player_id] += p.amount
     # Build financials dict
     player_financials = {}
     for pid in all_player_ids:
@@ -3840,9 +3839,16 @@ def add_payment():
     if request.method == 'POST':
         player_id = int(request.form.get('player_id'))
         amount = float(request.form.get('amount'))
+        payment_type = request.form.get('payment_type', 'payment')
         method = request.form.get('method')
         date_str = request.form.get('date')
-        notes = request.form.get('notes')
+        notes = request.form.get('notes', '')
+
+        # For refunds, store as negative amount
+        if payment_type == 'refund':
+            amount = -abs(amount)
+            if not notes:
+                notes = 'Manual refund'
 
         payment_date = datetime.strptime(date_str, '%Y-%m-%d') if date_str else datetime.utcnow()
 
@@ -3855,32 +3861,37 @@ def add_payment():
         )
         db.session.add(payment)
 
-        # Mark attendance as paid for active sessions where player is charged
-        active_session_ids = [s.id for s in Session.query.filter_by(is_archived=False).all()]
-        if active_session_ids:
-            unpaid_atts = Attendance.query.filter(
-                Attendance.player_id == player_id,
-                Attendance.session_id.in_(active_session_ids),
-                Attendance.status.in_(['YES', 'FILLIN']),
-                Attendance.payment_status == 'unpaid'
-            ).all()
-            for att in unpaid_atts:
-                att.payment_status = 'paid'
-                if att.status == 'FILLIN':
-                    sess_costs = get_cached_session_costs(att.session_id)
-                    cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
-                    fillin_cost = sess_costs.get(cat, 0)
-                    att_sess = Session.query.get(att.session_id)
-                    s_date = att_sess.date.strftime('%m/%d') if att_sess else date.today().strftime('%m/%d')
-                    comment = f'Fill-in cost ${fillin_cost:.2f} for session {s_date} paid'
-                    att.comments = (att.comments + ' | ' + comment) if att.comments else comment
+        # Mark attendance as paid only for regular payments (not refunds)
+        if payment_type != 'refund':
+            active_session_ids = [s.id for s in Session.query.filter_by(is_archived=False).all()]
+            if active_session_ids:
+                unpaid_atts = Attendance.query.filter(
+                    Attendance.player_id == player_id,
+                    Attendance.session_id.in_(active_session_ids),
+                    Attendance.status.in_(['YES', 'FILLIN']),
+                    Attendance.payment_status == 'unpaid'
+                ).all()
+                for att in unpaid_atts:
+                    att.payment_status = 'paid'
+                    if att.status == 'FILLIN':
+                        sess_costs = get_cached_session_costs(att.session_id)
+                        cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+                        fillin_cost = sess_costs.get(cat, 0)
+                        att_sess = Session.query.get(att.session_id)
+                        s_date = att_sess.date.strftime('%m/%d') if att_sess else date.today().strftime('%m/%d')
+                        comment = f'Fill-in cost ${fillin_cost:.2f} for session {s_date} paid'
+                        att.comments = (att.comments + ' | ' + comment) if att.comments else comment
 
         db.session.commit()
         clear_session_cache()
 
         player = Player.query.get(player_id)
-        log_activity('add_payment', f'Payment ${amount:.2f} from {player.name}', 'payment', payment.id)
-        flash(f'Payment of ${amount:.2f} from {player.name} recorded!', 'success')
+        if payment_type == 'refund':
+            log_activity('refund_payment', f'Refund ${abs(amount):.2f} to {player.name}', 'payment', payment.id)
+            flash(f'Refund of ${abs(amount):.2f} to {player.name} recorded!', 'success')
+        else:
+            log_activity('add_payment', f'Payment ${amount:.2f} from {player.name}', 'payment', payment.id)
+            flash(f'Payment of ${amount:.2f} from {player.name} recorded!', 'success')
         return redirect(url_for('payments'))
 
     players = Player.query.order_by(Player.name).all()

@@ -211,7 +211,11 @@
                             </span>
                         </td>
                         <td class="py-3 px-4 text-gray-600">{{ payment.notes or '-' }}</td>
+                        {% if payment.amount < 0 %}
+                        <td class="py-3 px-4 text-right font-semibold text-red-600">-${{ '%.2f'|format(payment.amount|abs) }} <span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">Refund</span></td>
+                        {% else %}
                         <td class="py-3 px-4 text-right font-semibold text-wimbledon-green">${{ '%.2f'|format(payment.amount) }}</td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
