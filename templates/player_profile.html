@@ -7,7 +7,7 @@
     <!-- Header with Profile Photo -->
     <div class="text-center mb-8">
         <div class="relative inline-block">
-            {% if player.profile_photo_data %}
+            {% if player.profile_photo_mime %}
             <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="{{ player.name }}" class="w-24 h-24 rounded-full object-cover shadow-xl border-4 border-wimbledon-gold">
             {% else %}
             <div class="w-24 h-24 gradient-primary rounded-full shadow-xl flex items-center justify-center border-4 border-wimbledon-gold">
@@ -135,7 +135,7 @@
             <form method="POST" enctype="multipart/form-data" class="space-y-4">
                 <input type="hidden" name="action" value="update_photo">
                 <div class="flex items-center gap-4">
-                    {% if player.profile_photo_data %}
+                    {% if player.profile_photo_mime %}
                     <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="{{ player.name }}" class="w-20 h-20 rounded-full object-cover border-4 border-wimbledon-gold/30 shadow-lg flex-shrink-0">
                     {% else %}
                     <div class="w-20 h-20 rounded-full bg-gradient-to-br from-wimbledon-purple to-wimbledon-green flex items-center justify-center border-4 border-wimbledon-gold/30 shadow-lg flex-shrink-0">

@@ -14,7 +14,7 @@
 <!-- Player Header -->
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
     <div class="flex items-center space-x-4">
-        {% if player.profile_photo_data %}
+        {% if player.profile_photo_mime %}
         <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-20 h-20 rounded-2xl object-cover shadow-lg border-2 border-wimbledon-gold">
         {% else %}
         <div class="w-20 h-20 gradient-primary rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg border-2 border-wimbledon-gold">

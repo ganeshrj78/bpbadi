@@ -266,7 +266,7 @@
         {% for att in pending_dropouts %}
         <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" id="pending-dropout-{{ att.id }}">
             <div class="flex items-center gap-3">
-                {% if att.player.profile_photo_data %}
+                {% if att.player.profile_photo_mime %}
                 <img src="{{ url_for('player_photo', player_id=att.player.id) }}" class="w-9 h-9 rounded-full object-cover border-2 border-orange-300">
                 {% else %}
                 <div class="w-9 h-9 gradient-primary rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
@@ -608,7 +608,7 @@
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap">
                         <a href="{{ url_for('player_detail', id=player.id) }}" class="flex items-center space-x-3 group">
-                            {% if player.profile_photo_data %}
+                            {% if player.profile_photo_mime %}
                             <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-9 h-9 rounded-full object-cover border-2 border-wimbledon-gold/30 shadow-md">
                             {% else %}
                             <div class="w-9 h-9 gradient-primary rounded-full flex items-center justify-center text-white font-bold shadow-md border border-wimbledon-gold/30">{{ player.name[0].upper() }}</div>

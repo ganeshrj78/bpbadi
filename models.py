@@ -50,7 +50,7 @@ class Player(db.Model):
     date_of_birth = db.Column(db.Date, nullable=True)  # Optional date of birth
     gender = db.Column(db.String(10), default='male')  # 'male', 'female', 'other'
     profile_photo = db.Column(db.String(255))  # filename of uploaded photo (legacy)
-    profile_photo_data = db.Column(db.LargeBinary)  # photo stored as binary in DB
+    profile_photo_data = db.deferred(db.Column(db.LargeBinary))  # photo stored as binary in DB — deferred to avoid loading on every query
     profile_photo_mime = db.Column(db.String(50))  # MIME type e.g. image/jpeg
     managed_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True, index=True)  # Parent player who can vote/pay for this player
     is_admin = db.Column(db.Boolean, default=False)  # Player admin flag

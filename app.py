@@ -194,9 +194,15 @@ def player_photo(player_id):
     """Serve player profile photo from database, fall back to filesystem, then initials"""
     player = Player.query.get(player_id)
     if player and player.profile_photo_data:
+        # ETag based on player id + photo mime (changes when photo is re-uploaded)
+        import hashlib
+        etag = hashlib.md5(f'{player_id}:{player.profile_photo_mime}:{len(player.profile_photo_data)}'.encode()).hexdigest()
+        if request.headers.get('If-None-Match') == etag:
+            return '', 304
         response = make_response(player.profile_photo_data)
         response.headers['Content-Type'] = player.profile_photo_mime or 'image/jpeg'
         response.headers['Cache-Control'] = 'public, max-age=86400'
+        response.headers['ETag'] = etag
         return response
     # Fall back to filesystem
     if player and player.profile_photo:
