@@ -276,10 +276,46 @@ def log_activity(action, description, entity_type=None, entity_id=None):
 # Cached helper for monthly summary (expensive calculation)
 @cache.memoize(timeout=60)  # Cache for 60 seconds
 def get_cached_monthly_summary():
-    """Calculate monthly summary with caching"""
+    """Calculate monthly summary with caching — batch-loads all data to avoid N+1."""
     all_sessions = Session.query.order_by(Session.date.desc()).all()
+    session_ids = [s.id for s in all_sessions]
 
-    # Build session_id -> month_key map for pending refund lookup
+    # Batch-load all courts, attendances, and refunds in 4 queries total
+    all_courts = Court.query.filter(Court.session_id.in_(session_ids)).all() if session_ids else []
+    all_att = Attendance.query.filter(
+        Attendance.session_id.in_(session_ids),
+        Attendance.status.in_(['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'])
+    ).all() if session_ids else []
+    all_refunds = DropoutRefund.query.filter(DropoutRefund.session_id.in_(session_ids)).all() if session_ids else []
+
+    # Pre-compute per-session court costs
+    court_costs = {}  # {sid: {'regular': float, 'adhoc': float}}
+    for c in all_courts:
+        if c.session_id not in court_costs:
+            court_costs[c.session_id] = {'regular': 0.0, 'adhoc': 0.0}
+        key = 'adhoc' if c.court_type == 'adhoc' else 'regular'
+        court_costs[c.session_id][key] += c.cost
+
+    # Pre-compute per-session attendance counts and category breakdowns
+    att_counts = {}  # {sid: {'regular': int, 'adhoc': int, 'kid': int}}
+    for att in all_att:
+        sid = att.session_id
+        if sid not in att_counts:
+            att_counts[sid] = {'regular': 0, 'adhoc': 0, 'kid': 0}
+        if att.status in ('YES', 'DROPOUT'):
+            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+            att_counts[sid][cat] += 1
+
+    # Pre-compute per-session refund totals
+    refund_totals = {}  # {sid: float} (processed refunds)
+    pending_refund_by_session = {}  # {sid: float}
+    for r in all_refunds:
+        if r.status == 'processed':
+            refund_totals[r.session_id] = refund_totals.get(r.session_id, 0.0) + (r.refund_amount or 0)
+        elif r.status == 'pending':
+            pending_refund_by_session[r.session_id] = pending_refund_by_session.get(r.session_id, 0.0) + (r.refund_amount or 0)
+
+    # Build session_id -> month_key map
     session_month_map = {sess.id: sess.date.strftime('%Y-%m') for sess in all_sessions}
 
     monthly_summary = {}
@@ -288,62 +324,67 @@ def get_cached_monthly_summary():
         label = sess.date.strftime('%B %Y')
         if key not in monthly_summary:
             monthly_summary[key] = {
-                'label': label,
-                'sessions': [],
-                'total_sessions': 0,
-                'archived_sessions': 0,
-                'birdie_charges': 0,
-                'regular_charges': 0,
-                'adhoc_charges': 0,
-                'kid_charges': 0,
-                'total_refunds': 0,
-                'total_collection': 0,
-                'payments_received': 0,
-                'pending_credits': 0,
-                'session_credits': 0,
+                'label': label, 'sessions': [], 'total_sessions': 0,
+                'archived_sessions': 0, 'birdie_charges': 0,
+                'regular_charges': 0, 'adhoc_charges': 0, 'kid_charges': 0,
+                'total_refunds': 0, 'total_collection': 0,
+                'payments_received': 0, 'pending_credits': 0, 'session_credits': 0,
             }
+
+        sid = sess.id
+        courts = court_costs.get(sid, {'regular': 0.0, 'adhoc': 0.0})
+        counts = att_counts.get(sid, {'regular': 0, 'adhoc': 0, 'kid': 0})
+        reg_count = counts['regular']
+        adhoc_count = counts['adhoc']
+        kid_count = counts['kid']
+
+        # Cost per player calculation (same as model methods but no DB calls)
+        reg_court_cost = courts['regular']
+        court_pool = reg_court_cost + ((sess.credits or 0) if sess.apply_credits else 0)
+        cost_per_player = round(court_pool / reg_count + sess.birdie_cost, 2) if reg_count > 0 else (sess.birdie_cost or 0)
+
+        regular_charges = round(cost_per_player * reg_count, 2)
+        adhoc_charges = round(cost_per_player * adhoc_count, 2)
+        kid_charges = round(11.0 * kid_count, 2)
+        total_collection = round(regular_charges + adhoc_charges + kid_charges, 2)
+        total_refunds = round(refund_totals.get(sid, 0.0), 2)
+        non_kid = reg_count + adhoc_count
+        birdie_total = round(sess.birdie_cost * non_kid, 2)
+
         sess_data = {
-            'id': sess.id,
-            'date': sess.date,
-            'is_archived': sess.is_archived,
-            'voting_frozen': sess.voting_frozen,
-            'payment_released': sess.payment_released,
-            'birdie_cost': sess.birdie_cost,
+            'id': sid, 'date': sess.date,
+            'is_archived': sess.is_archived, 'voting_frozen': sess.voting_frozen,
+            'payment_released': sess.payment_released, 'birdie_cost': sess.birdie_cost,
             'credits': sess.credits or 0,
-            'regular_player_count': sess.get_regular_player_count(),
-            'adhoc_player_count': sess.get_adhoc_player_count(),
-            'regular_charges': sess.get_regular_player_charges(),
-            'adhoc_charges': sess.get_adhoc_player_charges(),
-            'kid_charges': sess.get_kid_player_charges(),
-            'total_refunds': sess.get_total_refunds(),
-            'total_collection': sess.get_total_collection(),
-            'cost_per_player': sess.get_cost_per_player(),
+            'regular_player_count': reg_count, 'adhoc_player_count': adhoc_count,
+            'regular_charges': regular_charges, 'adhoc_charges': adhoc_charges,
+            'kid_charges': kid_charges, 'total_refunds': total_refunds,
+            'total_collection': total_collection, 'cost_per_player': cost_per_player,
         }
         monthly_summary[key]['sessions'].append(sess_data)
         monthly_summary[key]['total_sessions'] += 1
         if sess.is_archived:
             monthly_summary[key]['archived_sessions'] += 1
-        monthly_summary[key]['birdie_charges'] += sess.get_birdie_cost_total()
-        monthly_summary[key]['regular_charges'] += sess_data['regular_charges']
-        monthly_summary[key]['adhoc_charges'] += sess_data['adhoc_charges']
-        monthly_summary[key]['kid_charges'] += sess_data['kid_charges']
-        monthly_summary[key]['total_refunds'] += sess_data['total_refunds']
-        monthly_summary[key]['total_collection'] += sess_data['total_collection']
+        monthly_summary[key]['birdie_charges'] += birdie_total
+        monthly_summary[key]['regular_charges'] += regular_charges
+        monthly_summary[key]['adhoc_charges'] += adhoc_charges
+        monthly_summary[key]['kid_charges'] += kid_charges
+        monthly_summary[key]['total_refunds'] += total_refunds
+        monthly_summary[key]['total_collection'] += total_collection
         monthly_summary[key]['session_credits'] += sess_data['credits']
 
     # Actual payments received, grouped by payment month
-    # Only load payments for months we care about (avoid full table scan)
     month_keys = set(monthly_summary.keys())
     for payment in Payment.query.with_entities(Payment.date, Payment.amount).all():
-        key = payment.date.strftime('%Y-%m')
-        if key in month_keys:
-            monthly_summary[key]['payments_received'] += payment.amount
+        pkey = payment.date.strftime('%Y-%m')
+        if pkey in month_keys:
+            monthly_summary[pkey]['payments_received'] += payment.amount
 
-    # Pending dropout refunds = credits owed back to players, grouped by session month
-    for refund in DropoutRefund.query.filter_by(status='pending').all():
-        key = session_month_map.get(refund.session_id)
-        if key and key in monthly_summary:
-            monthly_summary[key]['pending_credits'] += refund.refund_amount
+    # Pending dropout refunds grouped by session month
+    for sid, amount in pending_refund_by_session.items():
+        mkey = session_month_map.get(sid)
+        if mkey and mkey in monthly_summary:
+            monthly_summary[mkey]['pending_credits'] += amount
 
     for key in monthly_summary:
         monthly_summary[key]['is_fully_archived'] = (
@@ -443,6 +484,81 @@ def get_cached_player_stats():
             'fillin_paid': round(player_fillin_paid.get(player.id, 0.0), 2)
         }
     return player_stats, refund_map, session_cost_map, court_cost_by_session, session_counts
+
+
+def compute_session_display_stats(session_ids):
+    """Batch-compute display stats for sessions: time_range, court_count, attendee_count, cost_per_player.
+    Returns dict {session_id: {time_range, court_count, attendee_count, cost_per_player}}."""
+    if not session_ids:
+        return {}
+    # Batch-load courts and attendances
+    all_courts = Court.query.filter(Court.session_id.in_(session_ids)).all()
+    all_att = Attendance.query.filter(
+        Attendance.session_id.in_(session_ids),
+        Attendance.status.in_(['YES', 'DROPOUT'])
+    ).all()
+    all_sessions = {s.id: s for s in Session.query.filter(Session.id.in_(session_ids)).all()}
+
+    # Courts per session
+    courts_by_session = defaultdict(list)
+    for c in all_courts:
+        courts_by_session[c.session_id].append(c)
+
+    # Attendance counts per session
+    reg_counts = defaultdict(int)
+    kid_counts = defaultdict(int)
+    total_counts = defaultdict(int)
+    for att in all_att:
+        total_counts[att.session_id] += 1
+        if att.category == 'kid':
+            kid_counts[att.session_id] += 1
+        else:
+            reg_counts[att.session_id] += 1
+
+    stats = {}
+    for sid in session_ids:
+        sess = all_sessions.get(sid)
+        if not sess:
+            stats[sid] = {'time_range': ('TBD', 'TBD'), 'court_count': 0, 'attendee_count': 0, 'cost_per_player': 0}
+            continue
+        courts = courts_by_session.get(sid, [])
+        # Time range
+        if courts:
+            time_range = (min(c.start_time for c in courts), max(c.end_time for c in courts))
+        elif sess.start_time and sess.end_time:
+            def _fmt(ts):
+                try:
+                    h, m = map(int, ts.split(':'))
+                    p = 'AM' if h < 12 else 'PM'
+                    dh = h if h <= 12 else h - 12
+                    if dh == 0: dh = 12
+                    return f"{dh}:{m:02d} {p}"
+                except:
+                    return ts
+            time_range = (_fmt(sess.start_time), _fmt(sess.end_time))
+        else:
+            time_range = ('TBD', 'TBD')
+
+        # Cost per player
+        reg_court_cost = sum(c.cost for c in courts if c.court_type != 'adhoc')
+        court_pool = reg_court_cost + ((sess.credits or 0) if sess.apply_credits else 0)
+        rc = reg_counts.get(sid, 0)
+        cost_per_player = round(court_pool / rc + sess.birdie_cost, 2) if rc > 0 else (sess.birdie_cost or 0)
+
+        non_kid = reg_counts.get(sid, 0)
+        kids = kid_counts.get(sid, 0)
+        birdie_total = round((sess.birdie_cost or 0) * non_kid, 2)
+        total_collection = round(cost_per_player * non_kid + 11.0 * kids, 2)
+
+        stats[sid] = {
+            'time_range': time_range,
+            'court_count': len(courts),
+            'attendee_count': total_counts.get(sid, 0),
+            'cost_per_player': cost_per_player,
+            'birdie_total': birdie_total,
+            'total_collection': total_collection,
+        }
+    return stats
 
 
 @cache.memoize(timeout=30)
@@ -1072,10 +1188,22 @@ def player_profile():
         return redirect(url_for('player_profile'))
 
     # Get attendance history
-    attendances = player.attendances.join(Session).order_by(Session.date.desc()).all()
+    attendances = player.attendances.join(Session).options(joinedload(Attendance.session)).order_by(Session.date.desc()).all()
     payments = player.payments.order_by(Payment.date.desc()).all()
 
-    return render_template('player_profile.html', player=player, attendances=attendances, payments=payments, today=date.today())
+    # Pre-compute per-attendance costs and session stats to avoid N+1
+    att_session_ids = list({att.session_id for att in attendances})
+    session_stats = compute_session_display_stats(att_session_ids)
+    _ps, _rm, session_cost_map, _ccbs, _sc = get_cached_player_stats()
+    att_cost_map = {}
+    for att in attendances:
+        if att.status in ('YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'):
+            costs = session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
+            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+            att_cost_map[att.id] = costs[cat]
+
+    return render_template('player_profile.html', player=player, attendances=attendances, payments=payments,
+                          today=date.today(), session_stats=session_stats, att_cost_map=att_cost_map)
 
 
 # Player sessions view - see all sessions and vote
@@ -1131,13 +1259,13 @@ def player_sessions():
     # Get all players for showing attendance
     all_players = Player.query.order_by(Player.name).all()
 
-    # Get all attendance records for sessions we're displaying
+    # Get all attendance records for sessions we're displaying (batch-load to avoid N+1)
     all_sessions = upcoming_sessions + past_sessions + archived_sessions
-    session_attendance = {}  # {session_id: {player_id: status}}
-    for sess in all_sessions:
-        session_attendance[sess.id] = {}
-        for att in sess.attendances.all():
-            session_attendance[sess.id][att.player_id] = att.status
+    all_session_ids = [s.id for s in all_sessions]
+    session_attendance = {sid: {} for sid in all_session_ids}
+    if all_session_ids:
+        for att in Attendance.query.filter(Attendance.session_id.in_(all_session_ids)).all():
+            session_attendance[att.session_id][att.player_id] = att.status
 
     # Ensure current player and managed players have attendance records for upcoming sessions
     for sess in upcoming_sessions + past_sessions:
@@ -1174,10 +1302,21 @@ def player_sessions():
     all_months = set()
     for s in upcoming_sessions + past_sessions:
         all_months.add(s.date.strftime('%Y-%m'))
+    coll_ids = set()
+    coll_settings = {}
     for mk in all_months:
         cid = SiteSettings.get(f'payment_collector_{mk}', '')
         if cid:
-            collector_by_month[mk] = Player.query.get(int(cid))
+            coll_ids.add(int(cid))
+            coll_settings[mk] = int(cid)
+    if coll_ids:
+        coll_by_id = {p.id: p for p in Player.query.filter(Player.id.in_(coll_ids)).all()}
+        for mk, cid in coll_settings.items():
+            if cid in coll_by_id:
+                collector_by_month[mk] = coll_by_id[cid]
+
+    # Pre-compute session display stats (time_range, court_count, attendee_count, cost_per_player)
+    session_stats = compute_session_display_stats(all_session_ids)
 
     return render_template('player_sessions.html',
                          player=player,
@@ -1190,7 +1329,8 @@ def player_sessions():
                          attendance_map=attendance_map,
                          all_players=all_players,
                          session_attendance=session_attendance,
-                         collector_by_month=collector_by_month)
+                         collector_by_month=collector_by_month,
+                         session_stats=session_stats)
 
 
 # Player payment - players can record their own and managed players' payments
@@ -1372,15 +1512,21 @@ def player_payments():
         }
 
     # Payment collectors — show for each month that has released sessions
-    released_sessions = Session.query.filter_by(is_archived=False, payment_released=True).all()
+    released_sessions = [s for s in frozen_sessions if s.payment_released and not s.is_archived]
     released_months = set(s.date.strftime('%Y-%m') for s in released_sessions)
     payment_collectors = {}
-    for mk in sorted(released_months):
+    collector_ids = set()
+    collector_settings = {}
+    for mk in released_months:
         cid = SiteSettings.get(f'payment_collector_{mk}', '')
         if cid:
-            collector = Player.query.get(int(cid))
-            if collector:
-                payment_collectors[mk] = collector
+            collector_ids.add(int(cid))
+            collector_settings[mk] = int(cid)
+    if collector_ids:
+        collectors_by_id = {p.id: p for p in Player.query.filter(Player.id.in_(collector_ids)).all()}
+        for mk, cid in collector_settings.items():
+            if cid in collectors_by_id:
+                payment_collectors[mk] = collectors_by_id[cid]
 
     return render_template('player_payments.html',
                          player=player,
@@ -1748,7 +1894,28 @@ def player_detail(id):
     player = Player.query.get_or_404(id)
     attendances = player.attendances.join(Session).options(joinedload(Attendance.session)).order_by(Session.date.desc()).all()
     payments = player.payments.order_by(Payment.date.desc()).all()
-    return render_template('player_detail.html', player=player, attendances=attendances, payments=payments)
+
+    # Pre-compute financials and per-attendance costs to avoid N+1 in template
+    _ps, _rm, session_cost_map, _ccbs, _sc = get_cached_player_stats()
+    player_total_charges = 0.0
+    att_cost_map = {}  # {attendance.id: cost}
+    for att in attendances:
+        if att.status in ('YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'):
+            costs = session_cost_map.get(att.session_id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
+            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+            att_cost_map[att.id] = costs[cat]
+            sess = att.session
+            if not (hasattr(sess, 'payment_released') and not sess.payment_released and not sess.is_archived):
+                pass  # count all for total_charges
+            player_total_charges += costs[cat]
+    player_total_payments = round(sum(p.amount for p in payments), 2)
+    player_balance = round(player_total_charges - player_total_payments, 2)
+
+    return render_template('player_detail.html', player=player, attendances=attendances, payments=payments,
+                          att_cost_map=att_cost_map,
+                          player_total_charges=round(player_total_charges, 2),
+                          player_total_payments=player_total_payments,
+                          player_balance=player_balance)
 
 
 @app.route('/players/<int:id>/edit', methods=['GET', 'POST'])
@@ -1934,6 +2101,9 @@ def sessions():
     # Archived sessions grouped by year and month
     archived_sessions = Session.query.filter_by(is_archived=True).order_by(Session.date.desc()).all()
 
+    # Pre-compute session summary for both archived and active sessions
+    session_summary = {}
+
     # Pre-compute archived session stats (avoids N+1 from template calling model methods)
     archived_ids = [s.id for s in archived_sessions]
     if archived_ids:
@@ -2089,8 +2259,7 @@ def sessions():
 
     session_birdie_map = {s.id: (s.birdie_cost or 0) for s in active_sessions}
 
-    # Pre-compute per-session attendee count and cost_per_player for templates
-    session_summary = {}
+    # Pre-compute per-session attendee count and cost_per_player for active sessions
     for s in active_sessions:
         counts = session_counts.get(s.id, {'regular': 0, 'adhoc': 0})
         costs = active_session_costs.get(s.id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
@@ -2148,8 +2317,8 @@ def sessions():
     # Pending dropout requests for notification banner
     pending_dropout_requests = [att for att in all_attendances if att.status == 'PENDING_DROPOUT']
 
-    # Payment collector for the selected month (show all admin players as options)
-    admin_players = Player.query.filter_by(is_admin=True, is_active=True, is_approved=True).order_by(Player.name).all()
+    # Payment collector for the selected month (derive from all_players to avoid extra query)
+    admin_players = [p for p in all_players if p.is_admin]
     current_collector_id = SiteSettings.get(f'payment_collector_{selected_month}', '')
 
     return render_template('sessions.html',
@@ -2205,29 +2374,69 @@ def sessions_by_month(month_key):
             fillin_by_session.setdefault(att.session_id, []).append(att)
         attendees_by_session.setdefault(att.session_id, []).append(att)
 
+    # Batch-load all courts for the month
+    all_courts = Court.query.filter(Court.session_id.in_(session_ids)).order_by(Court.id).all() if session_ids else []
+    courts_by_session = defaultdict(list)
+    for c in all_courts:
+        courts_by_session[c.session_id].append(c)
+
+    # Batch-load refund totals
+    refund_totals = {}
+    if session_ids:
+        for r in DropoutRefund.query.filter(DropoutRefund.session_id.in_(session_ids), DropoutRefund.status == 'processed').all():
+            refund_totals[r.session_id] = refund_totals.get(r.session_id, 0.0) + (r.refund_amount or 0)
+
     session_stats = []
     for sess in month_sessions:
-        start_time, end_time = sess.get_time_range()
-        courts = sess.courts.all()
-        # Compute fillin total for this session
-        cost_reg = sess.get_cost_per_regular_player()
+        courts = courts_by_session.get(sess.id, [])
+        # Time range from courts
+        if courts:
+            start_time = min(c.start_time for c in courts)
+            end_time = max(c.end_time for c in courts)
+        elif sess.start_time and sess.end_time:
+            def _fmt_t(ts):
+                try:
+                    h, m = map(int, ts.split(':'))
+                    p = 'AM' if h < 12 else 'PM'
+                    dh = h if h <= 12 else h - 12
+                    if dh == 0: dh = 12
+                    return f"{dh}:{m:02d} {p}"
+                except:
+                    return ts
+            start_time, end_time = _fmt_t(sess.start_time), _fmt_t(sess.end_time)
+        else:
+            start_time, end_time = 'TBD', 'TBD'
+
+        regular_courts = [c for c in courts if c.court_type != 'adhoc']
+        adhoc_courts = [c for c in courts if c.court_type == 'adhoc']
+        reg_court_cost = sum(c.cost for c in regular_courts)
+
+        sess_atts = attendees_by_session.get(sess.id, [])
+        reg_att_count = sum(1 for a in sess_atts if a.category == 'regular' and a.status in ('YES', 'DROPOUT'))
+        adhoc_att_count = sum(1 for a in sess_atts if a.category == 'adhoc' and a.status in ('YES', 'DROPOUT'))
+        kid_att_count = sum(1 for a in sess_atts if a.category == 'kid' and a.status in ('YES', 'DROPOUT'))
+        total_attendees = reg_att_count + adhoc_att_count + kid_att_count
+
+        # Cost per player (same formula as model)
+        court_pool = reg_court_cost + ((sess.credits or 0) if sess.apply_credits else 0)
+        per_player = round(court_pool / reg_att_count + (sess.birdie_cost or 0), 2) if reg_att_count > 0 else (sess.birdie_cost or 0)
+
+        # Fillin total
         fillin_total = 0.0
         for att in fillin_by_session.get(sess.id, []):
             cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
-            fillin_total += 11.0 if cat == 'kid' else cost_reg
-        regular_courts = [c for c in courts if c.court_type == 'regular']
-        adhoc_courts = [c for c in courts if c.court_type == 'adhoc']
-        per_player = sess.get_cost_per_regular_player()
-        regular_player_count = sess.get_regular_player_count()
-        sess_atts = attendees_by_session.get(sess.id, [])
-        reg_att_count = sum(1 for a in sess_atts if a.category == 'regular')
-        adhoc_att_count = sum(1 for a in sess_atts if a.category == 'adhoc')
-        kid_att_count = sum(1 for a in sess_atts if a.category == 'kid')
+            fillin_total += 11.0 if cat == 'kid' else per_player
+
+        # Collection and birdie totals
+        non_kid = reg_att_count + adhoc_att_count
+        collection = round(per_player * non_kid + 11.0 * kid_att_count, 2)
+        birdie_total = round((sess.birdie_cost or 0) * non_kid, 2)
+
         player_list = [{'name': a.player.name, 'category': a.category or 'regular', 'status': a.status}
                        for a in sorted(sess_atts, key=lambda a: a.player.name)]
         session_stats.append({
             'per_player': per_player,
-            'regular_player_count': regular_player_count,
+            'regular_player_count': reg_att_count,
             'reg_att_count': reg_att_count,
             'adhoc_att_count': adhoc_att_count,
             'kid_att_count': kid_att_count,
@@ -2236,16 +2445,16 @@ def sessions_by_month(month_key):
             'session': sess,
             'start_time': start_time,
             'end_time': end_time,
-            'attendees': sess.get_attendee_count(),
-            'total_cost': sess.get_total_cost(),
-            'regular_cost': sum(c.cost for c in regular_courts),
+            'attendees': total_attendees,
+            'total_cost': sum(c.cost for c in courts),
+            'regular_cost': reg_court_cost,
             'adhoc_cost': sum(c.cost for c in adhoc_courts),
             'regular_count': len(regular_courts),
             'adhoc_count': len(adhoc_courts),
-            'collection': sess.get_total_collection(),
-            'refunds': sess.get_total_refunds(),
+            'collection': collection,
+            'refunds': round(refund_totals.get(sess.id, 0.0), 2),
             'fillin': round(fillin_total, 2),
-            'birdie_total': sess.get_birdie_cost_total(),
+            'birdie_total': birdie_total,
             'credits': sess.credits or 0,
             'apply_credits': sess.apply_credits or False,
             'courts': [{'id': c.id, 'name': c.name, 'start_time': c.start_time,
@@ -2396,9 +2605,15 @@ def session_detail(id):
     ]
 
     # Refund data per player for this session (direct query avoids backref expiry after commit)
-    session_refunds = DropoutRefund.query.filter_by(session_id=id).all()
-    pending_refund_pids = {r.player_id for r in session_refunds if r.status == 'pending'}
-    refund_by_player = {r.player_id: r for r in session_refunds}
+    session_refunds_list = DropoutRefund.query.filter_by(session_id=id).options(joinedload(DropoutRefund.player)).all()
+    pending_refund_pids = {r.player_id for r in session_refunds_list if r.status == 'pending'}
+    refund_by_player = {r.player_id: r for r in session_refunds_list}
+    total_refunds_amount = round(sum(r.refund_amount for r in session_refunds_list if r.status == 'processed'), 2)
+    processed_refunds = [r for r in session_refunds_list if r.status == 'processed']
+    pending_refunds = [r for r in session_refunds_list if r.status == 'pending']
+
+    # Pre-compute session display stats to avoid N+1 in template
+    sess_stats = compute_session_display_stats([id]).get(id, {})
 
     return render_template('session_detail.html', session=sess, players=players,
                           players_display=players_display,
@@ -2407,7 +2622,11 @@ def session_detail(id):
                           player_session_costs=player_session_costs,
                           standby_players=standby_players,
                           pending_refund_pids=pending_refund_pids,
-                          refund_by_player=refund_by_player)
+                          refund_by_player=refund_by_player,
+                          sess_stats=sess_stats,
+                          total_refunds_amount=total_refunds_amount,
+                          processed_refunds=processed_refunds,
+                          pending_refunds=pending_refunds)
 
 
 @app.route('/sessions/<int:id>/edit', methods=['GET', 'POST'])
@@ -2542,9 +2761,11 @@ def bulk_archive_sessions():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess and not sess.is_archived:
             sess.is_archived = True
             count += 1
@@ -2564,9 +2785,11 @@ def bulk_unarchive_sessions():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess and sess.is_archived:
             sess.is_archived = False
             count += 1
@@ -2755,9 +2978,11 @@ def bulk_freeze_voting():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess and not sess.voting_frozen:
             sess.voting_frozen = True
             count += 1
@@ -2775,9 +3000,11 @@ def bulk_unfreeze_voting():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess and sess.voting_frozen:
             sess.voting_frozen = False
             count += 1
@@ -2795,10 +3022,12 @@ def bulk_toggle_freeze():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     frozen_count = 0
     unfrozen_count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess:
             sess.voting_frozen = not sess.voting_frozen
             if sess.voting_frozen:
@@ -2837,9 +3066,11 @@ def bulk_release_payment():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess and not sess.payment_released:
             sess.payment_released = True
             count += 1
@@ -2858,9 +3089,11 @@ def bulk_unrelease_payment():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess and sess.payment_released:
             sess.payment_released = False
             count += 1
@@ -2905,10 +3138,12 @@ def bulk_toggle_payment():
         flash('No sessions selected', 'error')
         return redirect(url_for('sessions'))
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
     released_count = 0
     unreleased_count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for sid in int_ids:
+        sess = sessions_map.get(sid)
         if sess:
             sess.payment_released = not sess.payment_released
             if sess.payment_released:
@@ -2949,15 +3184,22 @@ def bulk_attendance():
     else:
         players = Player.query.filter_by(is_active=True).all()
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
+    # Batch-load existing attendance records for these sessions
+    existing_att = {}
+    for att in Attendance.query.filter(Attendance.session_id.in_(int_ids)).all():
+        existing_att[(att.session_id, att.player_id)] = att
+
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for session_id in int_ids:
+        sess = sessions_map.get(session_id)
         if not sess:
             continue
 
         for player in players:
             # Find existing attendance or create new
-            attendance = Attendance.query.filter_by(session_id=session_id, player_id=player.id).first()
+            attendance = existing_att.get((session_id, player.id))
 
             if status == 'CLEAR':
                 if attendance:
@@ -3000,13 +3242,19 @@ def bulk_player_attendance():
     if not player:
         return jsonify({'success': False, 'error': 'Player not found'})
 
+    int_ids = [int(sid) for sid in session_ids]
+    sessions_map = {s.id: s for s in Session.query.filter(Session.id.in_(int_ids)).all()}
+    existing_att = {att.session_id: att for att in Attendance.query.filter(
+        Attendance.session_id.in_(int_ids), Attendance.player_id == player_id
+    ).all()}
+
     count = 0
-    for session_id in session_ids:
-        sess = Session.query.get(int(session_id))
+    for session_id in int_ids:
+        sess = sessions_map.get(session_id)
         if not sess:
             continue
 
-        attendance = Attendance.query.filter_by(session_id=session_id, player_id=player_id).first()
+        attendance = existing_att.get(session_id)
 
         if status == 'CLEAR':
             if attendance:

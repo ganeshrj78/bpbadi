@@ -11,7 +11,7 @@
     </a>
 </div>
 
-{% set start_time, end_time = session.get_time_range() %}
+{% set start_time, end_time = sess_stats.time_range %}
 
 <!-- Floating Save/Discard Bar -->
 <div id="detail-save-bar" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl border-2 border-wimbledon-purple px-6 py-3 flex items-center gap-4 z-50 hidden">
@@ -112,8 +112,8 @@
             </div>
             <span class="text-sm font-medium text-gray-500">Courts</span>
         </div>
-        <div class="text-3xl font-bold text-gray-800">{{ session.get_court_count() }}</div>
-        {% if session.get_attendee_count() > 0 %}
+        <div class="text-3xl font-bold text-gray-800">{{ sess_stats.court_count }}</div>
+        {% if sess_stats.attendee_count > 0 %}
         <div class="text-xs text-gray-400 mt-1">Suggested: {{ session.get_suggested_courts() }}</div>
         {% endif %}
     </div>
@@ -139,7 +139,7 @@
             </div>
             <span class="text-sm font-medium text-gray-500">Attendees</span>
         </div>
-        <div class="text-3xl font-bold text-wimbledon-green" id="attendee-count">{{ session.get_attendee_count() }}</div>
+        <div class="text-3xl font-bold text-wimbledon-green" id="attendee-count">{{ sess_stats.attendee_count }}</div>
     </div>
 
     <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20 card-hover transition-all">
@@ -149,7 +149,7 @@
             </div>
             <span class="text-sm font-medium text-gray-500">Per Player</span>
         </div>
-        <div class="text-3xl font-bold text-wimbledon-green" id="cost-per-player">${{ "%.2f"|format(session.get_cost_per_player()) }}</div>
+        <div class="text-3xl font-bold text-wimbledon-green" id="cost-per-player">${{ "%.2f"|format(sess_stats.cost_per_player) }}</div>
         <div class="text-xs text-gray-400 mt-1">incl. ${{ "%.2f"|format(session.birdie_cost) }} birdie</div>
     </div>
 </div>
@@ -207,21 +207,19 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
                     <div class="text-xs font-medium text-yellow-600 uppercase tracking-wide mb-1">Birdie Cost</div>
-                    <div class="text-2xl font-bold text-yellow-700">${{ "%.2f"|format(session.get_birdie_cost_total()) }}</div>
-                    <div class="text-xs text-yellow-600 mt-1">${{ "%.2f"|format(session.birdie_cost) }} × {{ session.get_attendee_count() }} players</div>
+                    <div class="text-2xl font-bold text-yellow-700">${{ "%.2f"|format(sess_stats.birdie_total) }}</div>
+                    <div class="text-xs text-yellow-600 mt-1">${{ "%.2f"|format(session.birdie_cost) }} × {{ sess_stats.attendee_count }} players</div>
                 </div>
                 <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
                     <div class="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Expected Collection</div>
-                    <div class="text-2xl font-bold text-blue-700">${{ "%.2f"|format(session.get_total_collection()) }}</div>
+                    <div class="text-2xl font-bold text-blue-700">${{ "%.2f"|format(sess_stats.total_collection) }}</div>
                     <div class="text-xs text-blue-500 mt-1">Pool + birdie + kids</div>
                 </div>
                 <div class="bg-red-50 rounded-xl p-4 border border-red-200">
                     <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds Given</div>
-                    <div class="text-2xl font-bold text-red-700">${{ "%.2f"|format(session.get_total_refunds()) }}</div>
-                    {% set processed_refunds = session.dropout_refunds|selectattr('status', 'equalto', 'processed')|list %}
-                    {% set pending_ref = session.dropout_refunds|selectattr('status', 'equalto', 'pending')|list %}
-                    {% if pending_ref %}
-                    <div class="text-xs text-yellow-600 font-medium mt-1">{{ pending_ref|length }} pending · ${{ "%.2f"|format(pending_ref|sum(attribute='refund_amount')) }}</div>
+                    <div class="text-2xl font-bold text-red-700">${{ "%.2f"|format(total_refunds_amount) }}</div>
+                    {% if pending_refunds %}
+                    <div class="text-xs text-yellow-600 font-medium mt-1">{{ pending_refunds|length }} pending · ${{ "%.2f"|format(pending_refunds|sum(attribute='refund_amount')) }}</div>
                     {% endif %}
                     {% if processed_refunds %}
                     <div class="mt-2 space-y-1 border-t border-red-200 pt-2">
@@ -238,7 +236,7 @@
                 </div>
                 <div class="bg-wimbledon-gold/20 rounded-xl p-4 border border-wimbledon-gold/40">
                     <div class="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Net Collection</div>
-                    <div class="text-2xl font-bold text-gray-800">${{ "%.2f"|format(session.get_total_collection() - session.get_total_refunds()) }}</div>
+                    <div class="text-2xl font-bold text-gray-800">${{ "%.2f"|format(sess_stats.total_collection - total_refunds_amount) }}</div>
                     <div class="text-xs text-gray-500 mt-1">Expected − refunds</div>
                 </div>
             </div>

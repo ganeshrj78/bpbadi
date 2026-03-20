@@ -116,7 +116,7 @@
                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{{ s.start_time }} – {{ s.end_time }}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">
                         <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-wimbledon-purple/10 text-wimbledon-purple font-bold text-xs">
-                            {{ s.session.get_court_count() }}
+                            {{ s.regular_count + s.adhoc_count }}
                         </span>
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">

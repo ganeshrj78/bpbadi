@@ -65,7 +65,7 @@
             <div class="border border-gray-200 rounded-xl p-4 hover:border-wimbledon-green/50 transition-all" x-data="{ showPlayers: false }">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div class="flex-1">
-                        {% set start_time, end_time = sess.get_time_range() %}
+                        {% set start_time, end_time = session_stats[sess.id].time_range %}
                         <div class="flex items-center gap-3 mb-2 flex-wrap">
                             <span class="text-lg font-semibold text-gray-800">{{ sess.date.strftime('%a, %b %d, %Y') }}</span>
                             <span class="text-sm text-gray-500">{{ start_time }} - {{ end_time }}</span>
@@ -84,15 +84,15 @@
                         <div class="flex flex-wrap gap-3 text-sm">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-wimbledon-purple/10 text-wimbledon-purple">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                                {{ sess.get_court_count() }} court{{ 's' if sess.get_court_count() > 1 else '' }}
+                                {{ session_stats[sess.id].court_count }} court{{ 's' if session_stats[sess.id].court_count > 1 else '' }}
                             </span>
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-wimbledon-green/10 text-wimbledon-green">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                <span id="count-{{ sess.id }}">{{ sess.get_attendee_count() }}</span> attending
+                                <span id="count-{{ sess.id }}">{{ session_stats[sess.id].attendee_count }}</span> attending
                             </span>
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                $<span id="cost-value-{{ sess.id }}">{{ '%.2f'|format(sess.get_cost_per_player()) }}</span>/player
+                                $<span id="cost-value-{{ sess.id }}">{{ '%.2f'|format(session_stats[sess.id].cost_per_player) }}</span>/player
                             </span>
                         </div>
                         {% if sess.notes %}
@@ -308,7 +308,7 @@
                         {% endif %}
                         {% endfor %}
                     </div>
-                    {% if sess.get_attendee_count() == 0 %}
+                    {% if session_stats[sess.id].attendee_count == 0 %}
                     <p class="text-gray-400 text-sm italic">No one has confirmed yet</p>
                     {% endif %}
                 </div>
@@ -355,7 +355,7 @@
             <div class="border border-gray-200 rounded-xl p-4 bg-gray-50" x-data="{ showPlayers: false }">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div class="flex-1">
-                        {% set start_time, end_time = sess.get_time_range() %}
+                        {% set start_time, end_time = session_stats[sess.id].time_range %}
                         <div class="flex items-center gap-3 mb-2 flex-wrap">
                             <span class="text-lg font-semibold text-gray-700">{{ sess.date.strftime('%a, %b %d, %Y') }}</span>
                             <span class="text-sm text-gray-500">{{ start_time }} - {{ end_time }}</span>
@@ -366,15 +366,15 @@
                         <div class="flex flex-wrap gap-3 text-sm">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-200 text-gray-600">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                                {{ sess.get_court_count() }} court{{ 's' if sess.get_court_count() > 1 else '' }}
+                                {{ session_stats[sess.id].court_count }} court{{ 's' if session_stats[sess.id].court_count > 1 else '' }}
                             </span>
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-200 text-gray-600">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                {{ sess.get_attendee_count() }} attended
+                                {{ session_stats[sess.id].attendee_count }} attended
                             </span>
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-200 text-gray-600">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                ${{ '%.2f'|format(sess.get_cost_per_player()) }}/player
+                                ${{ '%.2f'|format(session_stats[sess.id].cost_per_player) }}/player
                             </span>
                         </div>
                     </div>
@@ -470,7 +470,7 @@
                 <!-- Sessions List -->
                 <div x-show="open" x-collapse class="divide-y divide-gray-100">
                     {% for sess in group.sessions %}
-                    {% set past_start, past_end = sess.get_time_range() %}
+                    {% set past_start, past_end = session_stats[sess.id].time_range %}
                     <div class="p-4 bg-white" x-data="{ showPlayers: false }">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                             <div>
@@ -478,8 +478,8 @@
                                 <span class="text-sm text-gray-500 ml-2">{{ past_start }} - {{ past_end }}</span>
                             </div>
                             <div class="flex items-center gap-3">
-                                <span class="text-sm text-gray-500">{{ sess.get_attendee_count() }} attended</span>
-                                <span class="text-sm text-gray-500">${{ '%.2f'|format(sess.get_cost_per_player()) }}/player</span>
+                                <span class="text-sm text-gray-500">{{ session_stats[sess.id].attendee_count }} attended</span>
+                                <span class="text-sm text-gray-500">${{ '%.2f'|format(session_stats[sess.id].cost_per_player) }}/player</span>
                                 {% set my_status = attendance_map.get(player.id, {}).get(sess.id, 'NO') %}
                                 {% if my_status == 'YES' %}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">You attended</span>

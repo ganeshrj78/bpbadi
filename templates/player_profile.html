@@ -178,7 +178,7 @@
                 </thead>
                 <tbody>
                     {% for attendance in attendances[:10] %}
-                    {% set sess_start, sess_end = attendance.session.get_time_range() %}
+                    {% set sess_start, sess_end = session_stats[attendance.session_id].time_range %}
                     <tr class="border-b border-gray-100 table-row-hover">
                         <td class="py-3 px-4 text-gray-800">{{ attendance.session.date.strftime('%b %d, %Y') }}</td>
                         <td class="py-3 px-4 text-gray-600">{{ sess_start }} - {{ sess_end }}</td>
@@ -208,7 +208,7 @@
                         </td>
                         <td class="py-3 px-4 text-right font-medium {% if attendance.status == 'YES' %}text-gray-800{% else %}text-gray-400{% endif %}">
                             {% if attendance.status == 'YES' %}
-                            ${{ '%.2f'|format(attendance.session.get_cost_per_player()) }}
+                            ${{ '%.2f'|format(att_cost_map.get(attendance.id, 0)) }}
                             {% else %}
                             -
                             {% endif %}
