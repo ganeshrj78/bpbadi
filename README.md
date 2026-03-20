@@ -14,7 +14,11 @@ A web application for managing a badminton club — tracking players, court sess
 - **Monthly summaries** — Drill down by month to see charges, collections, refunds, and credits
 - **Google Sign-In** — Players with Gmail accounts can log in via Google
 - **Family management** — Parent players can vote and pay for managed dependents
-- **Notifications** — In-app notifications for dropout requests, registrations, and admin broadcasts
+- **Standby requests** — Players can request to join frozen sessions as standby; admin approves from dashboard or session detail
+- **Manual refunds** — Admin can process ad-hoc refunds (duplicate, overpayment, incorrect) via Record Payment
+- **Payment collector** — Admin assigns a collector per month; Zelle details shown on player sessions and payment screens
+- **Login trivia** — Random badminton facts (400+) shown on every login for players and admins
+- **Notifications** — In-app notifications for dropout requests, standby requests, registrations, and admin broadcasts
 - **Activity logs** — Full audit trail of all admin and player actions
 - **Royal Facility sync** — Imports court bookings from royalbadminton.ezfacility.com into sessions
 
@@ -81,8 +85,9 @@ Open → Voting Frozen → Payment Released → Archived
 
 Hosted on Render. On deploy, `start.sh` runs:
 ```bash
-flask db upgrade   # Apply any pending migrations
-gunicorn app:app   # Start the production server
+flask db upgrade          # Apply any pending migrations
+python3 seed_trivia.py    # Seed trivia table if empty
+gunicorn app:app          # Start the production server (3 workers, gthread)
 ```
 
 ### Environment Variables
@@ -98,9 +103,12 @@ gunicorn app:app   # Start the production server
 
 ```
 app.py                  # All routes and API endpoints
-models.py               # Database models (Player, Session, Court, Attendance, Payment, etc.)
+models.py               # Database models (Player, Session, Court, Attendance, Payment, BadmintonTrivia, etc.)
 config.py               # App configuration and environment
+seed.py                 # Seed initial player data
+seed_trivia.py          # Seed 400+ badminton trivia facts
 ezf_scrape.py           # Royal Facility court booking scraper
+start.sh                # Production startup: migrations + trivia seed + gunicorn
 templates/              # Jinja2 HTML templates (24 templates)
 migrations/versions/    # Alembic database migrations (idempotent)
 static/uploads/         # Player profile photos

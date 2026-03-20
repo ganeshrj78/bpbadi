@@ -93,13 +93,17 @@ Conventions and guidance for working with templates in BP Badminton.
 {% elif status == 'TENTATIVE' %}bg-yellow-100 border-yellow-500 text-yellow-700
 {% elif status == 'FILLIN' %}bg-blue-100 border-blue-500 text-blue-700
 {% elif status == 'DROPOUT' %}bg-orange-100 border-orange-500 text-orange-700
+{% elif status == 'STANDBY' %}bg-teal-100 border-teal-300 text-teal-700
+{% elif status == 'PENDING_STANDBY' %}bg-teal-100 border-teal-300 text-teal-700
+{% elif status == 'PENDING_DROPOUT' %}bg-orange-100 border-orange-300 text-orange-700
 {% else %}bg-gray-100 border-gray-300 text-gray-500{% endif %}
 ```
 
 ### Profile Photo with Fallback
-Photos are stored in the database (survives Render deploys). Served via `/player-photo/<id>` route:
+Photos are stored in the database (survives Render deploys). Served via `/player-photo/<id>` route with ETag caching.
+**Important:** Use `profile_photo_mime` (not `profile_photo_data`) for existence checks — `profile_photo_data` is deferred and would trigger a separate DB query:
 ```html
-{% if player.profile_photo %}
+{% if player.profile_photo_mime %}
 <img src="{{ url_for('player_photo', player_id=player.id) }}"
      class="w-8 h-8 rounded-full object-cover">
 {% else %}

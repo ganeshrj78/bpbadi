@@ -103,8 +103,14 @@
 │     username (encrypted)│     │    updated_at   │
 │     password (encrypted)│     └─────────────────┘
 │     session_cookie (enc)│
-│     created/updated     │
-└─────────────────────────┘
+│     created/updated     │     ┌─────────────────────┐
+└─────────────────────────┘     │  BADMINTON_TRIVIA   │
+                                ├─────────────────────┤
+                                │ PK  id              │
+                                │     trivia (text)    │
+                                │     category        │
+                                │     created_at      │
+                                └─────────────────────┘
 ```
 
 ## Relationship Summary
@@ -209,7 +215,7 @@ Regular and adhoc players pay the same rate.
 | `id` | INTEGER PK | Auto | |
 | `player_id` | INTEGER FK NN | — | → players.id |
 | `session_id` | INTEGER FK NN | — | → sessions.id (CASCADE DELETE) |
-| `status` | VARCHAR(20) NN | `NO` | `YES`, `NO`, `TENTATIVE`, `DROPOUT`, `FILLIN`, `STANDBY`, `PENDING_DROPOUT` |
+| `status` | VARCHAR(20) NN | `NO` | `YES`, `NO`, `TENTATIVE`, `DROPOUT`, `FILLIN`, `STANDBY`, `PENDING_DROPOUT`, `PENDING_STANDBY` |
 | `category` | VARCHAR(20) | `regular` | Per-session override: `regular`, `adhoc`, `kid` |
 | `payment_status` | VARCHAR(20) | `unpaid` | `unpaid`, `paid`, `pending_refund` |
 | `additional_cost` | FLOAT | 0 | Extra charge this session |
@@ -237,7 +243,7 @@ Regular and adhoc players pay the same rate.
 | `updated_by/at` | | | Audit (auto) |
 
 **Indexes:** player_id, date
-**Note:** Global (not session-specific). Balance = charges(`frozen_only`) − payments(`amount > 0`). Negative payments are refund credits created by dropout processing.
+**Note:** Global (not session-specific). Balance = charges(`frozen_only`) − SUM(all payments including negatives). Negative payments are refund credits from dropout processing or manual admin refunds (`method='Refund'`).
 
 ---
 
@@ -303,7 +309,7 @@ Regular and adhoc players pay the same rate.
 | `id` | INTEGER PK | Auto | |
 | `title` | VARCHAR(200) NN | — | Notification title |
 | `message` | TEXT NN | — | Body text |
-| `type` | VARCHAR(30) | `general` | `general`, `dropout_request`, `registration`, `system` |
+| `type` | VARCHAR(30) | `general` | `general`, `dropout_request`, `standby_request`, `registration`, `system` |
 | `target` | VARCHAR(20) | `all` | `all`, `admin`, `player` |
 | `player_id` | INTEGER FK | NULL | → players.id (specific player or NULL for broadcast) |
 | `link` | VARCHAR(255) | NULL | Optional navigation URL |
@@ -352,3 +358,17 @@ Regular and adhoc players pay the same rate.
 | `key` | VARCHAR(50) NN unique | — | Setting name |
 | `value` | TEXT | NULL | Setting value |
 | `updated_at` | DATETIME | NOW | Auto-updated |
+
+---
+
+## Table: `badminton_trivia`
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `id` | INTEGER PK | Auto | |
+| `trivia` | TEXT NN | — | The trivia fact text |
+| `category` | VARCHAR(50) | `general` | Category: `history`, `speed`, `equipment`, `rules`, `fitness`, `competition`, `players`, `technique`, `fun`, `training`, `countries`, `records`, `science`, `doubles`, `health` |
+| `created_at` | DATETIME | NOW | |
+
+**Seeded:** 400+ entries via `seed_trivia.py` (auto-seeded on Render deploy via `start.sh`)
+**Usage:** Random trivia shown on login via `db.func.random()` query

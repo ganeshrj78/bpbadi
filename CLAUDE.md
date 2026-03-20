@@ -21,7 +21,7 @@ python3 seed.py                   # Seed database
 - **Auth:** Password login + Google Sign-In (GIS) for @gmail.com accounts
 - **Theme:** Wimbledon — Purple (#44005C), Green (#006633), Gold (#C4A747), Cream (#F5F5DC)
 - **Caching:** FileSystemCache (shared across gunicorn workers), memoized expensive queries (60s TTL)
-- **Deploy:** Render (Docker, paid tier) — `start.sh` runs `flask db upgrade` then gunicorn (3 workers, gthread)
+- **Deploy:** Render (Docker, paid tier) — `start.sh` runs `flask db upgrade`, seeds trivia, then gunicorn (3 workers, gthread)
 
 ## Key Models
 
@@ -36,6 +36,7 @@ python3 seed.py                   # Seed database
 - `Notification` / `NotificationRead` — in-app notifications with read tracking
 - `SiteSettings` — key/value store for app-wide settings (e.g. guidelines)
 - `ExternalIntegration` — encrypted credentials for external services (e.g. EZFacility)
+- `BadmintonTrivia` — 400+ badminton facts shown randomly on login
 
 ## Category System
 
@@ -49,8 +50,8 @@ python3 seed.py                   # Seed database
 - `Per non-kid player = regular_court_cost / regular_player_count + birdie_cost`
 - Kids: flat $11 (no birdie, no court share)
 - Regular and Adhoc pay same rate
-- Balance = charges − payments (positive payments only, `Payment.amount > 0`)
-- Balance floors at zero unless player has a pending refund
+- Balance = charges − payments (all payments including negative refunds)
+- Balance can go negative (credit/overpayment)
 
 ## Payment Release Flow
 
@@ -62,7 +63,7 @@ python3 seed.py                   # Seed database
 
 ## Attendance Statuses
 
-YES (charged), NO, TENTATIVE, DROPOUT (charged, refund possible), FILLIN (charged), STANDBY, PENDING_DROPOUT
+YES (charged), NO, TENTATIVE, DROPOUT (charged, refund possible), FILLIN (charged), STANDBY, PENDING_DROPOUT, PENDING_STANDBY
 
 `payment_status`: `unpaid` | `paid` | `pending_refund`
 
@@ -77,6 +78,32 @@ YES (charged), NO, TENTATIVE, DROPOUT (charged, refund possible), FILLIN (charge
 2. Creates `DropoutRefund(pending)`, promotes STANDBY → FILLIN
 3. Process refund → `payment_status='paid'`, negative Payment created
 4. Session deletion cleans up DropoutRefund and associated refund Payment records
+
+## Standby Request Flow
+
+1. Player requests standby on frozen session → `POST /api/player/request-standby` → status = `PENDING_STANDBY`
+2. Admin sees request on dashboard + notification bell + session detail "Pending Standby Requests" card
+3. Admin approves → `POST /api/admin/approve-standby` → status = `STANDBY` (added to waitlist)
+4. Admin rejects → status reverts to `NO`
+
+## Manual Refund Flow
+
+1. Admin uses Record Payment form with Payment/Refund toggle
+2. Refund stored as negative `Payment.amount`, `method='Refund'`
+3. Refund reason dropdown: Duplicate, Paid Extra, Incorrect Payment, Other
+4. Notes prefixed with "Adhoc Refund - {reason}"
+
+## Payment Collector
+
+- Admin assigns a payment collector per month via sessions page dropdown
+- Collector name/Zelle shown in player sessions page (all months) and payment page (released months only)
+- Player payment form shows per-month breakdown with dynamic "Pay to" banner
+
+## Login Trivia
+
+- Random badminton trivia from `BadmintonTrivia` table shown on every login (player and admin)
+- 400+ facts across categories (history, speed, equipment, rules, fitness, etc.)
+- Seeded automatically on Render deploy via `start.sh`
 
 ## Migrations — MUST be idempotent
 
@@ -95,6 +122,8 @@ if 'col_name' not in existing_cols:
 - **N+1 prevention:** Dashboard and sessions routes batch-load attendances with `joinedload(Attendance.player)`, use pre-computed cost maps from `get_cached_player_stats()`
 - **Connection pool:** `pool_size=5, max_overflow=5` per worker — total max 30 connections across 3 workers
 - **Indexes:** Composite indexes on hot query paths (attendance session+status+category, payment date+player, refund player+status)
+- **Deferred loading:** `profile_photo_data` uses `db.deferred()` — never loaded unless explicitly accessed. Templates use `profile_photo_mime` for existence checks.
+- **ETag caching:** Player photo route returns ETag + Cache-Control headers for browser/edge caching (304 Not Modified)
 
 ## Critical Gotchas
 
