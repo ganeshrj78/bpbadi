@@ -4,13 +4,13 @@
 
 {% block content %}
 <!-- Page Header -->
-<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
     <div>
-        <h1 class="text-2xl sm:text-4xl font-serif font-bold text-wimbledon-purple">Sessions</h1>
-        <p class="text-gray-500 mt-1">Track court bookings and attendance</p>
+        <h1 class="text-xl sm:text-4xl font-serif font-bold text-wimbledon-purple">Sessions</h1>
+        <p class="text-gray-500 text-sm sm:text-base mt-0.5 sm:mt-1">Track court bookings and attendance</p>
     </div>
-    <a href="{{ url_for('add_session') }}" class="btn-success text-white px-6 py-3 rounded-xl font-semibold shadow-lg inline-flex items-center space-x-2 border border-wimbledon-gold/30">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+    <a href="{{ url_for('add_session') }}" class="btn-success text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold shadow-lg inline-flex items-center space-x-2 border border-wimbledon-gold/30 text-sm sm:text-base">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
         <span>New Session</span>
     </a>
 </div>
@@ -58,15 +58,15 @@
         <table class="min-w-full">
             <thead>
                 <tr class="bg-gradient-to-r from-wimbledon-cream to-white border-b border-wimbledon-gold/20">
-                    <th class="px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Month</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Birdie Charges</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Regular</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Adhoc</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Kids</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Refunds</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Total Collection</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Credits</th>
-                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Month</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell">Birdie</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden sm:table-cell">Regular</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden lg:table-cell">Adhoc</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden lg:table-cell">Kids</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell">Refunds</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Total</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell">Credits</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-wimbledon-gold/10">
@@ -74,39 +74,39 @@
                 <!-- Month row -->
                 <tr class="{% if summary.is_fully_archived %}bg-gray-50{% else %}bg-white{% endif %} hover:bg-wimbledon-cream/30 transition-all cursor-pointer"
                     @click="expandedMonth = expandedMonth === '{{ key }}' ? null : '{{ key }}'">
-                    <td class="px-4 py-3 whitespace-nowrap">
-                        <div class="flex items-center gap-2">
-                            <svg class="w-4 h-4 text-wimbledon-purple transition-transform" :class="expandedMonth === '{{ key }}' ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                            <a href="{{ url_for('sessions_by_month', month_key=key) }}" class="font-semibold text-wimbledon-purple hover:underline" @click.stop>{{ summary.label }}</a>
-                            <span class="text-xs text-gray-400">({{ summary.total_sessions }} sessions)</span>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap">
+                        <div class="flex items-center gap-1 sm:gap-2">
+                            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-wimbledon-purple transition-transform flex-shrink-0" :class="expandedMonth === '{{ key }}' ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <a href="{{ url_for('sessions_by_month', month_key=key) }}" class="font-semibold text-sm sm:text-base text-wimbledon-purple hover:underline" @click.stop>{{ summary.label }}</a>
+                            <span class="text-[10px] sm:text-xs text-gray-400 hidden sm:inline">({{ summary.total_sessions }})</span>
                         </div>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-yellow-700 font-medium">${{ "%.2f"|format(summary.birdie_charges) }}</span>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden md:table-cell">
+                        <span class="text-yellow-700 font-medium text-sm">${{ "%.2f"|format(summary.birdie_charges) }}</span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-green-700 font-medium">${{ "%.2f"|format(summary.regular_charges) }}</span>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden sm:table-cell">
+                        <span class="text-green-700 font-medium text-sm">${{ "%.2f"|format(summary.regular_charges) }}</span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-purple-700 font-medium">${{ "%.2f"|format(summary.adhoc_charges) }}</span>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden lg:table-cell">
+                        <span class="text-purple-700 font-medium text-sm">${{ "%.2f"|format(summary.adhoc_charges) }}</span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-blue-700 font-medium">${{ "%.2f"|format(summary.kid_charges) }}</span>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden lg:table-cell">
+                        <span class="text-blue-700 font-medium text-sm">${{ "%.2f"|format(summary.kid_charges) }}</span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="text-red-600 font-medium">-${{ "%.2f"|format(summary.total_refunds) }}</span>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden md:table-cell">
+                        <span class="text-red-600 font-medium text-sm">-${{ "%.2f"|format(summary.total_refunds) }}</span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        <span class="font-bold text-wimbledon-purple">${{ "%.2f"|format(summary.total_collection - summary.total_refunds) }}</span>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right">
+                        <span class="font-bold text-sm text-wimbledon-purple">${{ "%.2f"|format(summary.total_collection - summary.total_refunds) }}</span>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right">
-                        {% if summary.session_credits > 0 %}<span class="text-blue-600 font-semibold">${{ "%.2f"|format(summary.session_credits) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden md:table-cell">
+                        {% if summary.session_credits > 0 %}<span class="text-blue-600 font-semibold text-sm">${{ "%.2f"|format(summary.session_credits) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-center">
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-center">
                         {% if summary.is_fully_archived %}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">Archived</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-gray-200 text-gray-700">Archived</span>
                         {% else %}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-green-100 text-green-800">Active</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -114,55 +114,55 @@
                 {% for sess in summary.sessions | sort(attribute='date') %}
                 <tr x-show="expandedMonth === '{{ key }}'" x-cloak x-transition
                     class="bg-wimbledon-cream/20 border-l-4 border-wimbledon-gold/40">
-                    <td class="px-4 py-2 pl-10 whitespace-nowrap">
-                        <a href="{{ url_for('session_detail', id=sess.id) }}" class="text-sm text-wimbledon-purple hover:underline">
+                    <td class="px-2 sm:px-4 py-2 pl-6 sm:pl-10 whitespace-nowrap">
+                        <a href="{{ url_for('session_detail', id=sess.id) }}" class="text-xs sm:text-sm text-wimbledon-purple hover:underline">
                             {{ sess.date.strftime('%a, %b %d') }}
                         </a>
-                        <span class="text-[11px] text-gray-500 ml-1">({{ sess.regular_player_count }} Reg / {{ sess.adhoc_player_count }} Adh)</span>
+                        <span class="text-[10px] sm:text-[11px] text-gray-500 ml-1 hidden sm:inline">({{ sess.regular_player_count }}R/{{ sess.adhoc_player_count }}A)</span>
                         {% if sess.voting_frozen %}
-                        <span class="ml-1 inline-flex w-4 h-4 bg-blue-500 rounded-full items-center justify-center" title="Voting Frozen">
-                            <svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        <span class="ml-0.5 sm:ml-1 inline-flex w-3.5 h-3.5 sm:w-4 sm:h-4 bg-blue-500 rounded-full items-center justify-center" title="Voting Frozen">
+                            <svg class="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                         </span>
                         {% endif %}
                         {% if sess.payment_released %}
-                        <span class="ml-1 inline-flex w-4 h-4 bg-amber-500 rounded-full items-center justify-center" title="Payment Released">
-                            <span class="text-white text-[8px] font-bold">$</span>
+                        <span class="ml-0.5 sm:ml-1 inline-flex w-3.5 h-3.5 sm:w-4 sm:h-4 bg-amber-500 rounded-full items-center justify-center" title="Payment Released">
+                            <span class="text-white text-[7px] sm:text-[8px] font-bold">$</span>
                         </span>
                         {% endif %}
                         {% if sess.is_archived %}
-                        <span class="ml-1 text-[10px] text-gray-500">(archived)</span>
+                        <span class="ml-0.5 text-[10px] text-gray-500">(arch)</span>
                         {% endif %}
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-right">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden md:table-cell">
                         <span class="text-xs text-yellow-600">${{ "%.2f"|format(sess.birdie_cost) }}</span>
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-right">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden sm:table-cell">
                         <span class="text-xs text-green-700">${{ "%.2f"|format(sess.regular_charges) }}</span>
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-right">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden lg:table-cell">
                         <span class="text-xs text-purple-700">${{ "%.2f"|format(sess.adhoc_charges) }}</span>
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-right">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden lg:table-cell">
                         <span class="text-xs text-blue-700">${{ "%.2f"|format(sess.kid_charges) }}</span>
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-right">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden md:table-cell">
                         <span class="text-xs text-red-600">-${{ "%.2f"|format(sess.total_refunds) }}</span>
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-right">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
                         <span class="text-xs font-medium text-wimbledon-purple">${{ "%.2f"|format(sess.total_collection - sess.total_refunds) }}</span>
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-right">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden md:table-cell">
                         {% if sess.credits and sess.credits > 0 %}<span class="text-xs text-blue-600">${{ "%.2f"|format(sess.credits) }}</span>{% else %}<span class="text-xs text-gray-300">—</span>{% endif %}
                     </td>
-                    <td class="px-4 py-2 whitespace-nowrap text-center">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-center">
                         {% if sess.is_archived %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-200 text-gray-600">Archived</span>
+                        <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-200 text-gray-600">Arch</span>
                         {% elif sess.payment_released %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">Released</span>
+                        <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">Rlsd</span>
                         {% elif sess.voting_frozen %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700">Frozen</span>
+                        <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700">Frzn</span>
                         {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">Active</span>
+                        <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">Active</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -191,9 +191,9 @@
 
 <!-- Active Sessions - Attendance Matrix -->
 <div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden mb-8" x-data="sessionsMatrix()">
-    <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white flex items-center gap-4 flex-wrap">
+    <div class="px-3 sm:px-6 py-3 sm:py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white">
         <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-            <h2 class="text-base sm:text-lg font-serif font-bold text-wimbledon-purple flex items-center">
+            <h2 class="text-sm sm:text-lg font-serif font-bold text-wimbledon-purple flex items-center">
                 <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2 text-wimbledon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                 </svg>
@@ -201,54 +201,50 @@
             </h2>
             {% if active_months | default([]) | length >= 1 %}
             <select onchange="window.location.href='{{ url_for('sessions') }}?month=' + this.value"
-                class="px-2 py-1 sm:px-3 sm:py-1.5 border border-wimbledon-gold/30 rounded-lg text-sm font-medium text-wimbledon-purple bg-white focus:outline-none focus:border-wimbledon-purple focus:ring-2 focus:ring-wimbledon-purple/20">
+                class="px-2 py-1 sm:px-3 sm:py-1.5 border border-wimbledon-gold/30 rounded-lg text-xs sm:text-sm font-medium text-wimbledon-purple bg-white focus:outline-none focus:border-wimbledon-purple">
                 {% for key, label in active_months %}
                 <option value="{{ key }}" {% if key == selected_month %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <!-- Payment Collector selector -->
-            <div class="flex items-center gap-1 sm:gap-2">
-                <svg class="w-4 h-4 text-wimbledon-gold hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                <select id="payment-collector-select" onchange="setPaymentCollector(this.value)"
-                    class="px-2 py-1 sm:px-3 sm:py-1.5 border border-wimbledon-gold/30 rounded-lg text-sm font-medium text-gray-700 bg-white focus:outline-none focus:border-wimbledon-green focus:ring-2 focus:ring-wimbledon-green/20">
-                    <option value="">-- Collector --</option>
-                    {% for admin in admin_players | default([]) %}
-                    <option value="{{ admin.id }}" {% if current_collector_id == admin.id|string %}selected{% endif %}>{{ admin.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+            <select id="payment-collector-select" onchange="setPaymentCollector(this.value)"
+                class="px-2 py-1 sm:px-3 sm:py-1.5 border border-wimbledon-gold/30 rounded-lg text-xs sm:text-sm font-medium text-gray-700 bg-white focus:outline-none focus:border-wimbledon-green">
+                <option value="">-- Collector --</option>
+                {% for admin in admin_players | default([]) %}
+                <option value="{{ admin.id }}" {% if current_collector_id == admin.id|string %}selected{% endif %}>{{ admin.name }}</option>
+                {% endfor %}
+            </select>
             {% endif %}
         </div>
-        <div x-show="selectedSessions.length > 0" x-cloak class="flex flex-wrap items-center gap-2">
-            <span class="text-sm text-gray-600 whitespace-nowrap" x-text="selectedSessions.length + ' selected'"></span>
-            <button @click="showCourtsModal = true" class="px-3 py-1.5 bg-wimbledon-purple text-white rounded-lg text-xs font-medium hover:bg-wimbledon-purple/80 transition-all flex items-center gap-1 whitespace-nowrap">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                Assign Courts
+        <div x-show="selectedSessions.length > 0" x-cloak class="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2 pt-2 border-t border-wimbledon-gold/20">
+            <span class="text-xs sm:text-sm text-gray-600 whitespace-nowrap" x-text="selectedSessions.length + ' sel'"></span>
+            <button @click="showCourtsModal = true" class="px-2 sm:px-3 py-1 sm:py-1.5 bg-wimbledon-purple text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-wimbledon-purple/80 transition-all flex items-center gap-1 whitespace-nowrap">
+                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                Courts
             </button>
             <form method="POST" action="{{ url_for('bulk_toggle_freeze') }}" class="flex">
                 <template x-for="id in selectedSessions" :key="id">
                     <input type="hidden" name="session_ids" :value="id">
                 </template>
-                <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-all flex items-center gap-1 whitespace-nowrap">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                    Frze/UnFrze
+                <button type="submit" class="px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-blue-700 transition-all flex items-center gap-1 whitespace-nowrap">
+                    <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    Freeze
                 </button>
             </form>
             <form method="POST" action="{{ url_for('bulk_toggle_payment') }}" class="flex">
                 <template x-for="id in selectedSessions" :key="id">
                     <input type="hidden" name="session_ids" :value="id">
                 </template>
-                <button type="submit" class="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-all flex items-center gap-1 whitespace-nowrap">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Rlse/UnRlse Pymt
+                <button type="submit" class="px-2 sm:px-3 py-1 sm:py-1.5 bg-amber-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-amber-700 transition-all flex items-center gap-1 whitespace-nowrap">
+                    <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Release
                 </button>
             </form>
             <form method="POST" action="{{ url_for('bulk_archive_sessions') }}" x-ref="bulkArchiveForm" class="flex">
                 <template x-for="id in selectedSessions" :key="id">
                     <input type="hidden" name="session_ids" :value="id">
                 </template>
-                <button type="submit" class="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-xs font-medium hover:bg-gray-700 transition-all flex items-center gap-1 whitespace-nowrap">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                <button type="submit" class="px-2 sm:px-3 py-1 sm:py-1.5 bg-gray-600 text-white rounded-lg text-[10px] sm:text-xs font-medium hover:bg-gray-700 transition-all flex items-center gap-1 whitespace-nowrap">
+                    <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
                     Archive
                 </button>
             </form>
@@ -273,23 +269,34 @@
             </div>
         </div>
 
-        <!-- Payment Status Filter -->
-        <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-gray-600 hidden sm:inline">Payment:</span>
-            <select x-model="paymentFilter"
-                class="px-2 sm:px-3 py-1.5 border border-gray-300 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:border-wimbledon-purple focus:ring-2 focus:ring-wimbledon-purple/20 bg-white">
-                <option value="all">All Players</option>
-                <option value="paid">Paid</option>
-                <option value="unpaid">Unpaid</option>
-                <option value="not_participating">Not Playing</option>
-            </select>
-        </div>
-
-        <!-- Filter Counts (pushed to right) -->
-        <div class="flex items-center gap-2 sm:gap-3 ml-auto">
-            <span class="px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-bold text-xs sm:text-sm">{{ filter_counts.paid }} Paid</span>
-            <span class="px-2.5 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs sm:text-sm">{{ filter_counts.unpaid }} Unpaid</span>
-            <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 font-bold text-xs sm:text-sm hidden sm:inline-flex">{{ filter_counts.not_participating }} NP</span>
+        <!-- Payment Status Filter Buttons -->
+        <div class="flex items-center gap-1.5 sm:gap-2 ml-auto">
+            <button @click="paymentFilter = 'all'"
+                :class="paymentFilter === 'all' ? 'bg-wimbledon-purple text-white border-wimbledon-purple shadow-md' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'"
+                class="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold border-2 transition-all">
+                All
+            </button>
+            <button @click="paymentFilter = 'paid'"
+                :class="paymentFilter === 'paid' ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-white text-green-700 border-green-300 hover:bg-green-50'"
+                class="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold border-2 transition-all flex items-center gap-1 sm:gap-1.5">
+                <span class="inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-bold"
+                    :class="paymentFilter === 'paid' ? 'bg-white/30 text-white' : 'bg-green-100 text-green-700'">{{ filter_counts.paid }}</span>
+                <span>Paid</span>
+            </button>
+            <button @click="paymentFilter = 'unpaid'"
+                :class="paymentFilter === 'unpaid' ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-white text-red-700 border-red-300 hover:bg-red-50'"
+                class="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold border-2 transition-all flex items-center gap-1 sm:gap-1.5">
+                <span class="inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-bold"
+                    :class="paymentFilter === 'unpaid' ? 'bg-white/30 text-white' : 'bg-red-100 text-red-700'">{{ filter_counts.unpaid }}</span>
+                <span>Unpaid</span>
+            </button>
+            <button @click="paymentFilter = 'not_participating'"
+                :class="paymentFilter === 'not_participating' ? 'bg-gray-600 text-white border-gray-600 shadow-md' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'"
+                class="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold border-2 transition-all flex items-center gap-1 sm:gap-1.5">
+                <span class="inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-bold"
+                    :class="paymentFilter === 'not_participating' ? 'bg-white/30 text-white' : 'bg-gray-100 text-gray-500'">{{ filter_counts.not_participating }}</span>
+                <span class="hidden sm:inline">Not Playing</span><span class="sm:hidden">NP</span>
+            </button>
         </div>
 
         <!-- Bulk Player Payment Actions -->
@@ -324,7 +331,7 @@
         <table class="min-w-full">
             <thead class="sticky top-0 z-20">
                 <tr class="bg-gradient-to-r from-wimbledon-cream to-white border-b border-wimbledon-gold/20">
-                    <th class="px-2 sm:px-4 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider sticky left-0 bg-wimbledon-cream z-30 min-w-[100px] sm:min-w-[140px] sm:min-w-[220px]">
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider sticky left-0 bg-wimbledon-cream z-30 min-w-[120px] sm:min-w-[180px] md:min-w-[220px]">
                         Player
                     </th>
                     {% for session in active_sessions %}
@@ -392,7 +399,7 @@
                 {% for player in regular_players %}
                 {% set stats = player_stats[player.id] %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="sectionOpen.regular && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0))">
+                    x-show="sectionOpen.regular && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || paymentFilter === '{{ player_payment_filter.get(player.id, "all") }}')">
                     <td class="px-2 sm:px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-1 sm:space-x-2">
                             <input type="checkbox"
@@ -592,7 +599,7 @@
                 {% for player in adhoc_players %}
                 {% set stats = player_stats[player.id] %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="sectionOpen.adhoc && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0))">
+                    x-show="sectionOpen.adhoc && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || paymentFilter === '{{ player_payment_filter.get(player.id, "all") }}')">
                     <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -792,7 +799,7 @@
                 {% for player in kid_players %}
                 {% set stats = player_stats[player.id] %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="sectionOpen.kid && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0))">
+                    x-show="sectionOpen.kid && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || paymentFilter === '{{ player_payment_filter.get(player.id, "all") }}')">
                     <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -1640,31 +1647,31 @@ function updatePlayerComments(playerId, comments) {
 <!-- Archived Sessions -->
 {% if archived_groups %}
 <div class="mb-8" x-data="{ selectedArchivedSessions: [] }">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-serif font-bold text-gray-500 flex items-center">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg sm:text-xl font-serif font-bold text-gray-500 flex items-center">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
             </svg>
             Archived Sessions
         </h2>
-        <div x-show="selectedArchivedSessions.length > 0" x-cloak class="flex items-center gap-3">
-            <span class="text-sm text-gray-600" x-text="selectedArchivedSessions.length + ' selected'"></span>
-            <form method="POST" action="{{ url_for('bulk_unarchive_sessions') }}">
+        <div x-show="selectedArchivedSessions.length > 0" x-cloak class="flex flex-wrap items-center gap-2">
+            <span class="text-xs sm:text-sm text-gray-600" x-text="selectedArchivedSessions.length + ' selected'"></span>
+            <form method="POST" action="{{ url_for('bulk_unarchive_sessions') }}" class="flex">
                 <template x-for="id in selectedArchivedSessions" :key="id">
                     <input type="hidden" name="session_ids" :value="id">
                 </template>
-                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-all flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Unarchive Selected
+                <button type="submit" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-green-700 transition-all flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Unarchive
                 </button>
             </form>
-            <form method="POST" action="{{ url_for('bulk_delete_sessions') }}" onsubmit="return confirm('Are you sure you want to permanently delete the selected sessions? This action cannot be undone.')">
+            <form method="POST" action="{{ url_for('bulk_delete_sessions') }}" onsubmit="return confirm('Are you sure you want to permanently delete the selected sessions? This action cannot be undone.')" class="flex">
                 <template x-for="id in selectedArchivedSessions" :key="id">
                     <input type="hidden" name="session_ids" :value="id">
                 </template>
-                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    Delete Selected
+                <button type="submit" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:bg-red-700 transition-all flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    Delete
                 </button>
             </form>
         </div>
@@ -1688,29 +1695,29 @@ function updatePlayerComments(playerId, comments) {
             <div class="divide-y divide-gray-100">
                 {% for session in group.sessions %}
                 {% set ass = session_summary.get(session.id, {}) if session_summary is defined else {} %}
-                <div class="flex items-center px-6 py-4 hover:bg-gray-50 transition-all">
-                    <div class="mr-4" @click.stop>
+                <div class="flex items-center px-3 sm:px-6 py-3 sm:py-4 hover:bg-gray-50 transition-all">
+                    <div class="mr-2 sm:mr-4" @click.stop>
                         <input type="checkbox"
                             value="{{ session.id }}"
                             @change="$event.target.checked ? selectedArchivedSessions.push({{ session.id }}) : selectedArchivedSessions = selectedArchivedSessions.filter(id => id !== {{ session.id }})"
                             :checked="selectedArchivedSessions.includes({{ session.id }})"
-                            class="w-4 h-4 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple">
+                            class="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded border-gray-300 text-wimbledon-purple focus:ring-wimbledon-purple">
                     </div>
-                    <a href="{{ url_for('session_detail', id=session.id) }}" class="flex-1 flex items-center justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 bg-gray-100 rounded-lg flex flex-col items-center justify-center">
-                                <span class="text-lg font-bold text-gray-600">{{ session.date.strftime('%d') }}</span>
+                    <a href="{{ url_for('session_detail', id=session.id) }}" class="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4">
+                        <div class="flex items-center gap-2 sm:gap-4">
+                            <div class="w-9 h-9 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex flex-col items-center justify-center flex-shrink-0">
+                                <span class="text-sm sm:text-lg font-bold text-gray-600">{{ session.date.strftime('%d') }}</span>
                             </div>
                             <div>
-                                <div class="font-medium text-gray-700">{{ session.date.strftime('%A') }}</div>
-                                <div class="text-sm text-gray-500">{{ ass.get('start_time', 'TBD') }} - {{ ass.get('end_time', 'TBD') }}</div>
+                                <div class="font-medium text-sm sm:text-base text-gray-700">{{ session.date.strftime('%a') }}<span class="hidden sm:inline">, {{ session.date.strftime('%b %d') }}</span></div>
+                                <div class="text-xs sm:text-sm text-gray-500">{{ ass.get('start_time', 'TBD') }} - {{ ass.get('end_time', 'TBD') }}</div>
                             </div>
                         </div>
-                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                        <div class="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 ml-11 sm:ml-0">
                             {% set cc = ass.get('court_count', 0) %}
-                            <span>{{ cc }} court{% if cc > 1 %}s{% endif %}</span>
-                            <span>{{ ass.get('attendee_count', 0) }} players</span>
-                            <span class="font-medium text-gray-700">${{ "%.2f"|format(ass.get('cost_per_player', 0)) }}/player</span>
+                            <span>{{ cc }}ct</span>
+                            <span>{{ ass.get('attendee_count', 0) }}pl</span>
+                            <span class="font-medium text-gray-700">${{ "%.2f"|format(ass.get('cost_per_player', 0)) }}/pl</span>
                         </div>
                     </a>
                 </div>

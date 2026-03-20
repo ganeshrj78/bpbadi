@@ -2395,10 +2395,11 @@ def sessions():
             if sid in attendance_details and pid in attendance_details[sid]:
                 attendance_details[sid][pid]['payment_status'] = 'pending_refund'
 
-    # Compute payment filter counts for participating players
+    # Compute payment filter counts and per-player filter status
     chargeable_statuses = {'YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'}
     participating_players = regular_players + adhoc_players + kid_players
     filter_counts = {'paid': 0, 'unpaid': 0, 'not_participating': len(not_playing_players)}
+    player_payment_filter = {}
     for p in participating_players:
         has_charges = False
         is_unpaid = False
@@ -2411,10 +2412,15 @@ def sessions():
                     is_unpaid = True
         if not has_charges:
             filter_counts['not_participating'] += 1
+            player_payment_filter[p.id] = 'not_participating'
         elif is_unpaid:
             filter_counts['unpaid'] += 1
+            player_payment_filter[p.id] = 'unpaid'
         else:
             filter_counts['paid'] += 1
+            player_payment_filter[p.id] = 'paid'
+    for p in not_playing_players:
+        player_payment_filter[p.id] = 'not_participating'
 
     # Pending dropout requests for notification banner
     pending_dropout_requests = [att for att in all_attendances if att.status == 'PENDING_DROPOUT']
@@ -2443,7 +2449,8 @@ def sessions():
                           selected_month=selected_month,
                           admin_players=admin_players,
                           current_collector_id=current_collector_id,
-                          filter_counts=filter_counts)
+                          filter_counts=filter_counts,
+                          player_payment_filter=player_payment_filter)
 
 
 @app.route('/sessions/month/<month_key>')

@@ -14,13 +14,13 @@
 <div x-data="monthSync()" x-init="init()">
 
 <!-- Page Header -->
-<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
     <div>
-        <h1 class="text-2xl sm:text-4xl font-serif font-bold text-wimbledon-purple">{{ month_label }}</h1>
-        <p class="text-gray-500 mt-1">{{ totals.sessions }} session{{ 's' if totals.sessions != 1 else '' }} this month</p>
+        <h1 class="text-xl sm:text-4xl font-serif font-bold text-wimbledon-purple">{{ month_label }}</h1>
+        <p class="text-gray-500 text-sm sm:text-base mt-0.5 sm:mt-1">{{ totals.sessions }} session{{ 's' if totals.sessions != 1 else '' }} this month</p>
     </div>
     <button @click="fetchRF()" :disabled="rfState === 'loading'"
-        class="px-5 py-3 bg-white border-2 border-wimbledon-purple text-wimbledon-purple rounded-xl font-semibold hover:bg-wimbledon-cream transition-all inline-flex items-center gap-2 shadow-sm disabled:opacity-50">
+        class="px-3 sm:px-5 py-2 sm:py-3 bg-white border-2 border-wimbledon-purple text-wimbledon-purple rounded-xl text-sm sm:text-base font-semibold hover:bg-wimbledon-cream transition-all inline-flex items-center gap-2 shadow-sm disabled:opacity-50">
         <svg x-show="rfState === 'loading'" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -80,46 +80,49 @@
         <table class="min-w-full">
             <thead>
                 <tr class="bg-wimbledon-cream/50 text-left">
-                    <th class="px-6 py-3 text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Date</th>
-                    <th class="px-4 py-3 text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Time</th>
-                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Courts</th>
-                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Attendees</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Birdie</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Total Charged</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider whitespace-normal leading-tight">Refund /<br>Fill In</th>
-                    <th class="px-4 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Credits</th>
-                    <th class="px-4 py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
+                    <th class="px-2 sm:px-6 py-2 sm:py-3 text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Date</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden sm:table-cell">Time</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell">Courts</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden sm:table-cell">Players</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden lg:table-cell">Birdie</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Total</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell whitespace-normal leading-tight">Refund/<br>Fill In</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden lg:table-cell">Credits</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                 </tr>
             </thead>
             {% for s in session_stats %}
             <tbody x-data="{expanded: false}">
                 <tr class="border-t border-wimbledon-gold/10 hover:bg-wimbledon-cream/40 transition-colors {% if s.session.is_archived %}opacity-60{% endif %}">
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex items-center gap-3">
-                            <button @click.stop="expanded = !expanded" class="text-gray-400 hover:text-wimbledon-purple transition-colors flex-shrink-0 p-1">
-                                <svg class="w-4 h-4 transition-transform" :class="expanded && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    <td class="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                        <div class="flex items-center gap-2 sm:gap-3">
+                            <button @click.stop="expanded = !expanded" class="text-gray-400 hover:text-wimbledon-purple transition-colors flex-shrink-0 p-0.5 sm:p-1">
+                                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform" :class="expanded && 'rotate-90'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </button>
-                            <a href="{{ url_for('session_detail', id=s.session.id) }}" class="flex items-center gap-3 group">
-                                <div class="w-12 h-12 gradient-primary rounded-xl flex flex-col items-center justify-center text-white shadow border border-wimbledon-gold/30 flex-shrink-0">
-                                    <span class="text-lg font-bold leading-none">{{ s.session.date.strftime('%d') }}</span>
-                                    <span class="text-[10px] uppercase opacity-80">{{ s.session.date.strftime('%a') }}</span>
+                            <a href="{{ url_for('session_detail', id=s.session.id) }}" class="flex items-center gap-2 sm:gap-3 group">
+                                <div class="w-9 h-9 sm:w-12 sm:h-12 gradient-primary rounded-lg sm:rounded-xl flex flex-col items-center justify-center text-white shadow border border-wimbledon-gold/30 flex-shrink-0">
+                                    <span class="text-sm sm:text-lg font-bold leading-none">{{ s.session.date.strftime('%d') }}</span>
+                                    <span class="text-[8px] sm:text-[10px] uppercase opacity-80">{{ s.session.date.strftime('%a') }}</span>
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-gray-800 group-hover:text-wimbledon-purple transition-colors">{{ s.session.date.strftime('%B %d, %Y') }}</div>
+                                    <div class="font-semibold text-xs sm:text-base text-gray-800 group-hover:text-wimbledon-purple transition-colors">
+                                        <span class="sm:hidden">{{ s.session.date.strftime('%b %d') }}</span>
+                                        <span class="hidden sm:inline">{{ s.session.date.strftime('%B %d, %Y') }}</span>
+                                    </div>
                                     {% if s.session.notes %}
-                                    <div class="text-xs text-gray-400 truncate max-w-[200px]">{{ s.session.notes }}</div>
+                                    <div class="text-[10px] sm:text-xs text-gray-400 truncate max-w-[100px] sm:max-w-[200px]">{{ s.session.notes }}</div>
                                     {% endif %}
                                 </div>
                             </a>
                         </div>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600">{{ s.start_time }} – {{ s.end_time }}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center">
-                        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-wimbledon-purple/10 text-wimbledon-purple font-bold text-xs">
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 hidden sm:table-cell">{{ s.start_time }} – {{ s.end_time }}</td>
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center hidden md:table-cell">
+                        <span class="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-wimbledon-purple/10 text-wimbledon-purple font-bold text-[10px] sm:text-xs">
                             {{ s.regular_count + s.adhoc_count }}
                         </span>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center">
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center hidden sm:table-cell">
                         <div class="flex items-center justify-center gap-1">
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" title="Regular">{{ s.reg_att_count }}</span>
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700" title="Adhoc">{{ s.adhoc_att_count }}</span>
@@ -129,11 +132,11 @@
                             <span class="text-[10px] text-gray-400 font-medium ml-0.5">={{ s.reg_att_count + s.adhoc_att_count + s.kid_att_count }}</span>
                         </div>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-yellow-700 font-medium">
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm text-yellow-700 font-medium hidden lg:table-cell">
                         {% if s.birdie_total > 0 %}${{ "%.2f"|format(s.birdie_total) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right font-semibold text-wimbledon-purple">${{ "%.2f"|format(s.collection) }}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm">
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-semibold text-wimbledon-purple">${{ "%.2f"|format(s.collection) }}</td>
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-right text-sm hidden md:table-cell">
                         {% if s.refunds > 0 or s.fillin > 0 %}
                         <span class="flex flex-col items-end leading-tight">
                             {% if s.refunds > 0 %}
@@ -146,21 +149,21 @@
                         </span>
                         {% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm text-blue-600 font-medium">
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm text-blue-600 font-medium hidden lg:table-cell">
                         {% if s.credits > 0 %}${{ "%.2f"|format(s.credits) }}{% else %}<span class="text-gray-300">—</span>{% endif %}
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center">
+                    <td class="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
                         {% if s.session.is_archived %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Archived</span>
+                        <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-gray-100 text-gray-600">Arch</span>
                         {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
+                        <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-green-100 text-green-700">Active</span>
                         {% endif %}
                     </td>
                 </tr>
                 <!-- Expanded court detail row -->
                 <tr x-show="expanded" x-cloak class="border-t border-gray-100 bg-gray-50/50"
                     x-data="sessionExpand_{{ s.session.id }}()" x-init="init()">
-                    <td colspan="9" class="px-6 py-4">
+                    <td colspan="9" class="px-3 sm:px-6 py-3 sm:py-4">
                         <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                             <div class="bg-green-50 rounded-lg p-3 border border-green-200">
                                 <div class="text-[10px] font-bold text-green-600 uppercase tracking-wide">Regular Courts</div>
@@ -189,23 +192,23 @@
                         <!-- Court list with inline edit -->
                         <div class="space-y-2">
                             <template x-for="(court, ci) in courts" :key="court.id">
-                                <div class="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-200 text-sm">
-                                    <div class="flex items-center gap-3">
-                                        <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white rounded-lg px-2 sm:px-3 py-2 border border-gray-200 text-sm gap-1 sm:gap-0">
+                                    <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                        <span class="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium"
                                             :class="court.court_type === 'adhoc' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'"
                                             x-text="court.court_type === 'adhoc' ? 'Adhoc' : 'Regular'"></span>
-                                        <span class="font-medium text-gray-800" x-text="court.name"></span>
-                                        <span class="text-gray-400 text-xs" x-text="court.start_time + ' – ' + court.end_time"></span>
+                                        <span class="font-medium text-xs sm:text-sm text-gray-800" x-text="court.name"></span>
+                                        <span class="text-gray-400 text-[10px] sm:text-xs" x-text="court.start_time + ' – ' + court.end_time"></span>
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-gray-500">$</span>
+                                    <div class="flex items-center gap-2 ml-auto">
+                                        <span class="text-gray-500 text-xs">$</span>
                                         <input type="number" step="0.01" :value="court.cost" @click.stop
                                             @change="updateCourt(ci, {cost: parseFloat($event.target.value)})"
-                                            class="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green text-right">
+                                            class="w-16 sm:w-20 px-1 sm:px-2 py-1 text-xs sm:text-sm border border-gray-300 rounded focus:outline-none focus:border-wimbledon-green text-right">
                                         <select @click.stop
                                             @change="updateCourt(ci, {court_type: $event.target.value})"
-                                            class="text-xs border border-gray-300 rounded px-1 py-1 focus:outline-none bg-white">
-                                            <option value="regular" :selected="court.court_type === 'regular'">Regular</option>
+                                            class="text-[10px] sm:text-xs border border-gray-300 rounded px-1 py-1 focus:outline-none bg-white">
+                                            <option value="regular" :selected="court.court_type === 'regular'">Reg</option>
                                             <option value="adhoc" :selected="court.court_type === 'adhoc'">Adhoc</option>
                                         </select>
                                     </div>
@@ -283,7 +286,7 @@
                                 <div :class="court.already_in_local
                                         ? 'bg-gray-50 border-gray-200 opacity-60'
                                         : 'bg-yellow-50 border-yellow-300'"
-                                    class="border rounded-xl p-3 text-xs min-w-[170px] flex-shrink-0">
+                                    class="border rounded-xl p-2 sm:p-3 text-xs min-w-[140px] sm:min-w-[170px] flex-shrink-0">
                                     <div class="font-semibold text-gray-800 mb-1" x-text="court.court_name"></div>
                                     <div class="text-gray-500 text-[11px] mb-2"
                                         x-text="court.start_time_24 + ' – ' + court.end_time_24 + ' (' + court.duration_minutes + ' min)'">
