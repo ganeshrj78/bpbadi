@@ -12,7 +12,7 @@
 <!-- Summary Cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
     <!-- Total Players -->
-    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative">
+    <a href="{{ url_for('players') }}" class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative block cursor-pointer">
         <div class="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 gradient-primary opacity-10 rounded-full -mr-10 sm:-mr-16 -mt-10 sm:-mt-16"></div>
         <div class="relative">
             <div class="flex items-center justify-between mb-2 sm:mb-4">
@@ -24,15 +24,15 @@
             </div>
             <div class="text-2xl sm:text-3xl font-bold text-gray-800">{{ total_players }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Total Players</div>
-            <a href="{{ url_for('players') }}" class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple hover:text-wimbledon-purple-light mt-3 font-medium">
+            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple mt-3 font-medium">
                 View all
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </a>
+            </span>
         </div>
-    </div>
+    </a>
 
     <!-- Upcoming Sessions -->
-    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative">
+    <a href="{{ url_for('sessions') }}" class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative block cursor-pointer">
         <div class="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 gradient-success opacity-10 rounded-full -mr-10 sm:-mr-16 -mt-10 sm:-mt-16"></div>
         <div class="relative">
             <div class="flex items-center justify-between mb-2 sm:mb-4">
@@ -44,15 +44,15 @@
             </div>
             <div class="text-2xl sm:text-3xl font-bold text-gray-800">{{ upcoming_sessions }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Upcoming</div>
-            <a href="{{ url_for('sessions') }}" class="hidden sm:inline-flex items-center text-sm text-wimbledon-green hover:text-wimbledon-green-light mt-3 font-medium">
+            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-3 font-medium">
                 View all
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </a>
+            </span>
         </div>
-    </div>
+    </a>
 
     <!-- Total Collected -->
-    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative">
+    <a href="{{ url_for('payments') }}" class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative block cursor-pointer">
         <div class="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 gradient-info opacity-10 rounded-full -mr-10 sm:-mr-16 -mt-10 sm:-mt-16"></div>
         <div class="relative">
             <div class="flex items-center justify-between mb-2 sm:mb-4">
@@ -64,15 +64,15 @@
             </div>
             <div class="text-xl sm:text-3xl font-bold text-wimbledon-green">${{ "%.2f"|format(total_collected) }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Total Collected</div>
-            <a href="{{ url_for('payments') }}" class="hidden sm:inline-flex items-center text-sm text-wimbledon-green hover:text-wimbledon-green-light mt-3 font-medium">
+            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-3 font-medium">
                 View payments
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </a>
+            </span>
         </div>
-    </div>
+    </a>
 
     <!-- Outstanding Balance -->
-    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative">
+    <a href="{{ url_for('payments') }}" class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative block cursor-pointer">
         <div class="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 gradient-warning opacity-10 rounded-full -mr-10 sm:-mr-16 -mt-10 sm:-mt-16"></div>
         <div class="relative">
             <div class="flex items-center justify-between mb-2 sm:mb-4">
@@ -86,12 +86,12 @@
                 ${{ "%.2f"|format(total_outstanding) }}
             </div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Outstanding Balance</div>
-            <a href="{{ url_for('payments') }}" class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple hover:text-wimbledon-purple-light mt-3 font-medium">
+            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple mt-3 font-medium">
                 View details
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </a>
+            </span>
         </div>
-    </div>
+    </a>
 </div>
 
 <!-- Quick Actions -->

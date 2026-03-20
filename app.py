@@ -2214,7 +2214,7 @@ def sessions():
     def _is_participating(player_id):
         for sess in active_sessions:
             s = attendance_map.get(sess.id, {}).get(player_id, '')
-            if s and s != 'NO':
+            if s and s not in ('NO', 'TENTATIVE'):
                 return True
         return False
 
@@ -2314,6 +2314,27 @@ def sessions():
             if sid in attendance_details and pid in attendance_details[sid]:
                 attendance_details[sid][pid]['payment_status'] = 'pending_refund'
 
+    # Compute payment filter counts for participating players
+    chargeable_statuses = {'YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'}
+    participating_players = regular_players + adhoc_players + kid_players
+    filter_counts = {'paid': 0, 'unpaid': 0, 'not_participating': len(not_playing_players)}
+    for p in participating_players:
+        has_charges = False
+        is_unpaid = False
+        for sess in active_sessions:
+            att_status = attendance_map.get(sess.id, {}).get(p.id, '')
+            if att_status in chargeable_statuses:
+                has_charges = True
+                ps = attendance_details.get(sess.id, {}).get(p.id, {}).get('payment_status', 'unpaid')
+                if ps == 'unpaid':
+                    is_unpaid = True
+        if not has_charges:
+            filter_counts['not_participating'] += 1
+        elif is_unpaid:
+            filter_counts['unpaid'] += 1
+        else:
+            filter_counts['paid'] += 1
+
     # Pending dropout requests for notification banner
     pending_dropout_requests = [att for att in all_attendances if att.status == 'PENDING_DROPOUT']
 
@@ -2340,7 +2361,8 @@ def sessions():
                           active_months=active_months_sorted,
                           selected_month=selected_month,
                           admin_players=admin_players,
-                          current_collector_id=current_collector_id)
+                          current_collector_id=current_collector_id,
+                          filter_counts=filter_counts)
 
 
 @app.route('/sessions/month/<month_key>')

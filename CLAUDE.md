@@ -63,13 +63,14 @@ python3 seed.py                   # Seed database
 
 ## Attendance Statuses
 
-YES (charged), NO, TENTATIVE, DROPOUT (charged, refund possible), FILLIN (charged), STANDBY, PENDING_DROPOUT, PENDING_STANDBY
+YES (charged), NO, TENTATIVE (not charged), DROPOUT (charged, refund possible), FILLIN (charged), STANDBY, PENDING_DROPOUT, PENDING_STANDBY
 
-`payment_status`: `unpaid` | `paid` | `pending_refund`
+- **TENTATIVE is non-participating:** `_is_participating()` excludes TENTATIVE. Players with only TENTATIVE/NO statuses appear in "Not Playing" section and show "Not Playing" status (not "Paid").
+- `payment_status`: `unpaid` | `paid` | `pending_refund`
 
 ## Player Display Order
 
-- **Sessions page:** Regular → Adhoc → Kids → Not Playing
+- **Sessions page:** Regular → Adhoc → Kids → Not Playing (includes TENTATIVE-only players)
 - **Session detail:** Regular → Adhoc → Waitlisted → Not Playing
 
 ## Dropout Flow
@@ -104,6 +105,12 @@ YES (charged), NO, TENTATIVE, DROPOUT (charged, refund possible), FILLIN (charge
 - Random badminton trivia from `BadmintonTrivia` table shown on every login (player and admin)
 - 400+ facts across categories (history, speed, equipment, rules, fitness, etc.)
 - Seeded automatically on Render deploy via `start.sh`
+- Trivia banner uses purple-to-green gradient, gold "Did You Know?" header, large shuttlecock icon, slide-in animation
+
+## Payment Filter (Sessions Page)
+
+- Payment filter is a `<select>` dropdown (not buttons) with inline Paid/Unpaid/NP count badges
+- Badges show per-filter counts so admins can see payment status distribution at a glance
 
 ## Migrations — MUST be idempotent
 
@@ -129,6 +136,17 @@ if 'col_name' not in existing_cols:
 - **ETag caching:** All HTML responses get ETag + `Cache-Control: no-cache` for browser/edge 304 revalidation. Static files cached 1 week. Player photo route returns ETag + Cache-Control headers.
 - **Jinja2 bytecode caching:** Templates compiled once, reused across requests via `FileSystemBytecodeCache`
 - **Gzip compression:** `Flask-Compress` reduces HTML response size ~70%
+
+## Mobile Responsiveness
+
+- **Dashboard KPI tiles** — All 4 cards (Total Players, Upcoming Sessions, Total Collected, Outstanding Balance) are `<a>` tags (not `<div>`), so tapping anywhere on the card navigates on mobile
+
+All 24 templates use Tailwind `sm:` breakpoints for mobile-friendly layouts:
+- **Responsive text:** `text-sm sm:text-base`, `text-xs sm:text-sm` for headings and body text
+- **Hidden columns:** `hidden sm:table-cell` to hide non-essential table columns on mobile
+- **Flex wrap:** `flex-wrap` on button groups and filter bars so they stack vertically on small screens
+- **Compact padding:** `px-2 sm:px-4`, `py-1 sm:py-2` for tighter spacing on mobile
+- **Full-width inputs:** Form inputs and selects use `w-full` on mobile, constrained widths on desktop
 
 ## Critical Gotchas
 

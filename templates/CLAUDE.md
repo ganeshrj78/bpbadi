@@ -24,7 +24,7 @@ Conventions and guidance for working with templates in BP Badminton.
 | `base.html` | Base layout with navigation, includes Tailwind/Alpine, `{% block head %}` for extra scripts |
 | `login.html` | Admin and player login + Google Sign-In |
 | `register.html` | Player self-registration |
-| `dashboard.html` | Admin dashboard with KPIs |
+| `dashboard.html` | Admin dashboard with KPIs (tiles are clickable `<a>` links for mobile tap navigation) |
 | `players.html` | Player list with filters |
 | `player_form.html` | Add/edit player |
 | `player_detail.html` | Player details, attendance, payments |
@@ -67,6 +67,35 @@ Conventions and guidance for working with templates in BP Badminton.
 ### Dynamic Classes
 ```html
 <button :class="paymentFilter === 'all' ? 'bg-wimbledon-purple text-white' : 'bg-white'">
+```
+
+## Mobile Responsive Patterns
+
+All templates use Tailwind `sm:` breakpoints for mobile-first layouts. Key patterns:
+
+### Responsive Text
+```html
+<h2 class="text-sm sm:text-lg font-bold">Title</h2>
+<span class="text-xs sm:text-sm">Detail text</span>
+```
+
+### Hidden Columns on Mobile
+```html
+<th class="hidden sm:table-cell">Non-essential column</th>
+<td class="hidden sm:table-cell">...</td>
+```
+
+### Flex Wrap for Button Groups
+```html
+<div class="flex flex-wrap items-center gap-2 sm:gap-3">
+    <button class="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2">Action</button>
+</div>
+```
+
+### Compact Padding
+```html
+<div class="px-2 sm:px-4 py-2 sm:py-4">
+<td class="px-1 sm:px-3 py-1 sm:py-2">
 ```
 
 ## Common UI Components
@@ -202,6 +231,29 @@ All forms must include CSRF token (handled by Flask-WTF):
 ```html
 <form onsubmit="return confirm('Are you sure?')">
 ```
+
+### Trivia Banner (Login)
+The login trivia flash message uses a themed gradient banner with animation:
+```html
+<!-- Purple-to-green gradient background, gold header, shuttlecock icon, slide-in animation -->
+<div class="bg-gradient-to-r from-wimbledon-purple to-wimbledon-green rounded-xl p-4 text-white animate-slide-in">
+    <div class="text-wimbledon-gold font-bold text-lg">Did You Know?</div>
+    <span class="text-4xl">&#x1F3F8;</span>  <!-- Large shuttlecock icon -->
+    <p class="text-sm">{{ trivia_text }}</p>
+</div>
+```
+
+### Payment Filter Dropdown (Sessions Page)
+The payment filter uses a `<select>` dropdown with inline count badges instead of buttons:
+```html
+<select x-model="paymentFilter">
+    <option value="all">All</option>
+    <option value="paid">Paid (N)</option>
+    <option value="unpaid">Unpaid (N)</option>
+    <option value="np">Not Playing (N)</option>
+</select>
+```
+Counts are computed from the attendance data and shown inline in each option.
 
 ### Form alignment in flex containers
 Use `class="flex"` on `<form>` elements inside flex containers (not `class="inline"`):

@@ -274,28 +274,22 @@
         </div>
 
         <!-- Payment Status Filter -->
-        <div class="flex items-center gap-1 sm:gap-2">
+        <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-gray-600 hidden sm:inline">Payment:</span>
-            <button @click="paymentFilter = 'all'"
-                :class="paymentFilter === 'all' ? 'bg-wimbledon-purple text-white' : 'bg-white text-gray-600 border border-gray-300'"
-                class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all">
-                All
-            </button>
-            <button @click="paymentFilter = 'paid'"
-                :class="paymentFilter === 'paid' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border border-gray-300'"
-                class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all">
-                Paid
-            </button>
-            <button @click="paymentFilter = 'unpaid'"
-                :class="paymentFilter === 'unpaid' ? 'bg-red-600 text-white' : 'bg-white text-gray-600 border border-gray-300'"
-                class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all">
-                Unpaid
-            </button>
-            <button @click="paymentFilter = 'not_participating'"
-                :class="paymentFilter === 'not_participating' ? 'bg-gray-500 text-white' : 'bg-white text-gray-600 border border-gray-300'"
-                class="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all">
-                <span class="hidden sm:inline">Not Playing</span><span class="sm:hidden">NP</span>
-            </button>
+            <select x-model="paymentFilter"
+                class="px-2 sm:px-3 py-1.5 border border-gray-300 rounded-lg text-xs sm:text-sm font-medium focus:outline-none focus:border-wimbledon-purple focus:ring-2 focus:ring-wimbledon-purple/20 bg-white">
+                <option value="all">All Players</option>
+                <option value="paid">Paid</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="not_participating">Not Playing</option>
+            </select>
+        </div>
+
+        <!-- Filter Counts (pushed to right) -->
+        <div class="flex items-center gap-2 sm:gap-3 ml-auto">
+            <span class="px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-bold text-xs sm:text-sm">{{ filter_counts.paid }} Paid</span>
+            <span class="px-2.5 py-1 rounded-full bg-red-100 text-red-700 font-bold text-xs sm:text-sm">{{ filter_counts.unpaid }} Unpaid</span>
+            <span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 font-bold text-xs sm:text-sm hidden sm:inline-flex">{{ filter_counts.not_participating }} NP</span>
         </div>
 
         <!-- Bulk Player Payment Actions -->
@@ -397,9 +391,8 @@
                 </tr>
                 {% for player in regular_players %}
                 {% set stats = player_stats[player.id] %}
-                {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="sectionOpen.regular && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
+                    x-show="sectionOpen.regular && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0))">
                     <td class="px-2 sm:px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-1 sm:space-x-2">
                             <input type="checkbox"
@@ -522,20 +515,20 @@
                         </span>
                     </td>
                     <td class="px-2 py-2 text-center whitespace-nowrap">
-                        {% if ns_np.all_no and active_sessions %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
-                        {% else %}
-                        {% set pstatus = namespace(val='paid') %}
+                        {% set pstatus = namespace(val='paid', has_charges=false) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
                             {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
+                                {% set pstatus.has_charges = true %}
                                 {% set ps = att_details.get('payment_status', 'unpaid') %}
                                 {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
                                 {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% if pstatus.val == 'unpaid' %}
+                        {% if not pstatus.has_charges %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
+                        {% elif pstatus.val == 'unpaid' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
                         {% elif pstatus.val == 'pending_refund' %}
                         <span class="inline-flex flex-col items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 leading-tight" data-player-status="{{ player.id }}">
@@ -544,7 +537,6 @@
                         </span>
                         {% else %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
-                        {% endif %}
                         {% endif %}
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -599,9 +591,8 @@
                 </tr>
                 {% for player in adhoc_players %}
                 {% set stats = player_stats[player.id] %}
-                {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="sectionOpen.adhoc && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
+                    x-show="sectionOpen.adhoc && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0))">
                     <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -612,7 +603,7 @@
                                 {% if player.profile_photo_mime %}
                                 <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover border border-wimbledon-gold/30 flex-shrink-0">
                                 {% else %}
-                                <div class="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold flex-shrink-0
+                                <div class="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold flex-shrink-0">
                                     {{ player.name[0] }}
                                 </div>
                                 {% endif %}
@@ -724,20 +715,20 @@
                         </span>
                     </td>
                     <td class="px-2 py-2 text-center whitespace-nowrap">
-                        {% if ns_np.all_no and active_sessions %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
-                        {% else %}
-                        {% set pstatus = namespace(val='paid') %}
+                        {% set pstatus = namespace(val='paid', has_charges=false) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
                             {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
+                                {% set pstatus.has_charges = true %}
                                 {% set ps = att_details.get('payment_status', 'unpaid') %}
                                 {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
                                 {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% if pstatus.val == 'unpaid' %}
+                        {% if not pstatus.has_charges %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
+                        {% elif pstatus.val == 'unpaid' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
                         {% elif pstatus.val == 'pending_refund' %}
                         <span class="inline-flex flex-col items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 leading-tight" data-player-status="{{ player.id }}">
@@ -746,7 +737,6 @@
                         </span>
                         {% else %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
-                        {% endif %}
                         {% endif %}
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -801,9 +791,8 @@
                 </tr>
                 {% for player in kid_players %}
                 {% set stats = player_stats[player.id] %}
-                {% set ns_np = namespace(all_no=false) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
-                    x-show="sectionOpen.kid && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0 && {{ 'false' if (ns_np.all_no and active_sessions) else 'true' }}) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0) || (paymentFilter === 'not_participating' && {{ 'true' if (ns_np.all_no and active_sessions) else 'false' }}))">
+                    x-show="sectionOpen.kid && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'paid' && {{ stats.balance }} <= 0) || (paymentFilter === 'unpaid' && {{ stats.balance }} > 0))">
                     <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
@@ -923,20 +912,20 @@
                         </span>
                     </td>
                     <td class="px-2 py-2 text-center whitespace-nowrap">
-                        {% if ns_np.all_no and active_sessions %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
-                        {% else %}
-                        {% set pstatus = namespace(val='paid') %}
+                        {% set pstatus = namespace(val='paid', has_charges=false) %}
                         {% for session in active_sessions %}
                             {% set att_status = attendance_map.get(session.id, {}).get(player.id, '') %}
                             {% set att_details = attendance_details.get(session.id, {}).get(player.id, {}) %}
                             {% if att_status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] %}
+                                {% set pstatus.has_charges = true %}
                                 {% set ps = att_details.get('payment_status', 'unpaid') %}
                                 {% if ps == 'unpaid' %}{% set pstatus.val = 'unpaid' %}{% endif %}
                                 {% if ps == 'pending_refund' and pstatus.val != 'unpaid' %}{% set pstatus.val = 'pending_refund' %}{% endif %}
                             {% endif %}
                         {% endfor %}
-                        {% if pstatus.val == 'unpaid' %}
+                        {% if not pstatus.has_charges %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-300">Not Playing</span>
+                        {% elif pstatus.val == 'unpaid' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700" data-player-status="{{ player.id }}">Unpaid</span>
                         {% elif pstatus.val == 'pending_refund' %}
                         <span class="inline-flex flex-col items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-700 leading-tight" data-player-status="{{ player.id }}">
@@ -945,7 +934,6 @@
                         </span>
                         {% else %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700" data-player-status="{{ player.id }}">Paid</span>
-                        {% endif %}
                         {% endif %}
                     </td>
                     <td class="px-2 py-2 text-right whitespace-nowrap">
@@ -1000,7 +988,6 @@
                 </tr>
                 {% for player in not_playing_players %}
                 {% set stats = player_stats[player.id] %}
-                {% set ns_np = namespace(all_no=true) %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="sectionOpen.notplaying && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'not_participating'))">
                     <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">

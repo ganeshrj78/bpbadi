@@ -5,6 +5,7 @@ A web application for managing a badminton club — tracking players, court sess
 ## Features
 
 - **Session management** — Create court sessions, assign courts, track costs per session
+- **Mobile-friendly UI** — All 24 templates use responsive Tailwind breakpoints for mobile and desktop
 - **Attendance tracking** — Players vote YES/NO/TENTATIVE; admins manage FILLIN/DROPOUT/STANDBY
 - **Automatic cost splitting** — Shared pool model divides court costs across all non-kid players equally; kids pay a flat $11
 - **Payment tracking** — Record payments per player, track balances, mark sessions paid/unpaid
@@ -28,7 +29,7 @@ A web application for managing a badminton club — tracking players, court sess
 |-------|-----------|
 | Backend | Flask 3.0, Flask-SQLAlchemy, Flask-Migrate |
 | Database | SQLite (local), PostgreSQL (production) |
-| Frontend | Jinja2, Tailwind CSS (CDN), Alpine.js 3.x |
+| Frontend | Jinja2, Tailwind CSS (CDN, mobile-first), Alpine.js 3.x |
 | Auth | Password + Google Identity Services (GIS) |
 | Scraping | Selenium (Chrome) via EZFacility integration |
 | Deployment | Render (gunicorn) |

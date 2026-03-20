@@ -82,6 +82,12 @@
             border: 1px solid #C4A14A;
         }
 
+        /* Trivia slide-in animation */
+        @keyframes trivia-slide-in {
+            0% { opacity: 0; transform: translateY(-20px) scale(0.97); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
         /* Pulse animation */
         @keyframes pulse-soft {
             0%, 100% { opacity: 1; }
@@ -482,19 +488,31 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
+                    {% if category == 'trivia' %}
+                    <div class="mb-6 p-5 rounded-2xl shadow-xl border-2 border-wimbledon-gold/50 bg-gradient-to-r from-wimbledon-purple via-wimbledon-purple-light to-wimbledon-green text-white relative overflow-hidden" style="animation: trivia-slide-in 0.6s ease-out">
+                        <div class="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(196,167,71,0.15),transparent_50%),radial-gradient(circle_at_80%_50%,rgba(196,167,71,0.15),transparent_50%)]"></div>
+                        <div class="relative flex items-start gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/30">
+                                <span class="text-3xl sm:text-4xl">🏸</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-xs sm:text-sm font-bold uppercase tracking-widest text-wimbledon-gold mb-1">Did You Know?</div>
+                                <p class="text-sm sm:text-base font-medium leading-relaxed">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
                     <div class="mb-6 p-4 rounded-xl shadow-lg flex items-center space-x-3 border
                         {% if category == 'error' %}bg-gradient-to-r from-wimbledon-purple to-wimbledon-purple-light text-white border-wimbledon-gold/30
-                        {% elif category == 'trivia' %}bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-900 border-wimbledon-gold/40
                         {% else %}bg-gradient-to-r from-wimbledon-green-dark to-wimbledon-green text-white border-wimbledon-gold/30{% endif %}">
                         {% if category == 'error' %}
                         <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        {% elif category == 'trivia' %}
-                        <span class="text-2xl flex-shrink-0">🏸</span>
                         {% else %}
                         <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         {% endif %}
                         <span class="font-medium">{{ message }}</span>
                     </div>
+                    {% endif %}
                 {% endfor %}
             {% endif %}
         {% endwith %}
