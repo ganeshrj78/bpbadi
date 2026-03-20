@@ -99,6 +99,14 @@ gunicorn app:app          # Start the production server (3 workers, gthread)
 | `APP_PASSWORD` | No | Master admin password (default: `bpbadi2024`) |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID for Sign-In |
 
+## Performance
+
+- Batch-loaded queries with `compute_session_display_stats()` — eliminates N+1 in all session/player templates
+- `FileSystemCache` with 60s TTL memoization for expensive aggregations
+- `Flask-Compress` for gzip responses, Jinja2 bytecode caching
+- ETag + `Cache-Control` headers on all HTML responses for Render edge caching (304 revalidation)
+- Deferred column loading for profile photos, composite DB indexes on hot paths
+
 ## Project Structure
 
 ```

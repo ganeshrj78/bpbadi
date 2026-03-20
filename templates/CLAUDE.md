@@ -134,7 +134,41 @@ function updateAttendance(sessionId, playerId, status) {
 
 ## Pre-computed Template Variables
 
-For performance, some routes pass pre-computed data:
+**IMPORTANT:** Never call model methods (e.g. `sess.get_cost_per_player()`, `player.get_balance()`) inside template loops — these trigger N+1 database queries. Routes must pre-compute all data and pass it as dicts.
+
+### Session Display Stats (`session_stats`)
+Computed by `compute_session_display_stats(session_ids)` — used in `player_sessions.html`, `player_profile.html`:
+```html
+{% set start_time, end_time = session_stats[sess.id].time_range %}
+{{ session_stats[sess.id].court_count }}
+{{ session_stats[sess.id].attendee_count }}
+{{ session_stats[sess.id].cost_per_player }}
+```
+
+### Single Session Stats (`sess_stats`)
+Used in `session_detail.html`:
+```html
+{% set start_time, end_time = sess_stats.time_range %}
+{{ sess_stats.court_count }}
+{{ sess_stats.attendee_count }}
+{{ sess_stats.cost_per_player }}
+{{ sess_stats.birdie_total }}
+{{ sess_stats.total_collection }}
+```
+
+### Per-Attendance Costs (`att_cost_map`)
+Used in `player_detail.html`, `player_profile.html`:
+```html
+{{ att_cost_map.get(attendance.id, 0) }}
+```
+
+### Player Financials (`player_total_charges`, `player_balance`)
+Used in `player_detail.html` — pre-computed in route, not from model methods:
+```html
+{{ player_total_charges }}
+{{ player_total_payments }}
+{{ player_balance }}
+```
 
 ### Sessions Page (`player_stats`)
 ```python
@@ -149,17 +183,11 @@ player_stats[player.id] = {
 }
 ```
 
-Use in template:
-```html
-{% set stats = player_stats[player.id] %}
-{{ stats.balance }}
-```
-
 ### Player Payments Page (frozen_only)
-Charges and balance use `frozen_only=True` — only sessions with `payment_released=True` or `is_archived=True` are included:
+Charges and balance pre-computed in route via `player_financials` dict:
 ```html
-{{ player.get_total_charges(frozen_only=True) }}
-{{ player.get_balance(frozen_only=True) }}
+{{ player_financials[pid].total_charges }}
+{{ player_financials[pid].balance }}
 ```
 
 ## Form Patterns

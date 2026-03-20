@@ -119,11 +119,16 @@ if 'col_name' not in existing_cols:
 - **Gunicorn:** 3 workers × 2 threads (`gthread`), 60s timeout, `max-requests 1000` for memory leak prevention
 - **Caching:** `FileSystemCache` in `.flask_cache/` — shared across workers (not `SimpleCache` which is per-process)
 - **Cache invalidation:** `clear_session_cache()` clears `get_cached_monthly_summary`, `get_cached_player_stats`, `get_cached_session_costs`
-- **N+1 prevention:** Dashboard and sessions routes batch-load attendances with `joinedload(Attendance.player)`, use pre-computed cost maps from `get_cached_player_stats()`
+- **N+1 prevention:** Routes MUST pre-compute all session/player stats and pass them as dicts to templates. Never call model methods like `sess.get_cost_per_player()` in template loops.
+- **Batch session stats:** Use `compute_session_display_stats(session_ids)` to batch-compute `time_range`, `court_count`, `attendee_count`, `cost_per_player`, `birdie_total`, `total_collection` for any list of sessions in 3 queries.
+- **Pre-computed cost maps:** `get_cached_player_stats()` returns `session_cost_map` for per-attendance cost lookups. Use `att_cost_map[att.id]` in templates instead of `att.session.get_cost_per_player()`.
+- **Bulk operations:** Always batch-load sessions with `Session.query.filter(Session.id.in_(ids))` instead of per-item `Session.query.get()` in loops.
 - **Connection pool:** `pool_size=5, max_overflow=5` per worker — total max 30 connections across 3 workers
 - **Indexes:** Composite indexes on hot query paths (attendance session+status+category, payment date+player, refund player+status)
 - **Deferred loading:** `profile_photo_data` uses `db.deferred()` — never loaded unless explicitly accessed. Templates use `profile_photo_mime` for existence checks.
-- **ETag caching:** Player photo route returns ETag + Cache-Control headers for browser/edge caching (304 Not Modified)
+- **ETag caching:** All HTML responses get ETag + `Cache-Control: no-cache` for browser/edge 304 revalidation. Static files cached 1 week. Player photo route returns ETag + Cache-Control headers.
+- **Jinja2 bytecode caching:** Templates compiled once, reused across requests via `FileSystemBytecodeCache`
+- **Gzip compression:** `Flask-Compress` reduces HTML response size ~70%
 
 ## Critical Gotchas
 
