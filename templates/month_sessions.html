@@ -16,7 +16,7 @@
 <!-- Page Header -->
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
     <div>
-        <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">{{ month_label }}</h1>
+        <h1 class="text-2xl sm:text-4xl font-serif font-bold text-wimbledon-purple">{{ month_label }}</h1>
         <p class="text-gray-500 mt-1">{{ totals.sessions }} session{{ 's' if totals.sessions != 1 else '' }} this month</p>
     </div>
     <button @click="fetchRF()" :disabled="rfState === 'loading'"
@@ -42,26 +42,26 @@
 </div>
 
 <!-- Month Totals -->
-<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+<div class="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-8">
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-5 border border-wimbledon-gold/20">
         <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Sessions</div>
-        <div class="text-3xl font-bold text-wimbledon-purple">{{ totals.sessions }}</div>
+        <div class="text-2xl sm:text-3xl font-bold text-wimbledon-purple">{{ totals.sessions }}</div>
     </div>
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-5 border border-wimbledon-gold/20">
         <div class="text-xs font-medium text-yellow-600 uppercase tracking-wide mb-1">Birdie</div>
-        <div class="text-3xl font-bold text-yellow-700">${{ "%.2f"|format(totals.birdie) }}</div>
+        <div class="text-2xl sm:text-3xl font-bold text-yellow-700">${{ "%.2f"|format(totals.birdie) }}</div>
     </div>
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
-        <div class="text-xs font-medium text-wimbledon-purple uppercase tracking-wide mb-1">Total Charged</div>
-        <div class="text-3xl font-bold text-wimbledon-purple">${{ "%.2f"|format(totals.collection) }}</div>
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-5 border border-wimbledon-gold/20">
+        <div class="text-xs font-medium text-wimbledon-purple uppercase tracking-wide mb-1">Charged</div>
+        <div class="text-2xl sm:text-3xl font-bold text-wimbledon-purple">${{ "%.2f"|format(totals.collection) }}</div>
     </div>
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-5 border border-wimbledon-gold/20">
         <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds</div>
-        <div class="text-3xl font-bold text-red-600">-${{ "%.2f"|format(totals.refunds) }}</div>
+        <div class="text-2xl sm:text-3xl font-bold text-red-600">-${{ "%.2f"|format(totals.refunds) }}</div>
     </div>
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20">
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-5 border border-wimbledon-gold/20">
         <div class="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Credits</div>
-        <div class="text-3xl font-bold text-blue-600">${{ "%.2f"|format(totals.credits) }}</div>
+        <div class="text-2xl sm:text-3xl font-bold text-blue-600">${{ "%.2f"|format(totals.credits) }}</div>
     </div>
 </div>
 

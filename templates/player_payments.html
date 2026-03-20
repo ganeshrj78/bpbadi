@@ -11,7 +11,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
         </div>
-        <h1 class="text-3xl font-serif font-bold text-wimbledon-purple">My Payments</h1>
+        <h1 class="text-2xl sm:text-3xl font-serif font-bold text-wimbledon-purple">My Payments</h1>
         <p class="text-gray-500 mt-1">Record and view your payments</p>
     </div>
 
@@ -25,7 +25,7 @@
     <div class="rounded-2xl shadow-lg p-6 border mb-6 {% if family_balance > 0 %}bg-red-50 border-red-200{% else %}bg-green-50 border-green-200{% endif %}">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-sm font-semibold {% if family_balance > 0 %}text-red-600{% else %}text-green-600{% endif %} uppercase tracking-wide">Family Balance Due</h3>
-            <p class="text-3xl font-bold {% if family_balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(family_balance) }}</p>
+            <p class="text-2xl sm:text-3xl font-bold {% if family_balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '%.2f'|format(family_balance) }}</p>
         </div>
         <div class="space-y-2 border-t {% if family_balance > 0 %}border-red-200{% else %}border-green-200{% endif %} pt-3">
             <div class="flex items-center justify-between text-sm">

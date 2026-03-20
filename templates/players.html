@@ -6,7 +6,7 @@
 <!-- Page Header -->
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
     <div>
-        <h1 class="text-4xl font-serif font-bold text-wimbledon-purple">Players</h1>
+        <h1 class="text-2xl sm:text-4xl font-serif font-bold text-wimbledon-purple">Players</h1>
         <p class="text-gray-500 mt-1">Manage your club members</p>
     </div>
     <a href="{{ url_for('add_player') }}" class="btn-primary text-white px-6 py-3 rounded-xl font-semibold shadow-lg inline-flex items-center space-x-2 border border-wimbledon-gold/30">
@@ -40,21 +40,21 @@
 
 <!-- Category Tabs -->
 <div class="mb-6">
-    <div class="bg-white rounded-xl shadow-sm p-1.5 inline-flex space-x-1 border border-wimbledon-gold/20">
+    <div class="bg-white rounded-xl shadow-sm p-1.5 inline-flex flex-wrap gap-1 border border-wimbledon-gold/20">
         <a href="{{ url_for('players', category='all', search=search_query) if search_query else url_for('players', category='all') }}"
-            class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all {% if current_category == 'all' %}gradient-primary text-white shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
-            All Players
+            class="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm transition-all {% if current_category == 'all' %}gradient-primary text-white shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
+            All
         </a>
         <a href="{{ url_for('players', category='regular', search=search_query) if search_query else url_for('players', category='regular') }}"
-            class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all {% if current_category == 'regular' %}gradient-success text-white shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
+            class="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm transition-all {% if current_category == 'regular' %}gradient-success text-white shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
             Regular
         </a>
         <a href="{{ url_for('players', category='adhoc', search=search_query) if search_query else url_for('players', category='adhoc') }}"
-            class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all {% if current_category == 'adhoc' %}gradient-primary text-white shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
+            class="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm transition-all {% if current_category == 'adhoc' %}gradient-primary text-white shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
             Ad-hoc
         </a>
         <a href="{{ url_for('players', category='kid', search=search_query) if search_query else url_for('players', category='kid') }}"
-            class="px-5 py-2.5 rounded-lg font-medium text-sm transition-all {% if current_category == 'kid' %}gradient-gold text-wimbledon-purple-dark shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
+            class="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg font-medium text-xs sm:text-sm transition-all {% if current_category == 'kid' %}gradient-gold text-wimbledon-purple-dark shadow-md{% else %}text-gray-600 hover:bg-wimbledon-cream{% endif %}">
             Kids
         </a>
     </div>

@@ -15,14 +15,14 @@
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
     <div class="flex items-center space-x-4">
         {% if player.profile_photo_mime %}
-        <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-20 h-20 rounded-2xl object-cover shadow-lg border-2 border-wimbledon-gold">
+        <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-lg border-2 border-wimbledon-gold">
         {% else %}
-        <div class="w-20 h-20 gradient-primary rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg border-2 border-wimbledon-gold">
+        <div class="w-14 h-14 sm:w-20 sm:h-20 gradient-primary rounded-2xl flex items-center justify-center text-white text-xl sm:text-3xl font-bold shadow-lg border-2 border-wimbledon-gold">
             {{ player.name[0].upper() }}
         </div>
         {% endif %}
         <div>
-            <h1 class="text-3xl font-serif font-bold text-wimbledon-purple">{{ player.name }}</h1>
+            <h1 class="text-xl sm:text-3xl font-serif font-bold text-wimbledon-purple">{{ player.name }}</h1>
             <div class="flex items-center gap-2 mt-2">
                 <span class="px-3 py-1.5 inline-flex text-xs leading-5 font-bold rounded-full shadow-sm
                     {% if player.category == 'regular' %}gradient-success text-white
@@ -43,26 +43,27 @@
             </div>
         </div>
     </div>
-    <div class="flex flex-wrap gap-3">
+    <div class="flex flex-wrap gap-2 sm:gap-3">
         <form method="POST" action="{{ url_for('toggle_active', id=player.id) }}">
-            <button type="submit" class="px-5 py-2.5 {% if player.is_active %}bg-red-500 hover:bg-red-600{% else %}bg-green-500 hover:bg-green-600{% endif %} text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all inline-flex items-center space-x-2 border border-wimbledon-gold/30">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{% if player.is_active %}M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636{% else %}M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z{% endif %}"></path></svg>
+            <button type="submit" class="px-3 py-1.5 sm:px-5 sm:py-2.5 {% if player.is_active %}bg-red-500 hover:bg-red-600{% else %}bg-green-500 hover:bg-green-600{% endif %} text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all inline-flex items-center space-x-1 sm:space-x-2 border border-wimbledon-gold/30 text-sm sm:text-base">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{% if player.is_active %}M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636{% else %}M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z{% endif %}"></path></svg>
                 <span>{% if player.is_active %}Deactivate{% else %}Activate{% endif %}</span>
             </button>
         </form>
         <form method="POST" action="{{ url_for('toggle_admin', id=player.id) }}">
-            <button type="submit" class="px-5 py-2.5 {% if player.is_admin %}bg-yellow-500 hover:bg-yellow-600{% else %}bg-wimbledon-purple hover:bg-wimbledon-purple-light{% endif %} text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all inline-flex items-center space-x-2 border border-wimbledon-gold/30">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                <span>{% if player.is_admin %}Remove Admin{% else %}Make Admin{% endif %}</span>
+            <button type="submit" class="px-3 py-1.5 sm:px-5 sm:py-2.5 {% if player.is_admin %}bg-yellow-500 hover:bg-yellow-600{% else %}bg-wimbledon-purple hover:bg-wimbledon-purple-light{% endif %} text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all inline-flex items-center space-x-1 sm:space-x-2 border border-wimbledon-gold/30 text-sm sm:text-base">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                <span class="hidden sm:inline">{% if player.is_admin %}Remove Admin{% else %}Make Admin{% endif %}</span>
+                <span class="sm:hidden">{% if player.is_admin %}Unadmin{% else %}Admin{% endif %}</span>
             </button>
         </form>
-        <a href="{{ url_for('edit_player', id=player.id) }}" class="px-5 py-2.5 border-2 border-wimbledon-gold/30 rounded-xl text-gray-600 hover:bg-wimbledon-cream font-medium transition-all inline-flex items-center space-x-2">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+        <a href="{{ url_for('edit_player', id=player.id) }}" class="px-3 py-1.5 sm:px-5 sm:py-2.5 border-2 border-wimbledon-gold/30 rounded-xl text-gray-600 hover:bg-wimbledon-cream font-medium transition-all inline-flex items-center space-x-1 sm:space-x-2 text-sm sm:text-base">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
             <span>Edit</span>
         </a>
         <form method="POST" action="{{ url_for('delete_player', id=player.id) }}" onsubmit="return confirm('Are you sure you want to delete this player?');">
-            <button type="submit" class="px-5 py-2.5 gradient-primary text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all inline-flex items-center space-x-2 border border-wimbledon-gold/30">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            <button type="submit" class="px-3 py-1.5 sm:px-5 sm:py-2.5 gradient-primary text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all inline-flex items-center space-x-1 sm:space-x-2 border border-wimbledon-gold/30 text-sm sm:text-base">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 <span>Delete</span>
             </button>
         </form>
@@ -77,7 +78,7 @@
         </svg>
         Contact Information
     </h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 bg-wimbledon-purple/10 rounded-xl flex items-center justify-center">
                 <svg class="w-5 h-5 text-wimbledon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
@@ -126,7 +127,7 @@
             </div>
             <span class="text-sm font-medium text-gray-500">Total Charges</span>
         </div>
-        <div class="text-3xl font-bold text-gray-800">${{ "%.2f"|format(player_total_charges) }}</div>
+        <div class="text-2xl sm:text-3xl font-bold text-gray-800">${{ "%.2f"|format(player_total_charges) }}</div>
     </div>
     <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20 card-hover transition-all">
         <div class="flex items-center space-x-3 mb-3">
@@ -135,7 +136,7 @@
             </div>
             <span class="text-sm font-medium text-gray-500">Total Paid</span>
         </div>
-        <div class="text-3xl font-bold text-wimbledon-green">${{ "%.2f"|format(player_total_payments) }}</div>
+        <div class="text-2xl sm:text-3xl font-bold text-wimbledon-green">${{ "%.2f"|format(player_total_payments) }}</div>
     </div>
     <div class="bg-white rounded-2xl shadow-lg p-6 border border-wimbledon-gold/20 card-hover transition-all">
         <div class="flex items-center space-x-3 mb-3">
@@ -144,7 +145,7 @@
             </div>
             <span class="text-sm font-medium text-gray-500">Balance Due</span>
         </div>
-        <div class="text-3xl font-bold {% if player_balance > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %}">
+        <div class="text-2xl sm:text-3xl font-bold {% if player_balance > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %}">
             ${{ "%.2f"|format(player_balance) }}
         </div>
     </div>
@@ -165,20 +166,20 @@
             <table class="min-w-full">
                 <thead class="bg-wimbledon-cream sticky top-0">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase">Status</th>
-                        <th class="px-6 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase">Cost</th>
+                        <th class="px-3 sm:px-6 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase">Date</th>
+                        <th class="px-3 sm:px-6 py-3 text-left text-xs font-bold text-wimbledon-purple uppercase">Status</th>
+                        <th class="px-3 sm:px-6 py-3 text-right text-xs font-bold text-wimbledon-purple uppercase">Cost</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-wimbledon-gold/10">
                     {% for attendance in attendances %}
                     <tr class="hover:bg-wimbledon-cream/50 transition-all">
-                        <td class="px-6 py-3">
+                        <td class="px-3 sm:px-6 py-3">
                             <a href="{{ url_for('session_detail', id=attendance.session_id) }}" class="text-gray-800 hover:text-wimbledon-purple font-medium transition-colors">
                                 {{ attendance.session.date.strftime('%b %d, %Y') }}
                             </a>
                         </td>
-                        <td class="px-6 py-3">
+                        <td class="px-3 sm:px-6 py-3">
                             <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full
                                 {% if attendance.status == 'YES' %}bg-wimbledon-green/10 text-wimbledon-green border border-wimbledon-green/20
                                 {% elif attendance.status == 'TENTATIVE' %}bg-wimbledon-gold/20 text-wimbledon-gold border border-wimbledon-gold/30
@@ -231,7 +232,7 @@
                     {% for payment in payments %}
                     <tr class="hover:bg-wimbledon-cream/50 transition-all">
                         <td class="px-6 py-3 text-gray-800 font-medium">{{ payment.date.strftime('%b %d, %Y') }}</td>
-                        <td class="px-6 py-3">
+                        <td class="px-3 sm:px-6 py-3">
                             <span class="px-2 py-1 bg-wimbledon-cream rounded text-xs font-medium text-gray-600 border border-wimbledon-gold/20">{{ payment.method }}</span>
                         </td>
                         <td class="px-6 py-3 text-right text-wimbledon-green font-bold">${{ "%.2f"|format(payment.amount) }}</td>

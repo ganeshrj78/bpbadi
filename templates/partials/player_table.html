@@ -3,28 +3,28 @@
         <table class="min-w-full">
             <thead>
                 <tr class="bg-gradient-to-r from-wimbledon-cream to-white border-b border-wimbledon-gold/20">
-                    <th class="px-6 py-4 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Player</th>
-                    <th class="px-6 py-4 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Category</th>
-                    <th class="px-6 py-4 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Contact</th>
-                    <th class="px-6 py-4 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Charges</th>
-                    <th class="px-6 py-4 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Paid</th>
-                    <th class="px-6 py-4 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Balance</th>
+                    <th class="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Player</th>
+                    <th class="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden sm:table-cell">Category</th>
+                    <th class="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell">Contact</th>
+                    <th class="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden sm:table-cell">Charges</th>
+                    <th class="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden sm:table-cell">Paid</th>
+                    <th class="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Balance</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-wimbledon-gold/10">
                 {% for player in player_list %}
                 <tr class="table-row-hover transition-all {% if not player.is_active %}opacity-50{% endif %}" x-data="{ showCategoryMenu: false }" data-name="{{ player.name|lower }}">
-                    <td class="px-6 py-4 whitespace-nowrap cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
-                        <div class="flex items-center space-x-3">
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
+                        <div class="flex items-center space-x-2 sm:space-x-3">
                             {% if player.profile_photo_mime %}
-                            <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-10 h-10 rounded-full object-cover shadow-md border-2 {% if player.is_active %}border-wimbledon-gold/30{% else %}border-gray-300{% endif %}">
+                            <img loading="lazy" src="{{ url_for('player_photo', player_id=player.id) }}" alt="" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover shadow-md border-2 {% if player.is_active %}border-wimbledon-gold/30{% else %}border-gray-300{% endif %} flex-shrink-0">
                             {% else %}
-                            <div class="w-10 h-10 {% if player.is_active %}gradient-primary{% else %}bg-gray-400{% endif %} rounded-full flex items-center justify-center text-white font-bold shadow-md border border-wimbledon-gold/30">
+                            <div class="w-8 h-8 sm:w-10 sm:h-10 {% if player.is_active %}gradient-primary{% else %}bg-gray-400{% endif %} rounded-full flex items-center justify-center text-white text-xs sm:text-base font-bold shadow-md border border-wimbledon-gold/30 flex-shrink-0">
                                 {{ player.name[0].upper() }}
                             </div>
                             {% endif %}
                             <div>
-                                <div class="font-semibold {% if player.is_active %}text-gray-800{% else %}text-gray-500{% endif %}">{{ player.name }}</div>
+                                <div class="font-semibold text-sm sm:text-base {% if player.is_active %}text-gray-800{% else %}text-gray-500{% endif %}">{{ player.name }}</div>
                                 <div class="flex gap-1">
                                     {% if player.is_admin %}
                                     <span class="text-xs text-wimbledon-purple font-medium">Admin</span>
@@ -36,7 +36,7 @@
                             </div>
                         </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap relative">
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap relative hidden sm:table-cell">
                         <button id="cat-badge-{{ player.id }}" @click.stop="showCategoryMenu = !showCategoryMenu"
                             class="px-3 py-1.5 inline-flex items-center gap-1 text-xs leading-5 font-bold rounded-full shadow-sm transition-all hover:scale-105
                             {% if player.category == 'regular' %}gradient-success text-white
@@ -62,7 +62,7 @@
                             </button>
                         </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap cursor-pointer hidden md:table-cell" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
                         <div class="text-sm text-gray-600">
                             {% if player.phone %}
                             <div class="flex items-center space-x-1">
@@ -79,13 +79,13 @@
                         </div>
                     </td>
                     {% set pf = player_financials.get(player.id, {}) if player_financials is defined else {} %}
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 text-right font-medium cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-800 text-right font-medium cursor-pointer hidden sm:table-cell" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
                         ${{ "%.2f"|format(pf.get('total_charges', 0)) }}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-wimbledon-green text-right font-semibold cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-wimbledon-green text-right font-semibold cursor-pointer hidden sm:table-cell" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
                         ${{ "%.2f"|format(pf.get('total_payments', 0)) }}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right cursor-pointer" onclick="window.location='{{ url_for('player_detail', id=player.id) }}'">
                         <span class="px-3 py-1.5 rounded-full text-sm font-bold
                             {% if pf.get('balance', 0) > 0 %}bg-wimbledon-purple/10 text-wimbledon-purple{% else %}bg-wimbledon-green/10 text-wimbledon-green{% endif %}">
                             ${{ "%.2f"|format(pf.get('balance', 0)) }}
