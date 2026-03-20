@@ -32,5 +32,23 @@ with app.app_context():
         print("Migrations applied.")
 PYEOF
 
+echo "Seeding badminton trivia if needed..."
+python3 - <<'PYEOF'
+from app import app, db
+from models import BadmintonTrivia
+
+with app.app_context():
+    count = BadmintonTrivia.query.count()
+    if count == 0:
+        print(f"No trivia found. Seeding...")
+        from seed_trivia import TRIVIA
+        for text, category in TRIVIA:
+            db.session.add(BadmintonTrivia(trivia=text, category=category))
+        db.session.commit()
+        print(f"Seeded {len(TRIVIA)} trivia entries.")
+    else:
+        print(f"Trivia table already has {count} entries. Skipping seed.")
+PYEOF
+
 echo "Starting gunicorn..."
 exec gunicorn -w 3 --threads 2 --worker-class gthread --timeout 60 --max-requests 1000 --max-requests-jitter 100 --preload app:app

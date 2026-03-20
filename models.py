@@ -700,3 +700,12 @@ class ExternalIntegration(db.Model):
         if not obj:
             return None, None, None
         return obj.url, obj.username, obj.password
+
+
+class BadmintonTrivia(db.Model):
+    __tablename__ = 'badminton_trivia'
+
+    id = db.Column(db.Integer, primary_key=True)
+    trivia = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(50), default='general')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

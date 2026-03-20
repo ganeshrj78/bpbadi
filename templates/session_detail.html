@@ -294,6 +294,54 @@
 </div>
 {% endif %}
 
+<!-- Pending Standby Requests -->
+{% set pending_standbys = [] %}
+{% for att in attendance_records.values() if att.status == 'PENDING_STANDBY' %}
+{% if pending_standbys.append(att) %}{% endif %}
+{% endfor %}
+{% if pending_standbys %}
+<div class="bg-white rounded-2xl shadow-lg border border-teal-300 mb-6 overflow-hidden">
+    <div class="px-6 py-4 border-b border-teal-200 bg-gradient-to-r from-teal-50 to-white">
+        <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center gap-2">
+            <svg class="w-5 h-5 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+            </svg>
+            Pending Standby Requests
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-500 text-white text-xs font-bold">{{ pending_standbys|length }}</span>
+        </h2>
+    </div>
+    <div class="divide-y divide-teal-100">
+        {% for att in pending_standbys %}
+        <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" id="pending-standby-{{ att.id }}">
+            <div class="flex items-center gap-3">
+                {% if att.player.profile_photo_mime %}
+                <img src="{{ url_for('player_photo', player_id=att.player.id) }}" class="w-9 h-9 rounded-full object-cover border-2 border-teal-300">
+                {% else %}
+                <div class="w-9 h-9 gradient-primary rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {{ att.player.name[0].upper() }}
+                </div>
+                {% endif %}
+                <div>
+                    <div class="font-semibold text-gray-800">{{ att.player.name }}</div>
+                    <div class="text-xs text-teal-600">Requested to join as standby · awaiting your approval</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 sm:flex-shrink-0">
+                <button onclick="handleStandbyApproval({{ att.id }}, 'approve', this, '{{ att.player.name | e }}')"
+                    class="px-4 py-1.5 bg-wimbledon-green text-white text-sm font-semibold rounded-lg hover:bg-wimbledon-green/90 transition-all">
+                    Approve
+                </button>
+                <button onclick="handleStandbyApproval({{ att.id }}, 'reject', this, '{{ att.player.name | e }}')"
+                    class="px-4 py-1.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 border border-gray-300 transition-all">
+                    Reject
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Pending Refunds -->
 {% set pending_refunds = session.dropout_refunds|selectattr('status', 'equalto', 'pending')|list %}
 {% if pending_refunds %}
@@ -579,7 +627,7 @@
                     </td>
                 </tr>
                 {% endif %}
-                {% if current_status in ['NO', 'TENTATIVE'] and not ns_hdr.notplaying_shown %}
+                {% if current_status in ['NO', 'TENTATIVE', 'PENDING_STANDBY'] and not ns_hdr.notplaying_shown %}
                 {% set ns_hdr.notplaying_shown = true %}
                 <tr class="bg-gray-100/60 cursor-pointer" @click="sectionOpen.notplaying = !sectionOpen.notplaying">
                     <td colspan="10" class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-200">
@@ -637,6 +685,11 @@
                         <span class="px-4 py-2 rounded-lg font-bold text-sm border-2 bg-orange-100 border-orange-300 text-orange-700 inline-flex items-center gap-1">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             Pending Dropout
+                        </span>
+                        {% elif current_status == 'PENDING_STANDBY' %}
+                        <span class="px-4 py-2 rounded-lg font-bold text-sm border-2 bg-teal-100 border-teal-300 text-teal-700 inline-flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                            Pending Standby
                         </span>
                         {% else %}
                         <select data-prev="{{ current_status }}" data-original="{{ current_status }}" data-player-name="{{ player.name | e }}"
@@ -1014,6 +1067,34 @@ async function handleDropoutApproval(attendanceId, action, btnEl, playerId, play
                 // Unpaid player moved to Not Playing, or rejection — just reload
                 location.reload();
             }
+        } else {
+            alert(data.error || 'Operation failed');
+            btnEl.disabled = false;
+            btnEl.textContent = action === 'approve' ? 'Approve' : 'Reject';
+        }
+    } catch (error) {
+        alert('Failed to process request. Please try again.');
+        btnEl.disabled = false;
+        btnEl.textContent = action === 'approve' ? 'Approve' : 'Reject';
+    }
+}
+
+async function handleStandbyApproval(attendanceId, action, btnEl, playerName) {
+    const actionText = action === 'approve' ? 'approve' : 'reject';
+    if (!confirm(`Are you sure you want to ${actionText} the standby request for ${playerName}?`)) return;
+
+    btnEl.disabled = true;
+    btnEl.textContent = action === 'approve' ? 'Approving...' : 'Rejecting...';
+
+    try {
+        const response = await fetch('/api/admin/approve-standby', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attendance_id: attendanceId, action: action })
+        });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
         } else {
             alert(data.error || 'Operation failed');
             btnEl.disabled = false;

@@ -13,7 +13,7 @@ import logging
 from collections import defaultdict
 from logging.handlers import RotatingFileHandler
 from config import Config
-from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, ActivityLog, Notification, NotificationRead, init_encryption
+from models import db, Player, Session, Court, Attendance, Payment, BirdieBank, DropoutRefund, SiteSettings, ExternalIntegration, ActivityLog, Notification, NotificationRead, BadmintonTrivia, init_encryption
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from flask_wtf.csrf import CSRFProtect
@@ -38,6 +38,11 @@ if _jinja_cache_dir:
 
 # Caching Configuration — FileSystemCache shared across gunicorn workers (set in config.py)
 cache = Cache(app)
+
+def get_random_trivia():
+    """Return a random badminton trivia from the database."""
+    trivia = BadmintonTrivia.query.order_by(db.func.random()).first()
+    return trivia.trivia if trivia else "Badminton is the fastest racket sport in the world!"
 
 # Gzip compression — reduces HTML response size ~70% on slow Render free tier
 Compress(app)
@@ -103,7 +108,8 @@ def inject_notification_count():
 
             pending_registrations = Player.query.filter_by(is_approved=False).count()
             pending_dropouts = Attendance.query.filter_by(status='PENDING_DROPOUT').join(Session).filter(Session.is_archived == False).count()
-            return {'unread_notification_count': admin_notif_count + pending_registrations + pending_dropouts}
+            pending_standbys = Attendance.query.filter_by(status='PENDING_STANDBY').join(Session).filter(Session.is_archived == False).count()
+            return {'unread_notification_count': admin_notif_count + pending_registrations + pending_dropouts + pending_standbys}
         elif user_type == 'player' and player_id:
             from sqlalchemy import and_, or_
             count = Notification.query.filter(
@@ -498,6 +504,8 @@ def login():
                 session['player_name'] = 'Admin'
                 security_logger.info(f'ADMIN_LOGIN_SUCCESS - IP: {client_ip}')
                 flash('Successfully logged in as admin!', 'success')
+                trivia = get_random_trivia()
+                flash(f'Did you know? {trivia}', 'trivia')
                 log_activity('login', 'Admin login')
                 return redirect(url_for('dashboard'))
             security_logger.warning(f'ADMIN_LOGIN_FAILED - IP: {client_ip}')
@@ -546,7 +554,9 @@ def login():
                         session['must_reset_password'] = True
                         flash('Please set a new password before continuing.', 'warning')
                         return redirect(url_for('force_reset_password'))
+                    trivia = get_random_trivia()
                     flash(f'Welcome back, {player.name}!', 'success')
+                    flash(f'Did you know? {trivia}', 'trivia')
                     return redirect(url_for('player_payments'))
             security_logger.warning(f'PLAYER_LOGIN_FAILED - Email: {email}, IP: {client_ip}')
             log_activity('login_failed', f'Failed player login attempt for {email} from {client_ip}')
@@ -595,6 +605,8 @@ def choose_role():
             flash('Please set a new password before continuing.', 'warning')
             return redirect(url_for('force_reset_password'))
         flash(f'Welcome back, {player_name}! (Admin)', 'success')
+        trivia = get_random_trivia()
+        flash(f'Did you know? {trivia}', 'trivia')
         return redirect(url_for('dashboard'))
     else:
         session['user_type'] = 'player'
@@ -605,7 +617,9 @@ def choose_role():
             session['must_reset_password'] = True
             flash('Please set a new password before continuing.', 'warning')
             return redirect(url_for('force_reset_password'))
+        trivia = get_random_trivia()
         flash(f'Welcome back, {player_name}!', 'success')
+        flash(f'Did you know? {trivia}', 'trivia')
         return redirect(url_for('player_payments'))
 
 
@@ -657,6 +671,9 @@ def google_callback():
         session['user_type'] = 'player'
         security_logger.info(f'GOOGLE_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
         log_activity('login', f'Player {player.name} logged in via Google')
+        flash(f'Welcome back, {player.name}!', 'success')
+        trivia = get_random_trivia()
+        flash(f'Did you know? {trivia}', 'trivia')
         return jsonify({'success': True, 'redirect': url_for('player_payments')})
 
     except ValueError:
@@ -953,6 +970,14 @@ def dashboard():
         Session.is_archived == False
     ).order_by(Session.date.asc()).all()
 
+    # Pending standby requests
+    pending_standby_requests = db.session.query(Attendance).join(Session).join(
+        Player, Attendance.player_id == Player.id
+    ).filter(
+        Attendance.status == 'PENDING_STANDBY',
+        Session.is_archived == False
+    ).order_by(Session.date.asc()).all()
+
     return render_template('dashboard.html',
                          total_players=total_players,
                          upcoming_sessions=upcoming_sessions,
@@ -961,6 +986,7 @@ def dashboard():
                          total_charges=round(total_charges, 2),
                          pending_approvals=pending_approvals,
                          pending_dropout_requests=pending_dropout_requests,
+                         pending_standby_requests=pending_standby_requests,
                          monthly_summary=monthly_summary)
 
 
@@ -1488,6 +1514,85 @@ def approve_player_dropout():
         db.session.commit()
         log_activity('dropout_rejected', f'Admin rejected dropout for {attendance.player.name} in session {attendance.session.date}', 'attendance', attendance.id)
         return jsonify({'success': True, 'message': f'Dropout request rejected for {attendance.player.name}.'})
+
+
+@app.route('/api/player/request-standby', methods=['POST'])
+@csrf.exempt
+@login_required
+def request_player_standby():
+    """Player requests to join a frozen session as standby — sets status to PENDING_STANDBY for admin approval."""
+    if session.get('user_type') != 'player':
+        return jsonify({'error': 'Player access only'}), 403
+
+    current_player_id = session.get('player_id')
+    current_player = Player.query.get(current_player_id)
+    data = request.get_json()
+    session_id = data.get('session_id')
+    target_player_id = data.get('player_id', current_player_id)
+
+    # Must be self or managed player
+    managed_player_ids = [p.id for p in current_player.managed_players]
+    if target_player_id != current_player_id and target_player_id not in managed_player_ids:
+        return jsonify({'error': 'You can only request standby for yourself or your managed players'}), 403
+
+    sess = Session.query.get(session_id)
+    if not sess:
+        return jsonify({'error': 'Session not found'}), 404
+    if not sess.voting_frozen:
+        return jsonify({'error': 'Standby requests are only for frozen sessions'}), 400
+
+    attendance = Attendance.query.filter_by(player_id=target_player_id, session_id=session_id).first()
+    if attendance and attendance.status in ['YES', 'FILLIN', 'STANDBY', 'PENDING_STANDBY']:
+        return jsonify({'error': 'Player is already confirmed or on standby'}), 400
+
+    if not attendance:
+        target_player = Player.query.get(target_player_id)
+        attendance = Attendance(
+            player_id=target_player_id,
+            session_id=session_id,
+            status='PENDING_STANDBY',
+            category=target_player.category or 'regular',
+            payment_status='unpaid'
+        )
+        db.session.add(attendance)
+    else:
+        attendance.status = 'PENDING_STANDBY'
+
+    db.session.commit()
+    clear_session_cache()
+
+    target_player = Player.query.get(target_player_id)
+    log_activity('standby_request', f'{target_player.name} requested standby for session {sess.date}', 'attendance', attendance.id)
+
+    return jsonify({'success': True, 'message': 'Standby request sent. Admin has been notified.'})
+
+
+@app.route('/api/admin/approve-standby', methods=['POST'])
+@csrf.exempt
+@admin_required
+def approve_player_standby():
+    """Admin approves or rejects a pending standby request."""
+    data = request.get_json()
+    attendance_id = data.get('attendance_id')
+    action = data.get('action', 'approve')  # approve or reject
+
+    attendance = Attendance.query.get(attendance_id)
+    if not attendance or attendance.status != 'PENDING_STANDBY':
+        return jsonify({'error': 'No pending standby request found'}), 404
+
+    if action == 'approve':
+        attendance.status = 'STANDBY'
+        db.session.commit()
+        clear_session_cache()
+        log_activity('standby_approved', f'Admin approved standby for {attendance.player.name} in session {attendance.session.date}', 'attendance', attendance.id)
+        return jsonify({'success': True, 'message': f'Standby approved for {attendance.player.name}.'})
+    else:
+        # Reject — revert to NO
+        attendance.status = 'NO'
+        db.session.commit()
+        clear_session_cache()
+        log_activity('standby_rejected', f'Admin rejected standby for {attendance.player.name} in session {attendance.session.date}', 'attendance', attendance.id)
+        return jsonify({'success': True, 'message': f'Standby request rejected for {attendance.player.name}.'})
 
 
 @app.route('/api/player/bulk-attendance', methods=['POST'])
@@ -4722,6 +4827,14 @@ def get_notifications_api():
                 'id': 'dropout', 'title': 'Pending Dropout Requests',
                 'message': f'{pending_dropout_count} player(s) requesting dropout',
                 'type': 'dropout_request', 'link': url_for('sessions'),
+                'is_read': False, 'created_at': ''
+            })
+        pending_standby_count = Attendance.query.filter_by(status='PENDING_STANDBY').join(Session).filter(Session.is_archived == False).count()
+        if pending_standby_count:
+            results.insert(0, {
+                'id': 'standby', 'title': 'Pending Standby Requests',
+                'message': f'{pending_standby_count} player(s) requesting standby',
+                'type': 'standby_request', 'link': url_for('sessions'),
                 'is_read': False, 'created_at': ''
             })
 
