@@ -60,16 +60,16 @@
     </div>
 </div>
 
-<!-- Pending category save bar -->
+<!-- Pending changes save bar -->
 <div id="cat-save-bar" class="hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-xl shadow-2xl border-2 border-wimbledon-purple px-6 py-3 flex items-center gap-4 z-50">
     <span class="text-sm font-medium text-gray-700">
-        <span id="cat-change-count">0</span> unsaved category change(s)
+        <span id="cat-change-count">0</span> unsaved change(s)
     </span>
-    <button onclick="saveCategoryChanges()" class="px-4 py-2 bg-wimbledon-green text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2">
+    <button onclick="saveAllChanges()" class="px-4 py-2 bg-wimbledon-green text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
         Save
     </button>
-    <button onclick="discardCategoryChanges()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-300 transition-all flex items-center gap-2">
+    <button onclick="discardAllChanges()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-300 transition-all flex items-center gap-2">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         Discard
     </button>
@@ -185,30 +185,64 @@ function queueCategoryChange(playerId, category, badgeEl) {
     categoryStyles[category].classes.forEach(c => badgeEl.classList.add(c));
     badgeEl.querySelector('span:first-child').textContent = categoryStyles[category].label;
 
-    // Update save bar
-    const count = Object.keys(pendingCategoryChanges).length;
+    updateSaveBar();
+}
+
+// Level batch save
+const pendingLevelChanges = {};
+
+const levelStyles = {
+    1: { classes: ['bg-gray-400', 'text-white'], label: 'Beg' },
+    2: { classes: ['bg-blue-500', 'text-white'], label: 'Int' },
+    3: { classes: ['bg-amber-500', 'text-white'], label: 'Adv' },
+};
+const allLevelClasses = ['bg-gray-400', 'bg-blue-500', 'bg-amber-500', 'text-white'];
+
+function queueLevelChange(playerId, level, badgeEl) {
+    pendingLevelChanges[playerId] = level;
+
+    // Update badge visually
+    allLevelClasses.forEach(c => badgeEl.classList.remove(c));
+    levelStyles[level].classes.forEach(c => badgeEl.classList.add(c));
+    badgeEl.querySelector('span:first-child').textContent = levelStyles[level].label;
+
+    updateSaveBar();
+}
+
+function updateSaveBar() {
+    const count = Object.keys(pendingCategoryChanges).length + Object.keys(pendingLevelChanges).length;
     document.getElementById('cat-change-count').textContent = count;
     document.getElementById('cat-save-bar').classList.toggle('hidden', count === 0);
 }
 
-async function saveCategoryChanges() {
+async function saveAllChanges() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-    const entries = Object.entries(pendingCategoryChanges);
+    const catEntries = Object.entries(pendingCategoryChanges);
+    const lvlEntries = Object.entries(pendingLevelChanges);
     try {
-        await Promise.all(entries.map(([playerId, category]) =>
-            fetch(`/api/players/${playerId}/category`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ category })
-            })
-        ));
+        await Promise.all([
+            ...catEntries.map(([playerId, category]) =>
+                fetch(`/api/players/${playerId}/category`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ category })
+                })
+            ),
+            ...lvlEntries.map(([playerId, level]) =>
+                fetch(`/api/players/${playerId}/level`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify({ level: parseInt(level) })
+                })
+            )
+        ]);
         location.reload();
     } catch (err) {
         alert('Failed to save changes: ' + err.message);
     }
 }
 
-function discardCategoryChanges() {
+function discardAllChanges() {
     location.reload();
 }
 </script>

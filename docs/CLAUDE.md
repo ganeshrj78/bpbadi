@@ -20,6 +20,7 @@
 │     is_admin        │
 │     is_active       │
 │     is_approved     │
+│     level           │
 │     additional_chgs │
 │     admin_comments  │
 │     created/updated │
@@ -81,7 +82,10 @@
 │     entity_id        │        │     link             │
 │     description      │        │ FK  created_by       │──► players.id
 │     ip_address       │        │     created_at       │
-└──────────────────────┘        └──────────┬───────────┘
+│     device_type      │        └──────────┬───────────┘
+│     os               │
+│     browser          │
+└──────────────────────┘
                                            │ 1:N
                                            ▼
                                 ┌──────────────────────┐
@@ -149,6 +153,7 @@
 | `is_admin` | BOOLEAN | FALSE | Player-level admin |
 | `is_active` | BOOLEAN | TRUE | Active membership |
 | `is_approved` | BOOLEAN | FALSE | Admin approval required |
+| `level` | INTEGER | 1 | Skill level: 1=Beginner, 2=Intermediate, 3=Advanced |
 | `additional_charges` | FLOAT | 0 | Extra charges by admin |
 | `admin_comments` | TEXT | NULL | Admin notes |
 | `created_by/at` | | | Audit |
@@ -297,6 +302,9 @@ Regular and adhoc players pay the same rate.
 | `entity_id` | INTEGER | NULL | ID of affected entity |
 | `description` | TEXT NN | — | Human-readable description |
 | `ip_address` | VARCHAR(45) | NULL | IPv4 or IPv6 |
+| `device_type` | VARCHAR(10) | NULL | `Desktop`, `Mobile`, `Tablet` |
+| `os` | VARCHAR(50) | NULL | e.g. `macOS 14.2`, `Windows 10/11`, `iOS 17.3`, `Android 14` |
+| `browser` | VARCHAR(100) | NULL | e.g. `Chrome 120`, `Safari 17` |
 
 **Indexes:** action, (timestamp, action)
 

@@ -2,6 +2,8 @@
 
 Conventions and guidance for working with templates in BP Badminton.
 
+**IMPORTANT:** All UI changes MUST be mobile-friendly. All changes must be documented back in `CLAUDE.md`, `templates/CLAUDE.md`, `docs/CLAUDE.md`, `requirements.txt`, and memory files.
+
 ## Technology Stack
 
 - **Jinja2** - Server-side templating
@@ -41,7 +43,7 @@ Conventions and guidance for working with templates in BP Badminton.
 | `month_sessions.html` | Monthly session summary |
 | `notifications.html` | Player notifications |
 | `admin_notifications.html` | Admin notification management |
-| `activity_logs.html` | Audit log viewer |
+| `activity_logs.html` | Audit log viewer: togglable columns (localStorage), resizable headers, device/browser tracking, trash delete |
 | `guidelines.html` | Club guidelines (editable via SiteSettings) |
 | `ezfacility_settings.html` | EZFacility integration settings |
 | `ezfacility_sync.html` | Court booking sync from EZFacility |

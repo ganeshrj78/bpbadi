@@ -57,7 +57,8 @@ class Player(db.Model):
     is_active = db.Column(db.Boolean, default=True, index=True)  # Active/Inactive status
     is_approved = db.Column(db.Boolean, default=False, index=True)  # Registration approval status
 
-    # Admin-managed fields for active sessions
+    # Admin-managed fields
+    level = db.Column(db.Integer, default=1)  # Skill level: 1=Beginner, 2=Intermediate, 3=Advanced
     additional_charges = db.Column(db.Float, default=0)  # Extra charges added by admin
     admin_comments = db.Column(db.Text)  # Admin comments for this player
 
@@ -558,6 +559,9 @@ class ActivityLog(db.Model):
     entity_id = db.Column(db.Integer)
     description = db.Column(db.Text, nullable=False)  # Human-readable description
     ip_address = db.Column(db.String(45))  # IPv4 or IPv6
+    device_type = db.Column(db.String(10))  # 'Desktop', 'Mobile', 'Tablet'
+    os = db.Column(db.String(50))  # e.g. 'macOS 14.2', 'Windows 10/11', 'iOS 17.3'
+    browser = db.Column(db.String(100))  # e.g. 'Chrome 120', 'Safari 17'
 
     __table_args__ = (
         db.Index('idx_activity_log_action', 'action'),

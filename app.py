@@ -244,6 +244,64 @@ def admin_required(f):
 
 
 # Activity logging helper
+def _parse_user_agent(ua_string):
+    """Parse User-Agent string to extract device type, OS, and browser. Lightweight — no external deps."""
+    if not ua_string:
+        return 'Unknown', 'Unknown', 'Unknown'
+
+    ua = ua_string.lower()
+    import re
+
+    # Device type
+    if any(k in ua for k in ('iphone', 'android', 'mobile', 'ipod')):
+        device = 'Mobile'
+    elif any(k in ua for k in ('ipad', 'tablet')):
+        device = 'Tablet'
+    else:
+        device = 'Desktop'
+
+    # OS detection
+    os_name = 'Unknown'
+    os_patterns = [
+        (r'iphone os (\d+[_.\d]*)', lambda m: f'iOS {m.group(1).replace("_", ".")}'),
+        (r'ipad.*os (\d+[_.\d]*)', lambda m: f'iPadOS {m.group(1).replace("_", ".")}'),
+        (r'android (\d+[.\d]*)', lambda m: f'Android {m.group(1)}'),
+        (r'windows nt 10\.0', lambda m: 'Windows 10/11'),
+        (r'windows nt 6\.3', lambda m: 'Windows 8.1'),
+        (r'windows nt 6\.1', lambda m: 'Windows 7'),
+        (r'mac os x (\d+[_.\d]*)', lambda m: f'macOS {m.group(1).replace("_", ".")}'),
+        (r'cros', lambda m: 'ChromeOS'),
+        (r'linux', lambda m: 'Linux'),
+    ]
+    for pattern, formatter in os_patterns:
+        m = re.search(pattern, ua)
+        if m:
+            os_name = formatter(m)
+            break
+
+    # Browser detection (order matters — check specific before generic)
+    browser = 'Unknown'
+    browser_patterns = [
+        (r'edg[ea]?/(\d+)', 'Edge'),
+        (r'opr/(\d+)', 'Opera'),
+        (r'chrome/(\d+)', 'Chrome'),
+        (r'crios/(\d+)', 'Chrome'),
+        (r'firefox/(\d+)', 'Firefox'),
+        (r'fxios/(\d+)', 'Firefox'),
+        (r'version/(\d+).*safari', 'Safari'),
+        (r'safari/(\d+)', 'Safari'),
+        (r'msie (\d+)', 'IE'),
+        (r'trident/.*rv:(\d+)', 'IE'),
+    ]
+    for pattern, name in browser_patterns:
+        m = re.search(pattern, ua)
+        if m:
+            browser = f'{name} {m.group(1)}'
+            break
+
+    return device, os_name, browser
+
+
 def log_activity(action, description, entity_type=None, entity_id=None):
     """Log an activity. Non-blocking — failures are silently logged, never affect the main request."""
     try:
@@ -257,6 +315,10 @@ def log_activity(action, description, entity_type=None, entity_id=None):
                 user_name = player.name if player else 'Unknown'
             else:
                 user_name = 'Unknown'
+
+        ua_string = request.headers.get('User-Agent', '')
+        device_type, os_name, browser = _parse_user_agent(ua_string)
+
         log = ActivityLog(
             user_type=user_type,
             user_name=user_name,
@@ -264,7 +326,10 @@ def log_activity(action, description, entity_type=None, entity_id=None):
             entity_type=entity_type,
             entity_id=entity_id,
             description=description,
-            ip_address=request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+            ip_address=request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip(),
+            device_type=device_type,
+            os=os_name,
+            browser=browser
         )
         db.session.add(log)
         db.session.commit()
@@ -1856,7 +1921,8 @@ def add_player():
             flash('Name is required', 'error')
             return render_template('player_form.html', player=None)
 
-        player = Player(name=name, category=category, phone=phone, email=email, zelle_preference=zelle_preference, gender=gender, is_approved=True)
+        level = int(request.form.get('level', 1))
+        player = Player(name=name, category=category, phone=phone, email=email, zelle_preference=zelle_preference, gender=gender, level=level, is_approved=True)
 
         # Handle date of birth
         if dob_str:
@@ -1931,6 +1997,7 @@ def edit_player(id):
         player.email = request.form.get('email')
         player.zelle_preference = request.form.get('zelle_preference', 'email')
         player.gender = request.form.get('gender', 'male')
+        player.level = int(request.form.get('level', player.level or 1))
         dob_str = request.form.get('date_of_birth')
         player.date_of_birth = datetime.strptime(dob_str, '%Y-%m-%d').date() if dob_str else None
 
@@ -2006,6 +2073,20 @@ def update_player_category(id):
         'player_id': player.id,
         'category': player.category
     })
+
+
+@app.route('/api/players/<int:id>/level', methods=['POST'])
+@csrf.exempt
+@admin_required
+def update_player_level(id):
+    player = Player.query.get_or_404(id)
+    data = request.get_json()
+    level = data.get('level')
+    if level not in [1, 2, 3]:
+        return jsonify({'error': 'Invalid level'}), 400
+    player.level = level
+    db.session.commit()
+    return jsonify({'success': True, 'player_id': player.id, 'level': player.level})
 
 
 @app.route('/players/<int:id>/toggle-active', methods=['POST'])
@@ -4942,9 +5023,11 @@ def ratelimit_handler(e):
 @app.route('/activity-logs')
 @admin_required
 def activity_logs():
-    all_logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).all()
+    total_count = ActivityLog.query.count()
+    # Cap at 2000 most recent logs for client-side performance
+    all_logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).limit(2000).all()
 
-    # Build JSON for client-side filtering
+    # Build JSON for client-side filtering — use list comprehension for speed
     import json
     logs_json = json.dumps([{
         'id': log.id,
@@ -4955,7 +5038,10 @@ def activity_logs():
         'user_type': log.user_type,
         'action': log.action,
         'description': log.description,
-        'ip': log.ip_address or ''
+        'ip': log.ip_address or '',
+        'device': log.device_type or '',
+        'os': log.os or '',
+        'browser': log.browser or ''
     } for log in all_logs])
 
     # Get distinct actions for filter dropdown
@@ -4964,7 +5050,7 @@ def activity_logs():
 
     # Fake paginator for total count in template
     class LogsInfo:
-        total = len(all_logs)
+        total = total_count
 
     return render_template('activity_logs.html', logs=LogsInfo(), actions=actions, logs_json=logs_json)
 
