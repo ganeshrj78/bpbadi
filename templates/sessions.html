@@ -331,7 +331,7 @@
         <table class="min-w-full">
             <thead class="sticky top-0 z-20">
                 <tr class="bg-gradient-to-r from-wimbledon-cream to-white border-b border-wimbledon-gold/20">
-                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider sticky left-0 bg-wimbledon-cream z-30 min-w-[120px] sm:min-w-[180px] md:min-w-[220px]">
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-wimbledon-purple uppercase tracking-wider sm:sticky sm:left-0 bg-wimbledon-cream z-30 min-w-[120px] sm:min-w-[180px] md:min-w-[220px]">
                         Player
                     </th>
                     {% for session in active_sessions %}
@@ -389,7 +389,7 @@
                 <!-- Regular Players Section -->
                 {% if regular_players %}
                 <tr class="bg-green-50 cursor-pointer" @click="sectionOpen.regular = !sectionOpen.regular">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-green-700 uppercase tracking-wider sticky left-0 bg-green-50">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-green-700 uppercase tracking-wider sm:sticky sm:left-0 bg-green-50">
                         <div class="flex items-center gap-2">
                             <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.regular ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             Regular Players ({{ regular_players|length }})
@@ -400,7 +400,7 @@
                 {% set stats = player_stats[player.id] %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="sectionOpen.regular && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || paymentFilter === '{{ player_payment_filter.get(player.id, "all") }}')">
-                    <td class="px-2 sm:px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
+                    <td class="px-2 sm:px-2 sm:px-4 py-2 whitespace-nowrap sm:sticky sm:left-0 bg-white z-10">
                         <div class="flex items-center space-x-1 sm:space-x-2">
                             <input type="checkbox"
                                 :checked="selectedPlayers.includes({{ player.id }})"
@@ -589,7 +589,7 @@
                 <!-- Adhoc Players Section -->
                 {% if adhoc_players %}
                 <tr class="bg-purple-50 cursor-pointer" @click="sectionOpen.adhoc = !sectionOpen.adhoc">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-purple-700 uppercase tracking-wider sticky left-0 bg-purple-50">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-purple-700 uppercase tracking-wider sm:sticky sm:left-0 bg-purple-50">
                         <div class="flex items-center gap-2">
                             <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.adhoc ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             Adhoc Players ({{ adhoc_players|length }})
@@ -600,7 +600,7 @@
                 {% set stats = player_stats[player.id] %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="sectionOpen.adhoc && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || paymentFilter === '{{ player_payment_filter.get(player.id, "all") }}')">
-                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap sm:sticky sm:left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
                                 :checked="selectedPlayers.includes({{ player.id }})"
@@ -789,7 +789,7 @@
                 <!-- Kid Players Section -->
                 {% if kid_players %}
                 <tr class="bg-yellow-50 cursor-pointer" @click="sectionOpen.kid = !sectionOpen.kid">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-yellow-700 uppercase tracking-wider sticky left-0 bg-yellow-50">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-yellow-700 uppercase tracking-wider sm:sticky sm:left-0 bg-yellow-50">
                         <div class="flex items-center gap-2">
                             <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.kid ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             Kids ({{ kid_players|length }})
@@ -800,7 +800,7 @@
                 {% set stats = player_stats[player.id] %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="sectionOpen.kid && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || paymentFilter === '{{ player_payment_filter.get(player.id, "all") }}')">
-                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap sm:sticky sm:left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
                                 :checked="selectedPlayers.includes({{ player.id }})"
@@ -986,7 +986,7 @@
                 <!-- Not Playing Section -->
                 {% if not_playing_players | default([]) %}
                 <tr class="bg-gray-100 cursor-pointer" x-show="paymentFilter === 'all' || paymentFilter === 'not_participating'" @click="sectionOpen.notplaying = !sectionOpen.notplaying">
-                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-100">
+                    <td colspan="{{ active_sessions|length + 5 }}" class="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider sm:sticky sm:left-0 bg-gray-100">
                         <div class="flex items-center gap-2">
                             <svg class="w-3.5 h-3.5 transition-transform" :class="sectionOpen.notplaying ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             Not Playing ({{ not_playing_players|length }})
@@ -997,7 +997,7 @@
                 {% set stats = player_stats[player.id] %}
                 <tr class="border-b border-gray-100 hover:bg-gray-50 transition-all"
                     x-show="sectionOpen.notplaying && (searchQuery === '' || '{{ player.name|lower }}'.includes(searchQuery.toLowerCase())) && (paymentFilter === 'all' || (paymentFilter === 'not_participating'))">
-                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap sticky left-0 bg-white z-10">
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap sm:sticky sm:left-0 bg-white z-10">
                         <div class="flex items-center space-x-2">
                             <input type="checkbox"
                                 :checked="selectedPlayers.includes({{ player.id }})"
