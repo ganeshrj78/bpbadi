@@ -45,7 +45,7 @@
 
 <!-- Monthly Summary -->
 {% if monthly_summary %}
-<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden mb-8" x-data="{ expandedMonth: null }">
+<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-x-auto mb-8" x-data="{ expandedMonth: null }">
     <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-gold/10 to-white">
         <h2 class="text-lg font-serif font-bold text-wimbledon-purple flex items-center">
             <svg class="w-5 h-5 mr-2 text-wimbledon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,7 +190,7 @@
 </div>
 
 <!-- Active Sessions - Attendance Matrix -->
-<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-hidden mb-8" x-data="sessionsMatrix()">
+<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 overflow-x-auto mb-8" x-data="sessionsMatrix()">
     <div class="px-3 sm:px-6 py-3 sm:py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-cream to-white">
         <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             <h2 class="text-sm sm:text-lg font-serif font-bold text-wimbledon-purple flex items-center">
@@ -327,7 +327,7 @@
             </button>
         </div>
     </div>
-    <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+    <div class="overflow-x-auto sm:max-h-[600px] sm:overflow-y-auto" style="-webkit-overflow-scrolling: touch;">
         <table class="min-w-full">
             <thead class="sticky top-0 z-20">
                 <tr class="bg-gradient-to-r from-wimbledon-cream to-white border-b border-wimbledon-gold/20">
