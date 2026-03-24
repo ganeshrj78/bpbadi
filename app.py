@@ -5189,7 +5189,7 @@ def get_notifications_api():
             results.insert(0, {
                 'id': 'dropout', 'title': 'Pending Dropout Requests',
                 'message': f'{pending_dropout_count} player(s) requesting dropout',
-                'type': 'dropout_request', 'link': url_for('sessions'),
+                'type': 'dropout_request', 'link': url_for('dashboard'),
                 'is_read': False, 'created_at': ''
             })
         pending_standby_count = Attendance.query.filter_by(status='PENDING_STANDBY').join(Session).filter(Session.is_archived == False).count()
@@ -5197,7 +5197,7 @@ def get_notifications_api():
             results.insert(0, {
                 'id': 'standby', 'title': 'Pending Standby Requests',
                 'message': f'{pending_standby_count} player(s) requesting standby',
-                'type': 'standby_request', 'link': url_for('sessions'),
+                'type': 'standby_request', 'link': url_for('dashboard'),
                 'is_read': False, 'created_at': ''
             })
 

@@ -278,7 +278,7 @@
                                         <div class="px-4 py-6 text-center text-sm text-gray-400">No notifications</div>
                                     </template>
                                     <template x-for="n in notifs" :key="n.id">
-                                        <a :href="n.link || '#'" class="block px-4 py-3 hover:bg-wimbledon-cream/30 transition-all" :class="!n.is_read ? 'bg-blue-50/50' : ''">
+                                        <a :href="n.link ? n.link : ('{{ url_for("notifications_page") }}?expand=' + n.id)" class="block px-4 py-3 hover:bg-wimbledon-cream/30 transition-all" :class="!n.is_read ? 'bg-blue-50/50' : ''">
                                             <div class="flex items-start gap-2">
                                                 <div class="mt-0.5 flex-shrink-0">
                                                     <template x-if="n.type === 'general'">
@@ -373,7 +373,7 @@
                                         <div class="px-4 py-6 text-center text-sm text-gray-400">No notifications</div>
                                     </template>
                                     <template x-for="n in notifs" :key="n.id">
-                                        <a :href="n.link || '#'" class="block px-4 py-3 hover:bg-wimbledon-cream/30 transition-all" :class="!n.is_read ? 'bg-blue-50/50' : ''">
+                                        <a :href="n.link ? n.link : ('{{ url_for("notifications_page") }}?expand=' + n.id)" class="block px-4 py-3 hover:bg-wimbledon-cream/30 transition-all" :class="!n.is_read ? 'bg-blue-50/50' : ''">
                                             <div class="flex items-start gap-2">
                                                 <div class="mt-0.5 flex-shrink-0">
                                                     <template x-if="n.type === 'general'">
