@@ -569,16 +569,19 @@ def compute_session_display_stats(session_ids):
     for c in all_courts:
         courts_by_session[c.session_id].append(c)
 
-    # Attendance counts per session
-    reg_counts = defaultdict(int)
+    # Attendance counts per session (split regular vs adhoc vs kid)
+    regular_counts = defaultdict(int)
+    adhoc_counts = defaultdict(int)
     kid_counts = defaultdict(int)
     total_counts = defaultdict(int)
     for att in all_att:
         total_counts[att.session_id] += 1
         if att.category == 'kid':
             kid_counts[att.session_id] += 1
+        elif att.category == 'adhoc':
+            adhoc_counts[att.session_id] += 1
         else:
-            reg_counts[att.session_id] += 1
+            regular_counts[att.session_id] += 1
 
     stats = {}
     for sid in session_ids:
@@ -604,13 +607,13 @@ def compute_session_display_stats(session_ids):
         else:
             time_range = ('TBD', 'TBD')
 
-        # Cost per player
+        # Cost per player — divide court pool by regular-category count only (adhoc pays same rate)
         reg_court_cost = sum(c.cost for c in courts if c.court_type != 'adhoc')
         court_pool = reg_court_cost + ((sess.credits or 0) if sess.apply_credits else 0)
-        rc = reg_counts.get(sid, 0)
+        rc = regular_counts.get(sid, 0)
         cost_per_player = round(court_pool / rc + sess.birdie_cost, 2) if rc > 0 else (sess.birdie_cost or 0)
 
-        non_kid = reg_counts.get(sid, 0)
+        non_kid = regular_counts.get(sid, 0) + adhoc_counts.get(sid, 0)
         kids = kid_counts.get(sid, 0)
         birdie_total = round((sess.birdie_cost or 0) * non_kid, 2)
         total_collection = round(cost_per_player * non_kid + 11.0 * kids, 2)
@@ -619,6 +622,9 @@ def compute_session_display_stats(session_ids):
             'time_range': time_range,
             'court_count': len(courts),
             'attendee_count': total_counts.get(sid, 0),
+            'regular_count': regular_counts.get(sid, 0),
+            'adhoc_count': adhoc_counts.get(sid, 0),
+            'kid_count': kids,
             'cost_per_player': cost_per_player,
             'birdie_total': birdie_total,
             'total_collection': total_collection,
