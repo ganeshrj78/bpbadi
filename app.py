@@ -4383,22 +4383,37 @@ def birdie_bank():
     # Admin list for purchased_by dropdown
     admins = Player.query.filter_by(is_admin=True, is_active=True, is_approved=True).order_by(Player.name).all()
 
-    # Compute per-admin owed: purchases - reimbursements
+    # Compute per-person owed: purchases + expenses - reimbursements
     admin_owed = {}
+    person_expenses = {}
     for t in transactions:
-        if t.purchased_by and t.transaction_type == 'purchase':
+        if t.purchased_by and t.transaction_type in ('purchase', 'expense'):
             admin_owed[t.purchased_by] = admin_owed.get(t.purchased_by, 0.0) + (t.cost or 0)
+            if t.transaction_type == 'expense':
+                person_expenses[t.purchased_by] = person_expenses.get(t.purchased_by, 0.0) + (t.cost or 0)
         elif t.purchased_by and t.transaction_type == 'reimbursement':
             admin_owed[t.purchased_by] = admin_owed.get(t.purchased_by, 0.0) - (t.cost or 0)
-    # Build display list: {player_id: {name, owed}}
+    # Build display list — only show rows with outstanding balance
     admin_owed_list = []
-    admin_name_map = {a.id: a.name for a in admins}
+    owed_pids = [pid for pid, amt in admin_owed.items() if round(amt, 2) > 0]
+    all_players_map = {a.id: a.name for a in Player.query.filter(Player.id.in_(owed_pids)).all()} if owed_pids else {}
     for pid, amount in sorted(admin_owed.items(), key=lambda x: -x[1]):
-        name = admin_name_map.get(pid)
+        rounded = round(amount, 2)
+        if rounded <= 0:
+            continue
+        name = all_players_map.get(pid)
         if not name:
             p = Player.query.get(pid)
             name = p.name if p else 'Unknown'
-        admin_owed_list.append({'id': pid, 'name': name, 'owed': round(amount, 2)})
+        admin_owed_list.append({'id': pid, 'name': name, 'owed': rounded})
+
+    # Compute outstanding (unreimbursed) expense amount per person
+    # For each person: expense_remaining = min(their_expenses, max(0, their_owed))
+    expense_outstanding = 0.0
+    for pid, exp_total in person_expenses.items():
+        owed = max(0, round(admin_owed.get(pid, 0), 2))
+        expense_outstanding += min(exp_total, owed)
+    expense_outstanding = round(expense_outstanding, 2)
 
     # Birdie cost collected from players: birdie_cost * charged_players per session
     all_sessions_with_birdie = Session.query.filter(Session.birdie_cost > 0).all()
@@ -4431,7 +4446,16 @@ def birdie_bank():
 
     # Total reimbursed
     total_reimbursed = sum(t.cost or 0 for t in transactions if t.transaction_type == 'reimbursement')
-    birdie_fund_balance = round(total_birdie_collected - total_reimbursed, 2)
+    total_expenses = sum(t.cost or 0 for t in transactions if t.transaction_type == 'expense')
+    birdie_fund_balance = round(total_birdie_collected - total_reimbursed - total_expenses, 2)
+
+    # Expense breakdown by category
+    expense_by_category = {}
+    for t in transactions:
+        if t.transaction_type == 'expense':
+            cat = t.expense_category or 'Other'
+            expense_by_category[cat] = expense_by_category.get(cat, 0.0) + (t.cost or 0)
+    expense_by_category = {k: round(v, 2) for k, v in sorted(expense_by_category.items(), key=lambda x: -x[1])}
 
     return render_template('birdie_bank.html',
                          transactions=transactions,
@@ -4439,7 +4463,10 @@ def birdie_bank():
                          total_spent=total_spent,
                          total_birdie_collected=total_birdie_collected,
                          total_reimbursed=round(total_reimbursed, 2),
+                         total_expenses=round(total_expenses, 2),
+                         expense_outstanding=expense_outstanding,
                          birdie_fund_balance=birdie_fund_balance,
+                         expense_by_category=expense_by_category,
                          sessions=sessions_list,
                          admins=admins,
                          admin_owed_list=admin_owed_list,
@@ -4457,13 +4484,15 @@ def add_birdie_transaction():
     date_str = request.form.get('date')
     session_id = request.form.get('session_id')
     purchased_by = request.form.get('purchased_by')
+    expense_category = request.form.get('expense_category')
 
     transaction_date = datetime.strptime(date_str, '%Y-%m-%d') if date_str else datetime.utcnow()
 
     transaction = BirdieBank(
         transaction_type=transaction_type,
         quantity=quantity,
-        cost=cost if transaction_type in ('purchase', 'reimbursement') else 0,
+        cost=cost if transaction_type in ('purchase', 'reimbursement', 'expense') else 0,
+        expense_category=expense_category if transaction_type == 'expense' else None,
         notes=notes,
         date=transaction_date,
         session_id=int(session_id) if session_id else None,
@@ -4482,6 +4511,12 @@ def add_birdie_transaction():
         who = purchaser.name if purchaser else 'Unknown'
         log_activity('birdie_reimbursement', f'Reimbursed {who} ${cost:.2f} for birdie purchase', 'birdie')
         flash(f'Reimbursed {who} ${cost:.2f} for birdie purchase', 'success')
+    elif transaction_type == 'expense':
+        purchaser = Player.query.get(int(purchased_by)) if purchased_by else None
+        who = f' (paid by {purchaser.name})' if purchaser else ''
+        cat = expense_category or 'Other'
+        log_activity('misc_expense', f'Misc Expense ({cat}): ${cost:.2f}{who} - {notes or ""}', 'birdie')
+        flash(f'Recorded misc expense ({cat}): ${cost:.2f}{who}', 'success')
     else:
         log_activity('birdie_transaction', f'Usage: {quantity} birdies', 'birdie')
         flash(f'Recorded usage of {quantity} birdies', 'success')
@@ -4499,11 +4534,11 @@ def adjust_birdie_owed():
     if player_id is None or new_owed is None:
         return jsonify(success=False, error='Missing player_id or new_owed'), 400
     new_owed = round(float(new_owed), 2)
-    # Compute current owed: purchases - reimbursements for this player
+    # Compute current owed: purchases + expenses - reimbursements for this player
     transactions = BirdieBank.query.filter_by(purchased_by=player_id).all()
     current_owed = 0.0
     for t in transactions:
-        if t.transaction_type == 'purchase':
+        if t.transaction_type in ('purchase', 'expense'):
             current_owed += (t.cost or 0)
         elif t.transaction_type == 'reimbursement':
             current_owed -= (t.cost or 0)

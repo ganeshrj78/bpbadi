@@ -506,9 +506,10 @@ class BirdieBank(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime, default=datetime.utcnow)
-    transaction_type = db.Column(db.String(20), nullable=False)  # 'purchase', 'usage', or 'reimbursement'
-    quantity = db.Column(db.Integer, nullable=False)  # positive for purchase, positive for usage
-    cost = db.Column(db.Float, default=0)  # cost for purchases, reimbursement amount
+    transaction_type = db.Column(db.String(20), nullable=False)  # 'purchase', 'usage', 'reimbursement', or 'expense'
+    quantity = db.Column(db.Integer, nullable=False)  # positive for purchase, positive for usage (0 for expenses)
+    cost = db.Column(db.Float, default=0)  # cost for purchases, reimbursement amount, or expense amount
+    expense_category = db.Column(db.String(50), nullable=True)  # e.g., 'Kits', 'Racquets', 'Nets', 'Other'
     notes = db.Column(db.Text)
     session_id = db.Column(db.Integer, db.ForeignKey('sessions.id'), nullable=True)  # link to session for usage
     purchased_by = db.Column(db.Integer, db.ForeignKey('players.id'), nullable=True)  # who paid for purchase/who gets reimbursed
@@ -529,6 +530,7 @@ class BirdieBank(db.Model):
             'transaction_type': self.transaction_type,
             'quantity': self.quantity,
             'cost': self.cost,
+            'expense_category': self.expense_category,
             'notes': self.notes,
             'session_id': self.session_id
         }
@@ -544,6 +546,11 @@ class BirdieBank(db.Model):
     def get_total_spent():
         """Calculate total amount spent on birdies"""
         return db.session.query(db.func.sum(BirdieBank.cost)).filter_by(transaction_type='purchase').scalar() or 0
+
+    @staticmethod
+    def get_total_expenses():
+        """Calculate total miscellaneous expenses"""
+        return db.session.query(db.func.sum(BirdieBank.cost)).filter_by(transaction_type='expense').scalar() or 0
 
 
 class ActivityLog(db.Model):
