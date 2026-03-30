@@ -17,7 +17,7 @@
 <div class="flex items-start justify-between mb-8">
     <div>
         <h1 class="text-2xl sm:text-4xl font-serif font-bold text-wimbledon-purple">Sync from Royal Facility</h1>
-        <p class="text-gray-500 mt-1">Fetch court bookings and compare with local sessions</p>
+        <p class="text-gray-500 mt-1">Fetch court bookings for <span class="font-semibold text-wimbledon-purple" x-data x-text="new Date().toLocaleDateString('en-US', {month: 'long', year: 'numeric'})"></span> and compare with local sessions</p>
     </div>
     <a href="{{ url_for('ezfacility_settings') }}" class="text-sm text-gray-400 hover:text-wimbledon-purple mt-2">⚙ Settings</a>
 </div>
@@ -234,13 +234,27 @@ function ezfacilitySync() {
                 .reduce((sum, b) => sum + b.courts.filter(c => c.already_in_local).length, 0);
         },
 
+        currentMonthDates() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const days = new Date(year, month + 1, 0).getDate();
+            const dates = [];
+            for (let d = 1; d <= days; d++) {
+                const dt = new Date(year, month, d);
+                dates.push(dt.toISOString().slice(0, 10));
+            }
+            return dates;
+        },
+
         async fetchBookings() {
             this.state = 'loading';
             this.error = null;
             try {
                 const resp = await fetch('{{ url_for('api_ezfacility_fetch_bookings') }}', {
                     method: 'POST',
-                    headers: {'X-CSRFToken': CSRF_TOKEN}
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+                    body: JSON.stringify({ dates: this.currentMonthDates() })
                 });
                 const data = await resp.json();
                 if (!data.success) {

@@ -390,7 +390,7 @@ def get_cached_monthly_summary():
         if key not in monthly_summary:
             monthly_summary[key] = {
                 'label': label, 'sessions': [], 'total_sessions': 0,
-                'archived_sessions': 0, 'birdie_charges': 0,
+                'archived_sessions': 0, 'birdie_charges': 0, 'court_charges': 0,
                 'regular_charges': 0, 'adhoc_charges': 0, 'kid_charges': 0,
                 'total_refunds': 0, 'total_collection': 0,
                 'payments_received': 0, 'pending_credits': 0, 'session_credits': 0,
@@ -425,12 +425,15 @@ def get_cached_monthly_summary():
             'regular_charges': regular_charges, 'adhoc_charges': adhoc_charges,
             'kid_charges': kid_charges, 'total_refunds': total_refunds,
             'total_collection': total_collection, 'cost_per_player': cost_per_player,
+            'birdie_total': birdie_total,
+            'court_charges': round(courts['regular'] + courts['adhoc'], 2),
         }
         monthly_summary[key]['sessions'].append(sess_data)
         monthly_summary[key]['total_sessions'] += 1
         if sess.is_archived:
             monthly_summary[key]['archived_sessions'] += 1
         monthly_summary[key]['birdie_charges'] += birdie_total
+        monthly_summary[key]['court_charges'] += sess_data['court_charges']
         monthly_summary[key]['regular_charges'] += regular_charges
         monthly_summary[key]['adhoc_charges'] += adhoc_charges
         monthly_summary[key]['kid_charges'] += kid_charges
@@ -620,7 +623,7 @@ def compute_session_display_stats(session_ids):
 
         stats[sid] = {
             'time_range': time_range,
-            'court_count': len(courts),
+            'court_count': sum(1 for c in courts if c.court_type != 'adhoc'),
             'attendee_count': total_counts.get(sid, 0),
             'regular_count': regular_counts.get(sid, 0),
             'adhoc_count': adhoc_counts.get(sid, 0),

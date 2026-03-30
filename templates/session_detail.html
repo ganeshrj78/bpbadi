@@ -151,7 +151,7 @@
             <span class="text-sm font-medium text-gray-500">Per Player</span>
         </div>
         <div class="text-2xl sm:text-3xl font-bold text-wimbledon-green" id="cost-per-player">${{ "%.2f"|format(sess_stats.cost_per_player) }}</div>
-        <div class="text-xs text-gray-400 mt-1">based on {{ sess_stats.regular_count | default(0) }} regular · incl. ${{ "%.2f"|format(session.birdie_cost) }} birdie</div>
+        <div class="text-xs text-gray-400 mt-1">based on {{ sess_stats.regular_count | default(0) }} regular · birdie total: ${{ "%.2f"|format(sess_stats.birdie_total | default(0)) }}</div>
     </div>
 </div>
 
@@ -169,12 +169,14 @@
         {% set regular_cost = session.get_regular_court_cost() %}
         {% set adhoc_cost = session.get_adhoc_court_cost() %}
         {% set credits = session.credits or 0 %}
-        {% set court_pool = regular_cost + credits %}
-        {% set non_kid_count = session.get_regular_player_count() + session.get_adhoc_player_count() %}
+        {% set reg_count = session.get_regular_player_count() %}
+        {% set adhoc_count = session.get_adhoc_player_count() %}
+        {% set non_kid_count = reg_count + adhoc_count %}
+        {% set court_pool = regular_cost + (credits if session.apply_credits else 0) %}
 
         <!-- Row 1: Cost Pool Breakdown -->
         <div>
-            <div class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Court Pool — regular courts only, split equally among all players</div>
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Court Pool — split equally among regular players</div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div class="bg-green-50 rounded-xl p-4 border border-green-200">
                     <div class="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Regular Courts</div>
@@ -183,20 +185,17 @@
                 <div class="bg-purple-50 rounded-xl p-4 border border-purple-200">
                     <div class="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">Adhoc Courts</div>
                     <div class="text-2xl font-bold text-purple-700">${{ "%.2f"|format(adhoc_cost) }}</div>
-                    {% if adhoc_cost > 0 %}
-                    <div class="text-xs text-purple-500 mt-1">Funded from credits</div>
-                    {% endif %}
                 </div>
                 <div class="bg-teal-50 rounded-xl p-4 border border-teal-200">
                     <div class="text-xs font-medium text-teal-600 uppercase tracking-wide mb-1">Credits</div>
                     <div class="text-2xl font-bold text-teal-700">${{ "%.2f"|format(credits) }}</div>
-                    <div class="text-xs text-teal-500 mt-1">Adjusts next month</div>
+                    <div class="text-xs text-teal-500 mt-1">{% if session.apply_credits %}Applied{% else %}Not applied{% endif %}</div>
                 </div>
                 <div class="bg-wimbledon-purple/10 rounded-xl p-4 border border-wimbledon-purple/20">
                     <div class="text-xs font-medium text-wimbledon-purple uppercase tracking-wide mb-1">Total Pool</div>
                     <div class="text-2xl font-bold text-wimbledon-purple">${{ "%.2f"|format(court_pool) }}</div>
-                    {% if non_kid_count > 0 %}
-                    <div class="text-xs text-wimbledon-purple/70 mt-1">${{ "%.2f"|format(court_pool / non_kid_count) }} × {{ non_kid_count }} players</div>
+                    {% if reg_count > 0 %}
+                    <div class="text-xs text-wimbledon-purple/70 mt-1">${{ "%.2f"|format(court_pool / reg_count) }}/player × {{ reg_count }} regular</div>
                     {% endif %}
                 </div>
             </div>
@@ -209,12 +208,7 @@
                 <div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
                     <div class="text-xs font-medium text-yellow-600 uppercase tracking-wide mb-1">Birdie Cost</div>
                     <div class="text-2xl font-bold text-yellow-700">${{ "%.2f"|format(sess_stats.birdie_total) }}</div>
-                    <div class="text-xs text-yellow-600 mt-1">${{ "%.2f"|format(session.birdie_cost) }} × {{ (sess_stats.regular_count | default(0)) + (sess_stats.adhoc_count | default(0)) }} players</div>
-                </div>
-                <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                    <div class="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Expected Collection</div>
-                    <div class="text-2xl font-bold text-blue-700">${{ "%.2f"|format(sess_stats.total_collection) }}</div>
-                    <div class="text-xs text-blue-500 mt-1">Pool + birdie + kids</div>
+                    <div class="text-xs text-yellow-600 mt-1">${{ "%.2f"|format(session.birdie_cost) }} × {{ non_kid_count }} players</div>
                 </div>
                 <div class="bg-red-50 rounded-xl p-4 border border-red-200">
                     <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds Given</div>
@@ -234,6 +228,11 @@
                     {% else %}
                     <div class="text-xs text-red-400 mt-1">No refunds processed yet</div>
                     {% endif %}
+                </div>
+                <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                    <div class="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Expected Collection</div>
+                    <div class="text-2xl font-bold text-blue-700">${{ "%.2f"|format(sess_stats.total_collection) }}</div>
+                    <div class="text-xs text-blue-500 mt-1">Pool + birdie + kids</div>
                 </div>
                 <div class="bg-wimbledon-gold/20 rounded-xl p-4 border border-wimbledon-gold/40">
                     <div class="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Net Collection</div>
