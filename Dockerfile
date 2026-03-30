@@ -9,6 +9,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install Playwright browser binaries + OS dependencies
+RUN playwright install --with-deps chromium
+
 COPY . .
 
 RUN mkdir -p instance static/uploads .jinja_cache .flask_cache
