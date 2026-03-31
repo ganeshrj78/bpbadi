@@ -2750,6 +2750,168 @@ def session_detail(id):
                           pending_refunds=pending_refunds)
 
 
+@app.route('/sessions/<int:id>/download-csv')
+@admin_required
+def session_download_csv(id):
+    import csv, io
+    sess = Session.query.get_or_404(id)
+    courts = Court.query.filter_by(session_id=id).order_by(Court.id).all()
+    attendances = Attendance.query.filter_by(session_id=id).options(joinedload(Attendance.player)).all()
+    refunds = DropoutRefund.query.filter_by(session_id=id).options(joinedload(DropoutRefund.player)).all()
+    refund_map = {r.player_id: r for r in refunds}
+    session_costs = get_cached_session_costs(id)
+    sess_stats = compute_session_display_stats([id]).get(id, {})
+
+    output = io.StringIO()
+    w = csv.writer(output)
+
+    # Section 1: Session Info
+    w.writerow(['=== SESSION INFO ==='])
+    w.writerow(['Date', sess.date.strftime('%Y-%m-%d')])
+    w.writerow(['Status', 'Archived' if sess.is_archived else ('Released' if sess.payment_released else ('Frozen' if sess.voting_frozen else 'Open'))])
+    w.writerow(['Voting Frozen', 'Yes' if sess.voting_frozen else 'No'])
+    w.writerow(['Payment Released', 'Yes' if sess.payment_released else 'No'])
+    w.writerow(['Birdie Cost (per player)', f"${sess.birdie_cost:.2f}"])
+    w.writerow(['Credits', f"${sess.credits or 0:.2f}"])
+    w.writerow(['Apply Credits', 'Yes' if sess.apply_credits else 'No'])
+    w.writerow([])
+
+    # Section 2: Courts
+    w.writerow(['=== COURTS ==='])
+    w.writerow(['Court Name', 'Type', 'Cost', 'Start Time', 'End Time'])
+    for c in courts:
+        w.writerow([c.name, c.court_type, f"${c.cost:.2f}", c.start_time or '', c.end_time or ''])
+    w.writerow([])
+
+    # Section 3: Financial Summary
+    w.writerow(['=== FINANCIAL SUMMARY ==='])
+    w.writerow(['Courts (Regular)', f"${sum(c.cost for c in courts if c.court_type != 'adhoc'):.2f}"])
+    w.writerow(['Courts (Adhoc)', f"${sum(c.cost for c in courts if c.court_type == 'adhoc'):.2f}"])
+    w.writerow(['Birdie Total', f"${sess_stats.get('birdie_total', 0):.2f}"])
+    w.writerow(['Expected Collection', f"${sess_stats.get('total_collection', 0):.2f}"])
+    w.writerow(['Total Refunds', f"${sum(r.refund_amount for r in refunds if r.status == 'processed'):.2f}"])
+    w.writerow(['Net Collection', f"${sess_stats.get('total_collection', 0) - sum(r.refund_amount for r in refunds if r.status == 'processed'):.2f}"])
+    w.writerow(['Cost Per Player', f"${sess_stats.get('cost_per_player', 0):.2f}"])
+    w.writerow(['Attendees', sess_stats.get('attendee_count', 0)])
+    w.writerow(['Regular Players', sess_stats.get('regular_count', 0)])
+    w.writerow(['Adhoc Players', sess_stats.get('adhoc_count', 0)])
+    w.writerow(['Kid Players', sess_stats.get('kid_count', 0)])
+    w.writerow([])
+
+    # Section 4: Attendance
+    w.writerow(['=== ATTENDANCE ==='])
+    w.writerow(['Player', 'Category', 'Status', 'Payment Status', 'Charge', 'Additional Cost', 'Comments', 'Refund Status', 'Refund Amount'])
+    for att in sorted(attendances, key=lambda a: (a.player.name if a.player else '')):
+        if not att.player:
+            continue
+        cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+        if att.status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT']:
+            charge = round(session_costs.get(cat, 0) + (att.additional_cost or 0), 2)
+        else:
+            charge = 0
+        refund = refund_map.get(att.player_id)
+        refund_status = refund.status if refund else ''
+        refund_amount = f"${refund.refund_amount:.2f}" if refund else ''
+        w.writerow([
+            att.player.name,
+            att.category or '',
+            att.status,
+            att.payment_status or '',
+            f"${charge:.2f}" if charge else '',
+            f"${att.additional_cost:.2f}" if att.additional_cost else '',
+            att.comments or '',
+            refund_status,
+            refund_amount,
+        ])
+
+    output.seek(0)
+    filename = f"session_{sess.date.strftime('%Y-%m-%d')}.csv"
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+@app.route('/sessions/download-csv')
+@admin_required
+def sessions_download_csv():
+    import csv, io
+    from flask import Response
+    month = request.args.get('month', '')
+    sessions = Session.query.filter(Session.is_archived == False).order_by(Session.date).all()
+    if month:
+        sessions = [s for s in sessions if s.date.strftime('%Y-%m') == month]
+
+    all_ids = [s.id for s in sessions]
+    all_courts = Court.query.filter(Court.session_id.in_(all_ids)).order_by(Court.session_id, Court.id).all()
+    courts_by_session = defaultdict(list)
+    for c in all_courts:
+        courts_by_session[c.session_id].append(c)
+
+    all_atts = Attendance.query.filter(Attendance.session_id.in_(all_ids)).options(joinedload(Attendance.player)).all()
+    atts_by_session = defaultdict(list)
+    for a in all_atts:
+        atts_by_session[a.session_id].append(a)
+
+    all_refunds = DropoutRefund.query.filter(DropoutRefund.session_id.in_(all_ids)).all()
+    refunds_by_session = defaultdict(list)
+    for r in all_refunds:
+        refunds_by_session[r.session_id].append(r)
+
+    sess_stats_map = compute_session_display_stats(all_ids)
+
+    output = io.StringIO()
+    w = csv.writer(output)
+    w.writerow(['Session Date', 'Status', 'Courts', 'Regular Players', 'Adhoc Players', 'Kids',
+                'Cost Per Player', 'Expected Collection', 'Net Collection', 'Refunds',
+                'Player', 'Category', 'Attendance Status', 'Payment Status', 'Charge', 'Comments'])
+
+    for sess in sessions:
+        courts = courts_by_session[sess.id]
+        atts = sorted(atts_by_session[sess.id], key=lambda a: a.player.name if a.player else '')
+        refunds = refunds_by_session[sess.id]
+        refund_map = {r.player_id: r for r in refunds}
+        stats = sess_stats_map.get(sess.id, {})
+        session_costs = get_cached_session_costs(sess.id)
+        status = 'Archived' if sess.is_archived else ('Released' if sess.payment_released else ('Frozen' if sess.voting_frozen else 'Open'))
+        court_names = ', '.join(c.name for c in courts if c.court_type != 'adhoc')
+
+        for att in atts:
+            if not att.player:
+                continue
+            cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+            charge = round(session_costs.get(cat, 0) + (att.additional_cost or 0), 2) if att.status in ['YES', 'DROPOUT', 'FILLIN', 'PENDING_DROPOUT'] else 0
+            refund = refund_map.get(att.player_id)
+            w.writerow([
+                sess.date.strftime('%Y-%m-%d'),
+                status,
+                court_names,
+                stats.get('regular_count', 0),
+                stats.get('adhoc_count', 0),
+                stats.get('kid_count', 0),
+                f"${stats.get('cost_per_player', 0):.2f}",
+                f"${stats.get('total_collection', 0):.2f}",
+                f"${stats.get('total_collection', 0) - sum(r.refund_amount for r in refunds if r.status == 'processed'):.2f}",
+                f"${sum(r.refund_amount for r in refunds if r.status == 'processed'):.2f}",
+                att.player.name,
+                att.category or '',
+                att.status,
+                att.payment_status or '',
+                f"${charge:.2f}" if charge else '',
+                att.comments or '',
+            ])
+
+    output.seek(0)
+    label = month if month else 'all'
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="sessions_{label}.csv"'}
+    )
+
+
 @app.route('/sessions/<int:id>/edit', methods=['GET', 'POST'])
 @admin_required
 def edit_session(id):
