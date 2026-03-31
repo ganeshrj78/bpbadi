@@ -1267,6 +1267,13 @@ def player_profile():
                 log_activity('change_password', f'Player {player.name} changed password', 'player', player.id)
                 flash('Password changed successfully!', 'success')
 
+        elif action == 'update_notifications':
+            player.notify_sms = request.form.get('notify_sms') == '1'
+            player.notify_email = request.form.get('notify_email') == '1'
+            db.session.commit()
+            log_activity('update_notifications', f'Player {player.name} updated notification preferences', 'player', player.id)
+            flash('Notification preferences updated!', 'success')
+
         elif action == 'update_photo':
             if 'profile_photo' in request.files:
                 file = request.files['profile_photo']
@@ -1457,11 +1464,14 @@ def player_payments():
         if target_value == 'family':
             family_ids = [player_id] + managed_player_ids
             family_players = Player.query.filter(Player.id.in_(family_ids)).all()
-            balances = {p.id: max(p.get_balance(), 0) for p in family_players}
+            balances = {p.id: max(p.get_balance(frozen_only=True), 0) for p in family_players}
             total_owed = sum(balances.values())
 
             if total_owed <= 0:
-                flash('No balance owed for the family', 'error')
+                flash('No balance owed — no payment needed.', 'error')
+                return redirect(url_for('player_payments'))
+            if amount > total_owed + 0.01:
+                flash(f'Amount ${amount:.2f} exceeds total owed ${total_owed:.2f}. Please enter the correct amount.', 'error')
                 return redirect(url_for('player_payments'))
 
             active_session_ids = [s.id for s in Session.query.filter_by(is_archived=False).all()]
@@ -1511,6 +1521,15 @@ def player_payments():
         target_player_id = int(target_value)
         if target_player_id != player_id and target_player_id not in managed_player_ids:
             flash('You can only record payments for yourself or managed players', 'error')
+            return redirect(url_for('player_payments'))
+
+        target_player_check = Player.query.get_or_404(target_player_id)
+        balance_owed = target_player_check.get_balance(frozen_only=True)
+        if balance_owed <= 0:
+            flash(f'{target_player_check.name} has no balance owed — no payment needed.', 'error')
+            return redirect(url_for('player_payments'))
+        if amount > balance_owed + 0.01:
+            flash(f'Amount ${amount:.2f} exceeds balance owed ${balance_owed:.2f} for {target_player_check.name}.', 'error')
             return redirect(url_for('player_payments'))
 
         payment = Payment(
@@ -1594,7 +1613,8 @@ def player_payments():
             'total_payments': payments_total,
             'balance': balance,
         }
-    # Build monthly balance summary (charges per month per player, family total)
+    # Build monthly balance summary (remaining owed per month per player, family total)
+    # Shows what's still owed, not raw charges — prevents duplicate payments
     monthly_summary = {}
     for mk in sorted(monthly_charges.keys()):
         month_label = datetime.strptime(mk, '%Y-%m').strftime('%B %Y')
@@ -1602,8 +1622,11 @@ def player_payments():
         month_players = {}
         for pid in all_player_ids:
             c = round(monthly_charges[mk].get(pid, 0), 2)
-            month_total += c
-            month_players[pid] = c
+            # Cap by player's overall remaining balance (can't owe more per month than total balance)
+            remaining = max(round(player_financials[pid]['balance'], 2), 0)
+            owed = round(min(c, remaining), 2)
+            month_total += owed
+            month_players[pid] = owed
         monthly_summary[mk] = {
             'label': month_label,
             'total': round(month_total, 2),
@@ -2109,6 +2132,21 @@ def update_player_category(id):
         'player_id': player.id,
         'category': player.category
     })
+
+
+@app.route('/api/players/<int:id>/notifications', methods=['POST'])
+@csrf.exempt
+@admin_required
+def update_player_notifications(id):
+    player = Player.query.get_or_404(id)
+    data = request.get_json()
+    player.notify_sms = bool(data.get('notify_sms', player.notify_sms))
+    player.notify_email = bool(data.get('notify_email', player.notify_email))
+    db.session.commit()
+    log_activity('update_player_notifications',
+                 f'Set {player.name} notifications: SMS={player.notify_sms}, Email={player.notify_email}',
+                 'player', player.id)
+    return jsonify({'success': True, 'notify_sms': player.notify_sms, 'notify_email': player.notify_email})
 
 
 @app.route('/api/players/<int:id>/level', methods=['POST'])

@@ -47,6 +47,8 @@ class Player(db.Model):
     email = db.Column(db.String(100), index=True)
     password_hash = db.Column(db.String(255))
     zelle_preference = db.Column(db.String(10), default='phone')  # 'phone' or 'email'
+    notify_sms = db.Column(db.Boolean, default=True)    # Opt-in for SMS/text notifications
+    notify_email = db.Column(db.Boolean, default=True)  # Opt-in for email notifications
     date_of_birth = db.Column(db.Date, nullable=True)  # Optional date of birth
     gender = db.Column(db.String(10), default='male')  # 'male', 'female', 'other'
     profile_photo = db.Column(db.String(255))  # filename of uploaded photo (legacy)
