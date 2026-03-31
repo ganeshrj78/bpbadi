@@ -182,15 +182,15 @@
             <div class="grid grid-cols-3 gap-2 sm:gap-3">
                 <div class="bg-green-50 rounded-lg p-2 sm:p-3 border border-green-200">
                     <div class="text-[10px] sm:text-xs font-medium text-green-600 uppercase tracking-wide">Regular Courts</div>
-                    <div class="text-lg sm:text-xl font-bold text-green-700">${{ "%.2f"|format(regular_cost) }}</div>
+                    <div class="text-base sm:text-xl font-bold text-green-700">${{ "%.2f"|format(regular_cost) }}</div>
                 </div>
                 <div class="bg-purple-50 rounded-lg p-2 sm:p-3 border border-purple-200">
                     <div class="text-[10px] sm:text-xs font-medium text-purple-600 uppercase tracking-wide">Adhoc Courts</div>
-                    <div class="text-lg sm:text-xl font-bold text-purple-700">${{ "%.2f"|format(adhoc_cost) }}</div>
+                    <div class="text-base sm:text-xl font-bold text-purple-700">${{ "%.2f"|format(adhoc_cost) }}</div>
                 </div>
                 <div class="bg-teal-50 rounded-lg p-2 sm:p-3 border border-teal-200">
                     <div class="text-[10px] sm:text-xs font-medium text-teal-600 uppercase tracking-wide">Credits</div>
-                    <div class="text-lg sm:text-xl font-bold text-teal-700">${{ "%.2f"|format(credits) }}</div>
+                    <div class="text-base sm:text-xl font-bold text-teal-700">${{ "%.2f"|format(credits) }}</div>
                     <div class="text-[10px] text-teal-500">{% if session.apply_credits %}Applied{% else %}Not applied{% endif %}</div>
                 </div>
             </div>
@@ -202,12 +202,12 @@
             <div class="grid grid-cols-3 gap-2 sm:gap-3">
                 <div class="bg-yellow-50 rounded-lg p-2 sm:p-3 border border-yellow-200">
                     <div class="text-[10px] sm:text-xs font-medium text-yellow-600 uppercase tracking-wide">Birdie Cost</div>
-                    <div class="text-lg sm:text-xl font-bold text-yellow-700">${{ "%.2f"|format(sess_stats.birdie_total) }}</div>
+                    <div class="text-base sm:text-xl font-bold text-yellow-700">${{ "%.2f"|format(sess_stats.birdie_total) }}</div>
                     <div class="text-[10px] text-yellow-600">Total − courts − refunds</div>
                 </div>
                 <div class="bg-red-50 rounded-lg p-2 sm:p-3 border border-red-200">
                     <div class="text-[10px] sm:text-xs font-medium text-red-600 uppercase tracking-wide">Refunds</div>
-                    <div class="text-lg sm:text-xl font-bold text-red-700">${{ "%.2f"|format(total_refunds_amount) }}</div>
+                    <div class="text-base sm:text-xl font-bold text-red-700">${{ "%.2f"|format(total_refunds_amount) }}</div>
                     {% if pending_refunds %}
                     <div class="text-[10px] text-yellow-600 font-medium">{{ pending_refunds|length }} pending</div>
                     {% endif %}
@@ -226,7 +226,7 @@
                 </div>
                 <div class="bg-blue-50 rounded-lg p-2 sm:p-3 border border-blue-200">
                     <div class="text-[10px] sm:text-xs font-medium text-blue-600 uppercase tracking-wide">Expected</div>
-                    <div class="text-lg sm:text-xl font-bold text-blue-700">${{ "%.2f"|format(sess_stats.total_collection) }}</div>
+                    <div class="text-base sm:text-xl font-bold text-blue-700">${{ "%.2f"|format(sess_stats.total_collection) }}</div>
                     <div class="text-[10px] text-blue-500">Pool + birdie + kids</div>
                 </div>
             </div>
