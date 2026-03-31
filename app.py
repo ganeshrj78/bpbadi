@@ -1120,23 +1120,27 @@ def dashboard():
         is_active_month = any(not s.is_archived for s in m_sessions)
 
         m_charges = 0
-        m_attendees = 0
-        m_paid = 0
-        m_unpaid = 0
+        m_collected = 0
+        m_player_ids = set()
+        m_paid_ids = set()
+        m_unpaid_ids = set()
         for sess in m_sessions:
             costs = dash_session_cost_map.get(sess.id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
             for att in att_by_session.get(sess.id, []):
                 if att.player and att.player.is_active:
-                    m_attendees += 1
+                    m_player_ids.add(att.player_id)
                     cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
-                    m_charges += costs[cat]
-                    m_charges += (att.additional_cost or 0)
+                    charge = costs[cat] + (att.additional_cost or 0)
+                    m_charges += charge
                     if att.payment_status == 'paid':
-                        m_paid += 1
+                        m_collected += charge
+                        m_paid_ids.add(att.player_id)
                     else:
-                        m_unpaid += 1
+                        m_unpaid_ids.add(att.player_id)
 
-        m_collected = payments_by_month.get(month_key, 0)
+        m_attendees = len(m_player_ids)
+        m_paid = len(m_paid_ids - m_unpaid_ids)    # paid all sessions this month
+        m_unpaid = len(m_unpaid_ids)               # has at least one unpaid session
 
         m_birdie = 0
         m_refunds = 0
