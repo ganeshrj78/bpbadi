@@ -44,7 +44,15 @@
             </div>
             <div class="text-2xl sm:text-3xl font-bold text-gray-800">{{ upcoming_sessions }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Upcoming</div>
-            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-3 font-medium">
+            <div class="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
+                {% for m in monthly_summary if m.is_active %}
+                <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
+                    <span>{{ m.month }}</span>
+                    <span class="font-medium text-gray-700">{{ m.sessions }} sess</span>
+                </div>
+                {% endfor %}
+            </div>
+            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-2 font-medium">
                 View all
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </span>
@@ -64,7 +72,15 @@
             </div>
             <div class="text-xl sm:text-3xl font-bold text-wimbledon-green">${{ "%.2f"|format(total_collected) }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Total Collected</div>
-            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-3 font-medium">
+            <div class="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
+                {% for m in monthly_summary if m.is_active %}
+                <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
+                    <span>{{ m.month }}</span>
+                    <span class="font-medium text-wimbledon-green">${{ "%.0f"|format(m.collected) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-2 font-medium">
                 View payments
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </span>
@@ -86,7 +102,15 @@
                 ${{ "%.2f"|format(total_outstanding) }}
             </div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Outstanding Balance</div>
-            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple mt-3 font-medium">
+            <div class="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
+                {% for m in monthly_summary if m.is_active %}
+                <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
+                    <span>{{ m.month }}</span>
+                    <span class="font-medium {% if m.outstanding > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %}">${{ "%.0f"|format(m.outstanding) }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple mt-2 font-medium">
                 View details
                 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </span>
