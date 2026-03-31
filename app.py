@@ -414,7 +414,8 @@ def get_cached_monthly_summary():
         total_collection = round(regular_charges + adhoc_charges + kid_charges, 2)
         total_refunds = round(refund_totals.get(sid, 0.0), 2)
         non_kid = reg_count + adhoc_count
-        birdie_total = round(sess.birdie_cost * non_kid, 2)
+        court_charges_total = round(courts['regular'] + courts['adhoc'], 2)
+        birdie_total = round(total_collection - total_refunds - court_charges_total, 2)
 
         sess_data = {
             'id': sid, 'date': sess.date,
@@ -618,8 +619,9 @@ def compute_session_display_stats(session_ids):
 
         non_kid = regular_counts.get(sid, 0) + adhoc_counts.get(sid, 0)
         kids = kid_counts.get(sid, 0)
-        birdie_total = round((sess.birdie_cost or 0) * non_kid, 2)
         total_collection = round(cost_per_player * non_kid + 11.0 * kids, 2)
+        total_court_charges = sum(c.cost for c in courts)
+        birdie_total = round(total_collection - total_court_charges, 2)
 
         stats[sid] = {
             'time_range': time_range,

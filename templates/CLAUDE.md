@@ -171,8 +171,11 @@ function updateAttendance(sessionId, playerId, status) {
 Computed by `compute_session_display_stats(session_ids)` — used in `player_sessions.html`, `player_profile.html`:
 ```html
 {% set start_time, end_time = session_stats[sess.id].time_range %}
-{{ session_stats[sess.id].court_count }}
+{{ session_stats[sess.id].court_count }}     {# excludes adhoc courts #}
 {{ session_stats[sess.id].attendee_count }}
+{{ session_stats[sess.id].regular_count }}
+{{ session_stats[sess.id].adhoc_count }}
+{{ session_stats[sess.id].kid_count }}
 {{ session_stats[sess.id].cost_per_player }}
 ```
 
@@ -180,11 +183,23 @@ Computed by `compute_session_display_stats(session_ids)` — used in `player_ses
 Used in `session_detail.html`:
 ```html
 {% set start_time, end_time = sess_stats.time_range %}
-{{ sess_stats.court_count }}
+{{ sess_stats.court_count }}       {# excludes adhoc courts #}
 {{ sess_stats.attendee_count }}
+{{ sess_stats.regular_count }}
+{{ sess_stats.adhoc_count }}
+{{ sess_stats.kid_count }}
 {{ sess_stats.cost_per_player }}
 {{ sess_stats.birdie_total }}
 {{ sess_stats.total_collection }}
+```
+
+### Monthly Summary Session Data (`sess` in sessions.html)
+Each session in `summary.sessions` is a dict with:
+```html
+{{ sess.birdie_total }}       {# total birdie collected (birdie_cost × non_kid) #}
+{{ sess.court_charges }}      {# actual court rental: regular + adhoc court costs #}
+{{ sess.regular_charges }}    {# charges to regular players #}
+{{ sess.adhoc_charges }}      {# charges to adhoc players #}
 ```
 
 ### Per-Attendance Costs (`att_cost_map`)

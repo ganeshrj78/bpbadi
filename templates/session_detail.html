@@ -104,68 +104,65 @@
 </div>
 
 <!-- Session Summary Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20 card-hover transition-all">
-        <div class="flex items-center space-x-3 mb-3">
-            <div class="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+    <div class="bg-white rounded-xl shadow p-3 sm:p-4 border border-wimbledon-gold/20">
+        <div class="flex items-center space-x-2 mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 gradient-primary rounded-lg flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
             </div>
-            <span class="text-sm font-medium text-gray-500">Courts</span>
+            <span class="text-xs sm:text-sm font-medium text-gray-500">Courts</span>
         </div>
-        <div class="text-2xl sm:text-3xl font-bold text-gray-800">{{ sess_stats.court_count }}</div>
+        <div class="text-xl sm:text-2xl font-bold text-gray-800">{{ sess_stats.court_count }}</div>
         {% if sess_stats.attendee_count > 0 %}
-        <div class="text-xs text-gray-400 mt-1">Suggested: {{ session.get_suggested_courts() }}</div>
+        <div class="text-[10px] sm:text-xs text-gray-400">Suggested: {{ session.get_suggested_courts() }}</div>
         {% endif %}
     </div>
 
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20 card-hover transition-all">
-        <div class="flex items-center space-x-3 mb-3">
-            <div class="w-10 h-10 gradient-gold rounded-xl flex items-center justify-center">
-                <svg class="w-5 h-5 text-wimbledon-purple-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    <div class="bg-white rounded-xl shadow p-3 sm:p-4 border border-wimbledon-gold/20">
+        <div class="flex items-center space-x-2 mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 gradient-success rounded-lg flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
             </div>
-            <span class="text-sm font-medium text-gray-500">Total Pool</span>
+            <span class="text-xs sm:text-sm font-medium text-gray-500">Attendees</span>
         </div>
-        {% set total_pool = session.get_regular_court_cost() + (session.credits or 0) %}
-        <div class="text-2xl sm:text-3xl font-bold text-gray-800">${{ "%.2f"|format(total_pool) }}</div>
-        {% if session.credits %}
-        <div class="text-xs text-gray-400 mt-1">Courts + ${{ "%.2f"|format(session.credits) }} credits</div>
-        {% endif %}
+        <div class="text-xl sm:text-2xl font-bold text-wimbledon-green" id="attendee-count">{{ sess_stats.attendee_count }}</div>
+        <div class="text-[10px] sm:text-xs text-gray-400">{{ sess_stats.regular_count | default(0) }}R · {{ sess_stats.adhoc_count | default(0) }}A{% if sess_stats.kid_count | default(0) > 0 %} · {{ sess_stats.kid_count }}K{% endif %}</div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20 card-hover transition-all">
-        <div class="flex items-center space-x-3 mb-3">
-            <div class="w-10 h-10 gradient-success rounded-xl flex items-center justify-center">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+    <div class="bg-white rounded-xl shadow p-3 sm:p-4 border border-wimbledon-gold/20">
+        <div class="flex items-center space-x-2 mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 gradient-info rounded-lg flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
             </div>
-            <span class="text-sm font-medium text-gray-500">Attendees</span>
+            <span class="text-xs sm:text-sm font-medium text-gray-500">Per Player</span>
         </div>
-        <div class="text-2xl sm:text-3xl font-bold text-wimbledon-green" id="attendee-count">{{ sess_stats.attendee_count }}</div>
-        <div class="text-xs text-gray-400 mt-1">{{ sess_stats.regular_count | default(0) }} Regular, {{ sess_stats.adhoc_count | default(0) }} Adhoc{% if sess_stats.kid_count | default(0) > 0 %}, {{ sess_stats.kid_count }} Kids{% endif %}</div>
+        <div class="text-xl sm:text-2xl font-bold text-wimbledon-green" id="cost-per-player">${{ "%.2f"|format(sess_stats.cost_per_player) }}</div>
+        <div class="text-[10px] sm:text-xs text-gray-400">birdie collected: ${{ "%.2f"|format(sess_stats.birdie_total | default(0)) }}</div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-lg p-5 border border-wimbledon-gold/20 card-hover transition-all">
-        <div class="flex items-center space-x-3 mb-3">
-            <div class="w-10 h-10 gradient-info rounded-xl flex items-center justify-center">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+    <div class="bg-white rounded-xl shadow p-3 sm:p-4 border border-wimbledon-gold/20">
+        <div class="flex items-center space-x-2 mb-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 gradient-gold rounded-lg flex items-center justify-center">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-wimbledon-purple-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
-            <span class="text-sm font-medium text-gray-500">Per Player</span>
+            <span class="text-xs sm:text-sm font-medium text-gray-500">Net Collection</span>
         </div>
-        <div class="text-2xl sm:text-3xl font-bold text-wimbledon-green" id="cost-per-player">${{ "%.2f"|format(sess_stats.cost_per_player) }}</div>
-        <div class="text-xs text-gray-400 mt-1">based on {{ sess_stats.regular_count | default(0) }} regular · birdie total: ${{ "%.2f"|format(sess_stats.birdie_total | default(0)) }}</div>
+        <div class="text-xl sm:text-2xl font-bold text-gray-800">${{ "%.2f"|format(sess_stats.total_collection - total_refunds_amount) }}</div>
+        <div class="text-[10px] sm:text-xs text-gray-400">Expected − refunds</div>
     </div>
 </div>
 
 <!-- Financial Summary -->
-<div class="bg-white rounded-2xl shadow-lg border border-wimbledon-gold/20 mb-6 overflow-hidden">
-    <div class="px-6 py-4 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-gold/10 to-white">
-        <h2 class="text-lg font-serif font-bold text-gray-800 flex items-center">
-            <svg class="w-5 h-5 mr-2 text-wimbledon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<div class="bg-white rounded-xl shadow border border-wimbledon-gold/20 mb-4 overflow-hidden">
+    <div class="px-3 sm:px-4 py-2 sm:py-3 border-b border-wimbledon-gold/20 bg-gradient-to-r from-wimbledon-gold/10 to-white">
+        <h2 class="text-sm sm:text-base font-serif font-bold text-gray-800 flex items-center">
+            <svg class="w-4 h-4 mr-1.5 text-wimbledon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
             </svg>
             Financial Summary
         </h2>
     </div>
-    <div class="p-6 space-y-4">
+    <div class="p-3 sm:p-4 space-y-3">
         {% set regular_cost = session.get_regular_court_cost() %}
         {% set adhoc_cost = session.get_adhoc_court_cost() %}
         {% set credits = session.credits or 0 %}
@@ -176,68 +173,56 @@
 
         <!-- Row 1: Cost Pool Breakdown -->
         <div>
-            <div class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Court Pool — split equally among regular players</div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-green-50 rounded-xl p-4 border border-green-200">
-                    <div class="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">Regular Courts</div>
-                    <div class="text-2xl font-bold text-green-700">${{ "%.2f"|format(regular_cost) }}</div>
+            <div class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Court Pool</div>
+            <div class="grid grid-cols-3 gap-2 sm:gap-3">
+                <div class="bg-green-50 rounded-lg p-2 sm:p-3 border border-green-200">
+                    <div class="text-[10px] sm:text-xs font-medium text-green-600 uppercase tracking-wide">Regular Courts</div>
+                    <div class="text-lg sm:text-xl font-bold text-green-700">${{ "%.2f"|format(regular_cost) }}</div>
                 </div>
-                <div class="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                    <div class="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">Adhoc Courts</div>
-                    <div class="text-2xl font-bold text-purple-700">${{ "%.2f"|format(adhoc_cost) }}</div>
+                <div class="bg-purple-50 rounded-lg p-2 sm:p-3 border border-purple-200">
+                    <div class="text-[10px] sm:text-xs font-medium text-purple-600 uppercase tracking-wide">Adhoc Courts</div>
+                    <div class="text-lg sm:text-xl font-bold text-purple-700">${{ "%.2f"|format(adhoc_cost) }}</div>
                 </div>
-                <div class="bg-teal-50 rounded-xl p-4 border border-teal-200">
-                    <div class="text-xs font-medium text-teal-600 uppercase tracking-wide mb-1">Credits</div>
-                    <div class="text-2xl font-bold text-teal-700">${{ "%.2f"|format(credits) }}</div>
-                    <div class="text-xs text-teal-500 mt-1">{% if session.apply_credits %}Applied{% else %}Not applied{% endif %}</div>
-                </div>
-                <div class="bg-wimbledon-purple/10 rounded-xl p-4 border border-wimbledon-purple/20">
-                    <div class="text-xs font-medium text-wimbledon-purple uppercase tracking-wide mb-1">Total Pool</div>
-                    <div class="text-2xl font-bold text-wimbledon-purple">${{ "%.2f"|format(court_pool) }}</div>
-                    {% if reg_count > 0 %}
-                    <div class="text-xs text-wimbledon-purple/70 mt-1">${{ "%.2f"|format(court_pool / reg_count) }}/player × {{ reg_count }} regular</div>
-                    {% endif %}
+                <div class="bg-teal-50 rounded-lg p-2 sm:p-3 border border-teal-200">
+                    <div class="text-[10px] sm:text-xs font-medium text-teal-600 uppercase tracking-wide">Credits</div>
+                    <div class="text-lg sm:text-xl font-bold text-teal-700">${{ "%.2f"|format(credits) }}</div>
+                    <div class="text-[10px] text-teal-500">{% if session.apply_credits %}Applied{% else %}Not applied{% endif %}</div>
                 </div>
             </div>
         </div>
 
         <!-- Row 2: Collection Summary -->
         <div>
-            <div class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Collection Summary</div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-                    <div class="text-xs font-medium text-yellow-600 uppercase tracking-wide mb-1">Birdie Cost</div>
-                    <div class="text-2xl font-bold text-yellow-700">${{ "%.2f"|format(sess_stats.birdie_total) }}</div>
-                    <div class="text-xs text-yellow-600 mt-1">${{ "%.2f"|format(session.birdie_cost) }} × {{ non_kid_count }} players</div>
+            <div class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1.5">Collection</div>
+            <div class="grid grid-cols-3 gap-2 sm:gap-3">
+                <div class="bg-yellow-50 rounded-lg p-2 sm:p-3 border border-yellow-200">
+                    <div class="text-[10px] sm:text-xs font-medium text-yellow-600 uppercase tracking-wide">Birdie Cost</div>
+                    <div class="text-lg sm:text-xl font-bold text-yellow-700">${{ "%.2f"|format(sess_stats.birdie_total) }}</div>
+                    <div class="text-[10px] text-yellow-600">Total − courts − refunds</div>
                 </div>
-                <div class="bg-red-50 rounded-xl p-4 border border-red-200">
-                    <div class="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">Refunds Given</div>
-                    <div class="text-2xl font-bold text-red-700">${{ "%.2f"|format(total_refunds_amount) }}</div>
+                <div class="bg-red-50 rounded-lg p-2 sm:p-3 border border-red-200">
+                    <div class="text-[10px] sm:text-xs font-medium text-red-600 uppercase tracking-wide">Refunds</div>
+                    <div class="text-lg sm:text-xl font-bold text-red-700">${{ "%.2f"|format(total_refunds_amount) }}</div>
                     {% if pending_refunds %}
-                    <div class="text-xs text-yellow-600 font-medium mt-1">{{ pending_refunds|length }} pending · ${{ "%.2f"|format(pending_refunds|sum(attribute='refund_amount')) }}</div>
+                    <div class="text-[10px] text-yellow-600 font-medium">{{ pending_refunds|length }} pending</div>
                     {% endif %}
                     {% if processed_refunds %}
-                    <div class="mt-2 space-y-1 border-t border-red-200 pt-2">
+                    <div class="mt-1 space-y-0.5 border-t border-red-200 pt-1">
                         {% for r in processed_refunds %}
-                        <div class="text-xs text-red-600 flex justify-between gap-2">
+                        <div class="text-[10px] text-red-600 flex justify-between gap-1">
                             <span class="font-medium truncate">{{ r.player.name }}</span>
-                            <span class="whitespace-nowrap">${{ "%.2f"|format(r.refund_amount) }} · {{ (r.processed_date or r.created_at).strftime('%b %d') if (r.processed_date or r.created_at) else '—' }}</span>
+                            <span class="whitespace-nowrap">${{ "%.2f"|format(r.refund_amount) }}</span>
                         </div>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div class="text-xs text-red-400 mt-1">No refunds processed yet</div>
+                    <div class="text-[10px] text-red-400">None</div>
                     {% endif %}
                 </div>
-                <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                    <div class="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Expected Collection</div>
-                    <div class="text-2xl font-bold text-blue-700">${{ "%.2f"|format(sess_stats.total_collection) }}</div>
-                    <div class="text-xs text-blue-500 mt-1">Pool + birdie + kids</div>
-                </div>
-                <div class="bg-wimbledon-gold/20 rounded-xl p-4 border border-wimbledon-gold/40">
-                    <div class="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Net Collection</div>
-                    <div class="text-2xl font-bold text-gray-800">${{ "%.2f"|format(sess_stats.total_collection - total_refunds_amount) }}</div>
-                    <div class="text-xs text-gray-500 mt-1">Expected − refunds</div>
+                <div class="bg-blue-50 rounded-lg p-2 sm:p-3 border border-blue-200">
+                    <div class="text-[10px] sm:text-xs font-medium text-blue-600 uppercase tracking-wide">Expected</div>
+                    <div class="text-lg sm:text-xl font-bold text-blue-700">${{ "%.2f"|format(sess_stats.total_collection) }}</div>
+                    <div class="text-[10px] text-blue-500">Pool + birdie + kids</div>
                 </div>
             </div>
         </div>

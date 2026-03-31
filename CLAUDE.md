@@ -57,9 +57,10 @@ python3 seed.py                   # Seed database
 
 ## Cost Calculation
 
-- `Per non-kid player = regular_court_cost / regular_player_count + birdie_cost`
+- `Per non-kid player = court_pool / regular_count + birdie_cost` (court_pool = regular_court_cost + credits if applied)
+- Division by **regular count only** (not regular + adhoc) — adhoc pays same rate but doesn't affect divisor
 - Kids: flat $11 (no birdie, no court share)
-- Regular and Adhoc pay same rate
+- Court count excludes adhoc courts (`court_type != 'adhoc'`)
 - Balance = charges − payments (all payments including negative refunds)
 - Balance can go negative (credit/overpayment)
 
@@ -145,7 +146,8 @@ if 'col_name' not in existing_cols:
 - **Caching:** `FileSystemCache` in `.flask_cache/` — shared across workers (not `SimpleCache` which is per-process)
 - **Cache invalidation:** `clear_session_cache()` clears `get_cached_monthly_summary`, `get_cached_player_stats`, `get_cached_session_costs`
 - **N+1 prevention:** Routes MUST pre-compute all session/player stats and pass them as dicts to templates. Never call model methods like `sess.get_cost_per_player()` in template loops.
-- **Batch session stats:** Use `compute_session_display_stats(session_ids)` to batch-compute `time_range`, `court_count`, `attendee_count`, `cost_per_player`, `birdie_total`, `total_collection` for any list of sessions in 3 queries.
+- **Batch session stats:** Use `compute_session_display_stats(session_ids)` to batch-compute `time_range`, `court_count`, `attendee_count`, `regular_count`, `adhoc_count`, `kid_count`, `cost_per_player`, `birdie_total`, `total_collection` for any list of sessions in 3 queries.
+- **Monthly summary `sess_data`:** Each session dict in `monthly_summary[key]['sessions']` includes `birdie_total`, `court_charges` (regular + adhoc court rental cost), `regular_charges`, `adhoc_charges`, `kid_charges`, `total_refunds`, `total_collection`, `cost_per_player`.
 - **Pre-computed cost maps:** `get_cached_player_stats()` returns `session_cost_map` for per-attendance cost lookups. Use `att_cost_map[att.id]` in templates instead of `att.session.get_cost_per_player()`.
 - **Bulk operations:** Always batch-load sessions with `Session.query.filter(Session.id.in_(ids))` instead of per-item `Session.query.get()` in loops.
 - **Connection pool:** `pool_size=5, max_overflow=5` per worker — total max 30 connections across 3 workers
