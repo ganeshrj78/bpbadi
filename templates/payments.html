@@ -284,7 +284,7 @@
 <script>
 function bulkPaymentGlobal() {
     const selected = {
-        {% for player, balance in outstanding_balances %}{{ player.id }}: true,
+        {% for player, balance in outstanding_balances %}{{ player.id }}: false,
         {% endfor %}
     };
     const amounts = {
