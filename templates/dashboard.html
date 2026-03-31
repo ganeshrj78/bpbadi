@@ -24,6 +24,20 @@
             </div>
             <div class="text-2xl sm:text-3xl font-bold text-gray-800">{{ total_players }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Total Players</div>
+            <div class="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
+                {% for m in monthly_summary if m.is_active %}
+                <div class="text-[10px] sm:text-xs text-gray-500">
+                    <div class="flex justify-between">
+                        <span>{{ m.month }}</span>
+                        <span class="font-bold text-gray-700">{{ m.attendees }} playing</span>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-0.5">
+                        <span class="text-wimbledon-green font-bold">{{ m.paid }} Pd</span>
+                        <span class="text-red-500 font-bold">{{ m.unpaid }} UnPd</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </a>
 
@@ -44,7 +58,7 @@
                 {% for m in monthly_summary if m.is_active %}
                 <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
                     <span>{{ m.month }}</span>
-                    <span class="font-medium text-gray-700">{{ m.sessions }} sess</span>
+                    <span class="font-bold text-gray-700">{{ m.sessions }} sess</span>
                 </div>
                 {% endfor %}
             </div>
@@ -72,8 +86,8 @@
                 {% for m in monthly_summary if m.is_active %}
                 <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
                     <span>{{ m.month }}</span>
-                    <span class="text-wimbledon-green font-medium">${{ "%.0f"|format(m.collected) }}</span>
-                    <span class="{% if m.outstanding > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %} font-medium">${{ "%.0f"|format(m.outstanding) }} out</span>
+                    <span class="text-wimbledon-green font-bold">Coll ${{ "%.0f"|format(m.collected) }}</span>
+                    <span class="{% if m.outstanding > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %} font-bold">Pend ${{ "%.0f"|format(m.outstanding) }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -97,7 +111,7 @@
                 {% for m in monthly_summary if m.is_active %}
                 <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
                     <span>{{ m.month }}</span>
-                    <span class="font-medium text-wimbledon-purple">${{ "%.0f"|format(m.charges) }}</span>
+                    <span class="font-bold text-wimbledon-purple">${{ "%.0f"|format(m.charges) }}</span>
                 </div>
                 {% endfor %}
             </div>

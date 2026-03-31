@@ -361,15 +361,18 @@ def get_cached_monthly_summary():
         key = 'adhoc' if c.court_type == 'adhoc' else 'regular'
         court_costs[c.session_id][key] += c.cost
 
-    # Pre-compute per-session attendance counts and category breakdowns
-    att_counts = {}  # {sid: {'regular': int, 'adhoc': int, 'kid': int}}
+    # Pre-compute per-session attendance counts and category breakdowns (incl. paid counts)
+    att_counts = {}  # {sid: {'regular': int, 'adhoc': int, 'kid': int, 'paid_regular': int, ...}}
     for att in all_att:
         sid = att.session_id
         if sid not in att_counts:
-            att_counts[sid] = {'regular': 0, 'adhoc': 0, 'kid': 0}
+            att_counts[sid] = {'regular': 0, 'adhoc': 0, 'kid': 0,
+                               'paid_regular': 0, 'paid_adhoc': 0, 'paid_kid': 0}
         if att.status in ('YES', 'DROPOUT'):
             cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
             att_counts[sid][cat] += 1
+            if att.payment_status == 'paid':
+                att_counts[sid]['paid_' + cat] += 1
 
     # Pre-compute per-session refund totals
     refund_totals = {}  # {sid: float} (processed refunds)
@@ -392,7 +395,7 @@ def get_cached_monthly_summary():
                 'label': label, 'sessions': [], 'total_sessions': 0,
                 'archived_sessions': 0, 'birdie_charges': 0, 'court_charges': 0,
                 'regular_charges': 0, 'adhoc_charges': 0, 'kid_charges': 0,
-                'total_refunds': 0, 'total_collection': 0,
+                'total_refunds': 0, 'total_collection': 0, 'collected': 0,
                 'payments_received': 0, 'pending_credits': 0, 'session_credits': 0,
             }
 
@@ -417,6 +420,13 @@ def get_cached_monthly_summary():
         court_charges_total = round(courts['regular'] + courts['adhoc'], 2)
         birdie_total = round(total_collection - total_refunds - court_charges_total, 2)
 
+        # Collected = charges from attendees who have already paid
+        counts_s = att_counts.get(sid, {})
+        collected = round(
+            cost_per_player * counts_s.get('paid_regular', 0) +
+            cost_per_player * counts_s.get('paid_adhoc', 0) +
+            11.0 * counts_s.get('paid_kid', 0), 2)
+
         sess_data = {
             'id': sid, 'date': sess.date,
             'is_archived': sess.is_archived, 'voting_frozen': sess.voting_frozen,
@@ -426,7 +436,7 @@ def get_cached_monthly_summary():
             'regular_charges': regular_charges, 'adhoc_charges': adhoc_charges,
             'kid_charges': kid_charges, 'total_refunds': total_refunds,
             'total_collection': total_collection, 'cost_per_player': cost_per_player,
-            'birdie_total': birdie_total,
+            'birdie_total': birdie_total, 'collected': collected,
             'court_charges': round(courts['regular'] + courts['adhoc'], 2),
         }
         monthly_summary[key]['sessions'].append(sess_data)
@@ -440,6 +450,7 @@ def get_cached_monthly_summary():
         monthly_summary[key]['kid_charges'] += kid_charges
         monthly_summary[key]['total_refunds'] += total_refunds
         monthly_summary[key]['total_collection'] += total_collection
+        monthly_summary[key]['collected'] += collected
         monthly_summary[key]['session_credits'] += sess_data['credits']
 
     # Actual payments received, grouped by payment month
@@ -1069,8 +1080,8 @@ def dashboard():
     all_sessions_for_summary = Session.query.all()
     session_months = sorted(
         {(s.date.year, s.date.month) for s in all_sessions_for_summary},
-        reverse=True
-    )[:6]
+        reverse=False
+    )[-6:]
 
     # Batch-load all chargeable attendances with player eagerly loaded (avoids N+1)
     all_session_ids = [s.id for s in all_sessions_for_summary]
@@ -1110,6 +1121,8 @@ def dashboard():
 
         m_charges = 0
         m_attendees = 0
+        m_paid = 0
+        m_unpaid = 0
         for sess in m_sessions:
             costs = dash_session_cost_map.get(sess.id, {'regular': 0, 'adhoc': 0, 'kid': 11.0})
             for att in att_by_session.get(sess.id, []):
@@ -1118,6 +1131,10 @@ def dashboard():
                     cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
                     m_charges += costs[cat]
                     m_charges += (att.additional_cost or 0)
+                    if att.payment_status == 'paid':
+                        m_paid += 1
+                    else:
+                        m_unpaid += 1
 
         m_collected = payments_by_month.get(month_key, 0)
 
@@ -1138,6 +1155,8 @@ def dashboard():
             'is_active': is_active_month,
             'sessions': len(m_sessions),
             'attendees': m_attendees,
+            'paid': m_paid,
+            'unpaid': m_unpaid,
             'charges': round(m_charges, 2),
             'collected': round(m_collected, 2),
             'outstanding': round(m_charges - m_collected, 2),
@@ -1146,10 +1165,10 @@ def dashboard():
             'credits': round(m_session_credits, 2),
         })
 
-    # Top cards: aggregate from active months (charges - collected for those months)
-    total_collected = round(sum(r['collected'] for r in monthly_summary if r['is_active']), 2)
-    total_charges = round(sum(r['charges'] for r in monthly_summary if r['is_active']), 2)
-    total_outstanding = round(sum(r['outstanding'] for r in monthly_summary if r['is_active']), 2)
+    # Top cards: all-time totals (not limited to active months)
+    total_collected = round(sum(p.amount for p in all_payments), 2)
+    total_charges = round(sum(r['charges'] for r in monthly_summary), 2)
+    total_outstanding = round(total_charges - total_collected, 2)
 
     # Pending approvals
     pending_approvals = Player.query.filter_by(is_approved=False).order_by(Player.created_at.desc()).all()

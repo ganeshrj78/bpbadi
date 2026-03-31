@@ -66,6 +66,7 @@
                     <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden lg:table-cell">Kids</th>
                     <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell">Refunds</th>
                     <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Total</th>
+                    <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden sm:table-cell">Collected</th>
                     <th class="px-2 sm:px-4 py-2 sm:py-3 text-right text-xs font-bold text-wimbledon-purple uppercase tracking-wider hidden md:table-cell">Credits</th>
                     <th class="px-2 sm:px-4 py-2 sm:py-3 text-center text-xs font-bold text-wimbledon-purple uppercase tracking-wider">Status</th>
                 </tr>
@@ -102,6 +103,9 @@
                     </td>
                     <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right">
                         <span class="font-bold text-sm text-wimbledon-purple">${{ "%.2f"|format(summary.total_collection - summary.total_refunds) }}</span>
+                    </td>
+                    <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden sm:table-cell">
+                        <span class="font-bold text-sm text-wimbledon-green">${{ "%.2f"|format(summary.collected) }}</span>
                     </td>
                     <td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-right hidden md:table-cell">
                         {% if summary.session_credits > 0 %}<span class="text-blue-600 font-semibold text-sm">${{ "%.2f"|format(summary.session_credits) }}</span>{% else %}<span class="text-gray-300">—</span>{% endif %}
@@ -157,6 +161,9 @@
                     </td>
                     <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
                         <span class="text-xs font-medium text-wimbledon-purple">${{ "%.2f"|format(sess.total_collection - sess.total_refunds) }}</span>
+                    </td>
+                    <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden sm:table-cell">
+                        <span class="text-xs font-medium text-wimbledon-green">${{ "%.2f"|format(sess.collected) }}</span>
                     </td>
                     <td class="px-2 sm:px-4 py-2 whitespace-nowrap text-right hidden md:table-cell">
                         {% if sess.credits and sess.credits > 0 %}<span class="text-xs text-blue-600">${{ "%.2f"|format(sess.credits) }}</span>{% else %}<span class="text-xs text-gray-300">—</span>{% endif %}
