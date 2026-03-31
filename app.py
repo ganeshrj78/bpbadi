@@ -1034,7 +1034,7 @@ def edit_guidelines():
 
         SiteSettings.set('member_guidelines', member_guidelines)
         SiteSettings.set('booking_guidelines', booking_guidelines)
-
+        log_activity('edit_guidelines', 'Updated club guidelines')
         return jsonify({'success': True})
     except Exception as e:
         app.logger.error(f'edit_guidelines error: {e}', exc_info=True)
@@ -2049,6 +2049,7 @@ def delete_player(id):
     name = player.name
     db.session.delete(player)
     db.session.commit()
+    log_activity('delete_player', f'Deleted player {name}', 'player', id)
     flash(f'Player {name} deleted successfully!', 'success')
     return redirect(url_for('players'))
 
@@ -2060,6 +2061,7 @@ def toggle_admin(id):
     player.is_admin = not player.is_admin
     db.session.commit()
     status = 'promoted to admin' if player.is_admin else 'removed from admin'
+    log_activity('toggle_admin', f'{player.name} {status}', 'player', id)
     flash(f'{player.name} has been {status}!', 'success')
     return redirect(url_for('player_detail', id=id))
 
@@ -2078,7 +2080,7 @@ def update_player_category(id):
     old_category = player.category
     player.category = category
     db.session.commit()
-
+    log_activity('update_player_category', f'{player.name} default category → {category}', 'player', player.id)
     return jsonify({
         'success': True,
         'player_id': player.id,
@@ -2095,8 +2097,10 @@ def update_player_level(id):
     level = data.get('level')
     if level not in [1, 2, 3]:
         return jsonify({'error': 'Invalid level'}), 400
+    level_labels = {1: 'Beginner', 2: 'Intermediate', 3: 'Advanced'}
     player.level = level
     db.session.commit()
+    log_activity('update_player_level', f'Set {player.name} level to {level_labels.get(level, level)}', 'player', player.id)
     return jsonify({'success': True, 'player_id': player.id, 'level': player.level})
 
 
@@ -2107,6 +2111,7 @@ def toggle_active(id):
     player.is_active = not player.is_active
     db.session.commit()
     status = 'activated' if player.is_active else 'deactivated'
+    log_activity('toggle_active', f'{player.name} {status}', 'player', id)
     flash(f'{player.name} has been {status}!', 'success')
     return redirect(url_for('player_detail', id=id))
 
@@ -2826,6 +2831,7 @@ def session_download_csv(id):
 
     output.seek(0)
     filename = f"session_{sess.date.strftime('%Y-%m-%d')}.csv"
+    log_activity('download_csv', f'Downloaded CSV for session {sess.date.strftime("%Y-%m-%d")}', 'session', sess.id)
     from flask import Response
     return Response(
         output.getvalue(),
@@ -2905,6 +2911,7 @@ def sessions_download_csv():
 
     output.seek(0)
     label = month if month else 'all'
+    log_activity('download_csv', f'Downloaded sessions CSV for {label} ({len(sessions)} sessions)')
     return Response(
         output.getvalue(),
         mimetype='text/csv',
@@ -3271,6 +3278,7 @@ def bulk_freeze_voting():
             count += 1
 
     db.session.commit()
+    log_activity('bulk_freeze_voting', f'Voting frozen for {count} session(s)')
     flash(f'Voting frozen for {count} session(s)!', 'success')
     return redirect(url_for('sessions'))
 
@@ -3293,6 +3301,7 @@ def bulk_unfreeze_voting():
             count += 1
 
     db.session.commit()
+    log_activity('bulk_unfreeze_voting', f'Voting unfrozen for {count} session(s)')
     flash(f'Voting unfrozen for {count} session(s)!', 'success')
     return redirect(url_for('sessions'))
 
@@ -3324,6 +3333,7 @@ def bulk_toggle_freeze():
         parts.append(f'{frozen_count} frozen')
     if unfrozen_count:
         parts.append(f'{unfrozen_count} unfrozen')
+    log_activity('bulk_toggle_freeze', f'Voting toggled: {", ".join(parts)}')
     flash(f'Voting toggled: {", ".join(parts)}!', 'success')
     return redirect(url_for('sessions'))
 
@@ -3360,6 +3370,7 @@ def bulk_release_payment():
 
     db.session.commit()
     clear_session_cache()
+    log_activity('bulk_release_payment', f'Payment released for {count} session(s)')
     flash(f'Payment released for {count} session(s)!', 'success')
     return redirect(url_for('sessions'))
 
@@ -3383,6 +3394,7 @@ def bulk_unrelease_payment():
 
     db.session.commit()
     clear_session_cache()
+    log_activity('bulk_unrelease_payment', f'Payment unreleased for {count} session(s)')
     flash(f'Payment unreleased for {count} session(s)!', 'success')
     return redirect(url_for('sessions'))
 
@@ -3441,6 +3453,7 @@ def bulk_toggle_payment():
         parts.append(f'{released_count} released')
     if unreleased_count:
         parts.append(f'{unreleased_count} unreleased')
+    log_activity('bulk_toggle_payment', f'Payment toggled: {", ".join(parts)}')
     flash(f'Payment toggled: {", ".join(parts)}!', 'success')
     return redirect(url_for('sessions'))
 
@@ -3503,6 +3516,7 @@ def bulk_attendance():
                 count += 1
 
     db.session.commit()
+    log_activity('bulk_attendance', f'Bulk set {count} attendance records → {status} (category: {category})')
     return jsonify({'success': True, 'count': count})
 
 
@@ -3558,6 +3572,7 @@ def bulk_player_attendance():
             count += 1
 
     db.session.commit()
+    log_activity('bulk_player_attendance', f'Bulk set {count} attendance records for {player.name} → {status}', 'player', player_id)
     return jsonify({'success': True, 'count': count})
 
 
@@ -3701,6 +3716,8 @@ def update_dropout_refund(id):
         log_activity('process_refund', f'Processed refund ${refund.refund_amount:.2f} for {refund.player.name}', 'refund', refund.id)
     elif action == 'cancel':
         log_activity('cancel_refund', f'Cancelled refund for {refund.player.name}', 'refund', refund.id)
+    elif action == 'update':
+        log_activity('update_refund', f'Updated refund for {refund.player.name} to ${refund.refund_amount:.2f}', 'refund', refund.id)
     if request.form.get('from_session'):
         return redirect(url_for('session_detail', id=session_id))
     return redirect(url_for('session_refunds', id=session_id))
@@ -3853,7 +3870,8 @@ def batch_update_attendance():
 
     db.session.commit()
     clear_session_cache()  # Invalidate cached data
-
+    if results:
+        log_activity('batch_attendance', f'Batch updated {len(results)} attendance record(s)')
     return jsonify({
         'success': len(errors) == 0,
         'updated': len(results),
@@ -4143,6 +4161,8 @@ def update_attendance_additional_cost():
     if attendance:
         attendance.additional_cost = additional_cost
         db.session.commit()
+        att_player = Player.query.get(player_id)
+        log_activity('update_additional_cost', f'Additional cost ${additional_cost:.2f} for {att_player.name if att_player else player_id} session {session_id}', 'attendance')
         return jsonify({'success': True})
 
     return jsonify({'error': 'Attendance record not found'}), 404
@@ -4199,6 +4219,7 @@ def bulk_update_payment_status():
                     db.session.add(payment)
 
     db.session.commit()
+    log_activity('bulk_payment_status', f'Bulk marked {len(records)} attendance records as {payment_status}')
     return jsonify({'success': True, 'updated': len(records)})
 
 
@@ -4249,6 +4270,8 @@ def update_attendance_comments():
     if attendance:
         attendance.comments = comments
         db.session.commit()
+        att_player = Player.query.get(player_id)
+        log_activity('update_attendance_comments', f'Updated comments for {att_player.name if att_player else player_id} session {session_id}', 'attendance')
         return jsonify({'success': True})
 
     return jsonify({'error': 'Attendance record not found'}), 404
@@ -4296,6 +4319,7 @@ def bulk_attendance_players():
 
     db.session.commit()
     cache.clear()
+    log_activity('bulk_attendance_players', f'Bulk set {count} attendance records → {status} for {len(player_ids)} player(s)')
     return jsonify({'success': True, 'updated': count})
 
 
@@ -4361,6 +4385,7 @@ def update_player_additional_charges():
     if player:
         player.additional_charges = additional_charges
         db.session.commit()
+        log_activity('update_additional_charges', f'Updated additional charges for {player.name} to ${additional_charges:.2f}', 'player', player_id)
         return jsonify({'success': True})
 
     return jsonify({'error': 'Player not found'}), 404
@@ -4378,6 +4403,7 @@ def update_player_comments():
     if player:
         player.admin_comments = comments
         db.session.commit()
+        log_activity('update_player_comments', f'Updated admin comments for {player.name}', 'player', player_id)
         return jsonify({'success': True})
 
     return jsonify({'error': 'Player not found'}), 404
@@ -4461,6 +4487,7 @@ def bulk_payment_api():
         count += 1
 
     db.session.commit()
+    log_activity('bulk_payment', f'Bulk payment recorded: {count} players via {method}')
     return jsonify({'success': True, 'count': count})
 
 
@@ -5482,6 +5509,7 @@ def delete_notification(id):
     NotificationRead.query.filter_by(notification_id=id).delete()
     db.session.delete(notif)
     db.session.commit()
+    log_activity('delete_notification', f'Deleted notification: {notif.title}', 'notification', id)
     return jsonify({'success': True})
 
 
