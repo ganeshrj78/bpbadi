@@ -24,10 +24,6 @@
             </div>
             <div class="text-2xl sm:text-3xl font-bold text-gray-800">{{ total_players }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Total Players</div>
-            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple mt-3 font-medium">
-                View all
-                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </span>
         </div>
     </a>
 
@@ -52,68 +48,59 @@
                 </div>
                 {% endfor %}
             </div>
-            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-2 font-medium">
-                View all
-                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </span>
         </div>
     </a>
 
-    <!-- Total Collected -->
+    <!-- Total Collected + Outstanding -->
     <a href="{{ url_for('payments') }}" class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative block cursor-pointer">
         <div class="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 gradient-info opacity-10 rounded-full -mr-10 sm:-mr-16 -mt-10 sm:-mt-16"></div>
         <div class="relative">
-            <div class="flex items-center justify-between mb-2 sm:mb-4">
+            <div class="flex items-center justify-between mb-2 sm:mb-3">
                 <div class="w-10 h-10 sm:w-12 sm:h-12 gradient-info rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg">
                     <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
             </div>
-            <div class="text-xl sm:text-3xl font-bold text-wimbledon-green">${{ "%.2f"|format(total_collected) }}</div>
-            <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Total Collected</div>
+            <div class="text-xl sm:text-2xl font-bold text-wimbledon-green">${{ "%.2f"|format(total_collected) }}</div>
+            <div class="text-xs sm:text-sm font-medium text-gray-500">Collected</div>
+            <div class="mt-1 flex items-baseline gap-1">
+                <span class="text-base sm:text-lg font-bold {% if total_outstanding > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %}">${{ "%.2f"|format(total_outstanding) }}</span>
+                <span class="text-[10px] sm:text-xs text-gray-400">outstanding</span>
+            </div>
             <div class="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
                 {% for m in monthly_summary if m.is_active %}
                 <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
                     <span>{{ m.month }}</span>
-                    <span class="font-medium text-wimbledon-green">${{ "%.0f"|format(m.collected) }}</span>
+                    <span class="text-wimbledon-green font-medium">${{ "%.0f"|format(m.collected) }}</span>
+                    <span class="{% if m.outstanding > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %} font-medium">${{ "%.0f"|format(m.outstanding) }} out</span>
                 </div>
                 {% endfor %}
             </div>
-            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-green mt-2 font-medium">
-                View payments
-                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </span>
         </div>
     </a>
 
-    <!-- Outstanding Balance -->
+    <!-- Expected Amount -->
     <a href="{{ url_for('payments') }}" class="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 card-hover transition-all border border-wimbledon-gold/20 overflow-hidden relative block cursor-pointer">
         <div class="absolute top-0 right-0 w-20 sm:w-32 h-20 sm:h-32 gradient-warning opacity-10 rounded-full -mr-10 sm:-mr-16 -mt-10 sm:-mt-16"></div>
         <div class="relative">
             <div class="flex items-center justify-between mb-2 sm:mb-4">
-                <div class="w-10 h-10 sm:w-12 sm:h-12 {% if total_outstanding > 0 %}gradient-warning{% else %}gradient-success{% endif %} rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 gradient-warning rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg">
                     <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                     </svg>
                 </div>
             </div>
-            <div class="text-xl sm:text-3xl font-bold {% if total_outstanding > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %}">
-                ${{ "%.2f"|format(total_outstanding) }}
-            </div>
-            <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Outstanding Balance</div>
+            <div class="text-xl sm:text-3xl font-bold text-wimbledon-purple">${{ "%.2f"|format(total_charges) }}</div>
+            <div class="text-xs sm:text-sm font-medium text-gray-500 mt-1">Expected Amount</div>
             <div class="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
                 {% for m in monthly_summary if m.is_active %}
                 <div class="flex justify-between text-[10px] sm:text-xs text-gray-500">
                     <span>{{ m.month }}</span>
-                    <span class="font-medium {% if m.outstanding > 0 %}text-wimbledon-purple{% else %}text-wimbledon-green{% endif %}">${{ "%.0f"|format(m.outstanding) }}</span>
+                    <span class="font-medium text-wimbledon-purple">${{ "%.0f"|format(m.charges) }}</span>
                 </div>
                 {% endfor %}
             </div>
-            <span class="hidden sm:inline-flex items-center text-sm text-wimbledon-purple mt-2 font-medium">
-                View details
-                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </span>
         </div>
     </a>
 </div>
