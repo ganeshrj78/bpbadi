@@ -4739,7 +4739,7 @@ def birdie_bank():
             Attendance.session_id, func.count(Attendance.id)
         ).filter(
             Attendance.session_id.in_(birdie_session_ids),
-            Attendance.status.in_(['YES', 'FILLIN', 'DROPOUT'])
+            Attendance.status.in_(['YES', 'FILLIN', 'DROPOUT', 'PENDING_DROPOUT'])
         ).group_by(Attendance.session_id).all()
         charged_counts = dict(counts)
 
@@ -4760,7 +4760,7 @@ def birdie_bank():
     # Total reimbursed
     total_reimbursed = sum(t.cost or 0 for t in transactions if t.transaction_type == 'reimbursement')
     total_expenses = sum(t.cost or 0 for t in transactions if t.transaction_type == 'expense')
-    birdie_fund_balance = round(total_birdie_collected - total_reimbursed - total_expenses, 2)
+    birdie_fund_balance = total_birdie_collected
 
     # Expense breakdown by category
     expense_by_category = {}
