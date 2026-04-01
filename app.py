@@ -629,7 +629,7 @@ def compute_session_display_stats(session_ids):
     all_courts = Court.query.filter(Court.session_id.in_(session_ids)).all()
     all_att = Attendance.query.filter(
         Attendance.session_id.in_(session_ids),
-        Attendance.status.in_(['YES', 'DROPOUT'])
+        Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT'])
     ).all()
     all_sessions = {s.id: s for s in Session.query.filter(Session.id.in_(session_ids)).all()}
 

@@ -172,27 +172,27 @@ class Session(db.Model):
     courts = db.relationship('Court', backref='session', lazy='dynamic', cascade='all, delete-orphan', order_by='Court.id')
 
     def get_attendee_count(self):
-        """Count players who attended (status=YES) plus dropouts (for frozen sessions, dropouts still count toward cost calculation)"""
-        return self.attendances.filter(Attendance.status.in_(['YES', 'DROPOUT'])).count()
+        """Count players in chargeable statuses — PENDING_DROPOUT included so cost doesn't change while awaiting approval"""
+        return self.attendances.filter(Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT'])).count()
 
     def get_regular_player_count(self):
-        """Count regular players who attended (status=YES or DROPOUT - dropouts still count for frozen session cost calculation)"""
+        """Count regular players in chargeable statuses — PENDING_DROPOUT included to keep cost stable for other players"""
         return self.attendances.filter(
-            Attendance.status.in_(['YES', 'DROPOUT']),
+            Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT']),
             Attendance.category == 'regular'
         ).count()
 
     def get_adhoc_player_count(self):
-        """Count adhoc players who attended (status=YES or DROPOUT - dropouts still count for frozen session cost calculation)"""
+        """Count adhoc players in chargeable statuses — PENDING_DROPOUT included to keep cost stable for other players"""
         return self.attendances.filter(
-            Attendance.status.in_(['YES', 'DROPOUT']),
+            Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT']),
             Attendance.category == 'adhoc'
         ).count()
 
     def get_kid_player_count(self):
-        """Count kid players who attended (status=YES or DROPOUT - dropouts still count for frozen session cost calculation)"""
+        """Count kid players in chargeable statuses — PENDING_DROPOUT included to keep cost stable for other players"""
         return self.attendances.filter(
-            Attendance.status.in_(['YES', 'DROPOUT']),
+            Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT']),
             Attendance.category == 'kid'
         ).count()
 
