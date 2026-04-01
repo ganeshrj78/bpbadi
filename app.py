@@ -422,7 +422,7 @@ def get_cached_monthly_summary():
         if sid not in att_counts:
             att_counts[sid] = {'regular': 0, 'adhoc': 0, 'kid': 0,
                                'paid_regular': 0, 'paid_adhoc': 0, 'paid_kid': 0}
-        if att.status in ('YES', 'DROPOUT'):
+        if att.status in ('YES', 'DROPOUT', 'PENDING_DROPOUT'):
             cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
             att_counts[sid][cat] += 1
             if att.payment_status == 'paid':
@@ -566,7 +566,7 @@ def get_cached_player_stats():
 
     session_counts = {}
     for att in all_chargeable_att:
-        if att.status in ('YES', 'DROPOUT'):
+        if att.status in ('YES', 'DROPOUT', 'PENDING_DROPOUT'):
             sid = att.session_id
             if sid not in session_counts:
                 session_counts[sid] = {'regular': 0, 'adhoc': 0}
@@ -2328,7 +2328,7 @@ def sessions():
             func.count(Attendance.id)
         ).filter(
             Attendance.session_id.in_(archived_ids),
-            Attendance.status.in_(['YES', 'DROPOUT'])
+            Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT'])
         ).group_by(Attendance.session_id).all()
         arch_attendee_map = dict(arch_att_counts)
         # Batch-load regular player counts for cost calculation
@@ -2337,7 +2337,7 @@ def sessions():
             func.count(Attendance.id)
         ).filter(
             Attendance.session_id.in_(archived_ids),
-            Attendance.status.in_(['YES', 'DROPOUT']),
+            Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT']),
             Attendance.category == 'regular'
         ).group_by(Attendance.session_id).all()
         arch_reg_map = dict(arch_reg_counts)
@@ -2651,9 +2651,9 @@ def sessions_by_month(month_key):
         reg_court_cost = sum(c.cost for c in regular_courts)
 
         sess_atts = attendees_by_session.get(sess.id, [])
-        reg_att_count = sum(1 for a in sess_atts if a.category == 'regular' and a.status in ('YES', 'DROPOUT'))
-        adhoc_att_count = sum(1 for a in sess_atts if a.category == 'adhoc' and a.status in ('YES', 'DROPOUT'))
-        kid_att_count = sum(1 for a in sess_atts if a.category == 'kid' and a.status in ('YES', 'DROPOUT'))
+        reg_att_count = sum(1 for a in sess_atts if a.category == 'regular' and a.status in ('YES', 'DROPOUT', 'PENDING_DROPOUT'))
+        adhoc_att_count = sum(1 for a in sess_atts if a.category == 'adhoc' and a.status in ('YES', 'DROPOUT', 'PENDING_DROPOUT'))
+        kid_att_count = sum(1 for a in sess_atts if a.category == 'kid' and a.status in ('YES', 'DROPOUT', 'PENDING_DROPOUT'))
         total_attendees = reg_att_count + adhoc_att_count + kid_att_count
 
         # Cost per player (same formula as model)
