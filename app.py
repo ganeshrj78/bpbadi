@@ -4779,6 +4779,7 @@ def birdie_bank():
                          total_expenses=round(total_expenses, 2),
                          expense_outstanding=expense_outstanding,
                          birdie_fund_balance=birdie_fund_balance,
+                         birdie_session_count=len(all_sessions_with_birdie),
                          expense_by_category=expense_by_category,
                          sessions=sessions_list,
                          admins=admins,
