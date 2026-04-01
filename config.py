@@ -20,6 +20,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = get_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     APP_PASSWORD = os.environ.get('APP_PASSWORD', 'bpbadi2024')
+    DEFAULT_PLAYER_PASSWORD = os.environ.get('DEFAULT_PLAYER_PASSWORD', 'Welcome2BP!')
 
     # Google OAuth
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')

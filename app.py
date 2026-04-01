@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 import os
 import uuid
 import hashlib
+import hmac
 import logging
 from collections import defaultdict
 from logging.handlers import RotatingFileHandler
@@ -162,27 +163,48 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max
 # Ensure upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+MIME_TYPES = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp'}
+
+# Magic byte signatures — validate actual file content, not just the extension
+_IMAGE_MAGIC = [
+    (b'\x89PNG\r\n\x1a\n', 'png'),
+    (b'\xff\xd8\xff', 'jpg'),
+    (b'GIF87a', 'gif'),
+    (b'GIF89a', 'gif'),
+    (b'RIFF', 'webp'),  # extra WEBP check below
+]
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-MIME_TYPES = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp'}
+def _detect_image_type(data):
+    """Return image type if magic bytes match a known format, else None."""
+    for magic, img_type in _IMAGE_MAGIC:
+        if data[:len(magic)] == magic:
+            if img_type == 'webp' and data[8:12] != b'WEBP':
+                continue
+            return img_type
+    return None
 
 def save_profile_photo(file, player=None):
-    """Save uploaded profile photo to database and return filename for backwards compat"""
-    if file and allowed_file(file.filename):
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        mime = MIME_TYPES.get(ext, 'image/jpeg')
-        photo_data = file.read()
-        if player:
-            player.profile_photo_data = photo_data
-            player.profile_photo_mime = mime
-        # Also save to filesystem as fallback for local dev
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        with open(filepath, 'wb') as f:
-            f.write(photo_data)
-        return filename
-    return None
+    """Save uploaded profile photo. Validates magic bytes — not just the extension."""
+    if not (file and allowed_file(file.filename)):
+        return None
+    photo_data = file.read()
+    img_type = _detect_image_type(photo_data)
+    if not img_type:
+        return None  # File content doesn't match any known image signature
+    ext = 'jpg' if img_type == 'jpg' else img_type
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    mime = MIME_TYPES.get(ext, 'image/jpeg')
+    if player:
+        player.profile_photo_data = photo_data
+        player.profile_photo_mime = mime
+    # Also save to filesystem as fallback for local dev
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    with open(filepath, 'wb') as f:
+        f.write(photo_data)
+    return filename
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -241,6 +263,38 @@ def admin_required(f):
             return redirect(url_for('player_payments'))
         return f(*args, **kwargs)
     return decorated_function
+
+
+def _validate_password_strength(password):
+    """Return (ok, error_message). Shared across all password-change routes."""
+    import re
+    if not password or len(password) < 9:
+        return False, 'Password must be at least 9 characters long.'
+    if not re.search(r'[A-Z]', password):
+        return False, 'Password must contain at least one uppercase letter.'
+    if not re.search(r'[a-z]', password):
+        return False, 'Password must contain at least one lowercase letter.'
+    if not re.search(r'[0-9]', password):
+        return False, 'Password must contain at least one number.'
+    if not re.search(r'[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/~`]', password):
+        return False, 'Password must contain at least one special character.'
+    return True, None
+
+
+def _safe_float(value, default=0.0):
+    """Parse float from user input without raising ValueError."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value, default=0):
+    """Parse int from user input without raising ValueError."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 # Activity logging helper
@@ -670,13 +724,15 @@ def clear_session_cache():
 
 # Master admin only decorator (for sensitive operations like promoting admins)
 def master_admin_required(f):
+    """Restricts to master admin only (user_type == 'admin').
+    player_admin users are blocked — prevents privilege escalation via toggle_admin."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('authenticated'):
             return redirect(url_for('login'))
-        if session.get('user_type') not in ['admin', 'player_admin']:
-            flash('Admin access required', 'error')
-            return redirect(url_for('player_payments'))
+        if session.get('user_type') != 'admin':
+            flash('Master admin access required', 'error')
+            return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -700,7 +756,7 @@ def login():
 
         if login_type == 'admin':
             password = request.form.get('password')
-            if password == app.config['APP_PASSWORD']:
+            if hmac.compare_digest(password or '', app.config['APP_PASSWORD']):
                 session.permanent = remember_me
                 session['authenticated'] = True
                 session['user_type'] = 'admin'
@@ -753,7 +809,7 @@ def login():
                     session['user_type'] = 'player'
                     security_logger.info(f'PLAYER_LOGIN_SUCCESS - Player: {player.name} (ID: {player.id}), IP: {client_ip}')
                     log_activity('login', f'Player {player.name} logged in')
-                    if player.check_password('Welcome2BP!'):
+                    if player.check_password(app.config['DEFAULT_PLAYER_PASSWORD']):
                         session['must_reset_password'] = True
                         flash('Please set a new password before continuing.', 'warning')
                         return redirect(url_for('force_reset_password'))
@@ -897,28 +953,12 @@ def force_reset_password():
         new_password = request.form.get('new_password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
 
-        import re
-        if not new_password or len(new_password) < 9:
-            flash('Password must be at least 9 characters long.', 'error')
+        ok, err = _validate_password_strength(new_password)
+        if not ok:
+            flash(err, 'error')
             return render_template('force_reset_password.html', player=player)
 
-        if not re.search(r'[A-Z]', new_password):
-            flash('Password must contain at least one uppercase letter.', 'error')
-            return render_template('force_reset_password.html', player=player)
-
-        if not re.search(r'[a-z]', new_password):
-            flash('Password must contain at least one lowercase letter.', 'error')
-            return render_template('force_reset_password.html', player=player)
-
-        if not re.search(r'[0-9]', new_password):
-            flash('Password must contain at least one number.', 'error')
-            return render_template('force_reset_password.html', player=player)
-
-        if not re.search(r'[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/~`]', new_password):
-            flash('Password must contain at least one special character.', 'error')
-            return render_template('force_reset_password.html', player=player)
-
-        if new_password == 'Welcome2BP!':
+        if new_password == app.config['DEFAULT_PLAYER_PASSWORD']:
             flash('Please choose a different password.', 'error')
             return render_template('force_reset_password.html', player=player)
 
@@ -989,7 +1029,7 @@ def register():
             is_approved=False,
             is_active=True
         )
-        player.set_password(password if password else 'Welcome2BP!')
+        player.set_password(password if password else app.config['DEFAULT_PLAYER_PASSWORD'])
 
         db.session.add(player)
         db.session.commit()
@@ -1032,16 +1072,26 @@ def edit_guidelines():
         member_guidelines = data.get('member_guidelines', '')
         booking_guidelines = data.get('booking_guidelines', '')
 
-        # Sanitize HTML to prevent XSS
+        # Sanitize HTML to prevent XSS.
+        # Uses a callable for allowed_attrs to block javascript:/vbscript: href schemes.
+        import urllib.parse
+        _safe_schemes = {'http', 'https', 'mailto'}
         allowed_tags = ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li',
                         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'img', 'table',
                         'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'pre', 'code', 'hr']
-        allowed_attrs = {'a': ['href', 'target', 'class'], 'img': ['src', 'alt', 'class'],
-                         'div': ['class'], 'span': ['class'], 'p': ['class'],
-                         'td': ['class', 'colspan', 'rowspan'], 'th': ['class', 'colspan', 'rowspan'],
-                         'h4': ['class'], 'strong': ['class']}
-        member_guidelines = bleach.clean(member_guidelines, tags=allowed_tags, attributes=allowed_attrs, strip=True)
-        booking_guidelines = bleach.clean(booking_guidelines, tags=allowed_tags, attributes=allowed_attrs, strip=True)
+
+        def _allowed_attrs(tag, name, value):
+            if tag == 'a' and name == 'href':
+                scheme = urllib.parse.urlparse(value).scheme.lower()
+                return not scheme or scheme in _safe_schemes
+            if tag == 'a':
+                return name in ('target', 'class')
+            if tag == 'img':
+                return name in ('src', 'alt', 'class')
+            return name in ('class', 'colspan', 'rowspan')
+
+        member_guidelines = bleach.clean(member_guidelines, tags=allowed_tags, attributes=_allowed_attrs, strip=True)
+        booking_guidelines = bleach.clean(booking_guidelines, tags=allowed_tags, attributes=_allowed_attrs, strip=True)
 
         SiteSettings.set('member_guidelines', member_guidelines)
         SiteSettings.set('booking_guidelines', booking_guidelines)
@@ -1259,13 +1309,15 @@ def player_profile():
                 flash('Current password is incorrect', 'error')
             elif new_password != confirm_password:
                 flash('New passwords do not match', 'error')
-            elif len(new_password) < 4:
-                flash('Password must be at least 4 characters', 'error')
             else:
-                player.set_password(new_password)
-                db.session.commit()
-                log_activity('change_password', f'Player {player.name} changed password', 'player', player.id)
-                flash('Password changed successfully!', 'success')
+                ok, err = _validate_password_strength(new_password)
+                if not ok:
+                    flash(err, 'error')
+                else:
+                    player.set_password(new_password)
+                    db.session.commit()
+                    log_activity('change_password', f'Player {player.name} changed password', 'player', player.id)
+                    flash('Password changed successfully!', 'success')
 
         elif action == 'update_notifications':
             player.notify_sms = request.form.get('notify_sms') == '1'
@@ -1452,7 +1504,7 @@ def player_payments():
 
     if request.method == 'POST':
         target_value = request.form.get('player_id', str(player_id))
-        amount = float(request.form.get('amount'))
+        amount = _safe_float(request.form.get('amount'))
         method = request.form.get('method')
         date_str = request.form.get('date')
         notes = request.form.get('notes')
@@ -1978,7 +2030,7 @@ def add_player():
             flash('Name is required', 'error')
             return render_template('player_form.html', player=None)
 
-        level = int(request.form.get('level', 1))
+        level = _safe_int(request.form.get('level', 1))
         player = Player(name=name, category=category, phone=phone, email=email, zelle_preference=zelle_preference, gender=gender, level=level, is_approved=True)
 
         # Handle date of birth
@@ -2054,7 +2106,7 @@ def edit_player(id):
         player.email = request.form.get('email')
         player.zelle_preference = request.form.get('zelle_preference', 'email')
         player.gender = request.form.get('gender', 'male')
-        player.level = int(request.form.get('level', player.level or 1))
+        player.level = _safe_int(request.form.get('level', player.level or 1))
         dob_str = request.form.get('date_of_birth')
         player.date_of_birth = datetime.strptime(dob_str, '%Y-%m-%d').date() if dob_str else None
 
@@ -2101,7 +2153,7 @@ def delete_player(id):
 
 
 @app.route('/players/<int:id>/toggle-admin', methods=['POST'])
-@admin_required
+@master_admin_required
 def toggle_admin(id):
     player = Player.query.get_or_404(id)
     player.is_admin = not player.is_admin
@@ -2669,11 +2721,11 @@ def sessions_by_month(month_key):
 @admin_required
 def add_session():
     if request.method == 'POST':
-        birdie_cost = float(request.form.get('birdie_cost', 2))
+        birdie_cost = _safe_float(request.form.get('birdie_cost', 2))
         notes = request.form.get('notes', '')
 
         # Get all dates to create sessions for
-        date_count = int(request.form.get('date_count', 1))
+        date_count = _safe_int(request.form.get('date_count', 1))
         created_sessions = []
 
         players = Player.query.all()
@@ -2987,8 +3039,8 @@ def edit_session(id):
 
     if request.method == 'POST':
         sess.date = datetime.strptime(request.form.get('date'), '%Y-%m-%d').date()
-        sess.birdie_cost = float(request.form.get('birdie_cost', 0))
-        sess.credits = float(request.form.get('credits', 0))
+        sess.birdie_cost = _safe_float(request.form.get('birdie_cost', 0))
+        sess.credits = _safe_float(request.form.get('credits', 0))
         sess.apply_credits = request.form.get('apply_credits') == 'on'
         sess.notes = request.form.get('notes')
 
@@ -3007,7 +3059,7 @@ def edit_session(id):
             em = total % 60
             return f"{eh:02d}:{em:02d}"
 
-        court_count = int(request.form.get('court_count', 0))
+        court_count = _safe_int(request.form.get('court_count', 0))
 
         # Delete existing courts and recreate
         Court.query.filter_by(session_id=id).delete()
@@ -3016,8 +3068,8 @@ def edit_session(id):
         for i in range(court_count):
             court_name = request.form.get(f'court_name_{i}', f'Court {i+1}')
             court_type = request.form.get(f'court_type_{i}', 'regular')
-            court_cost = float(request.form.get(f'court_cost_{i}', 105))
-            court_hours = float(request.form.get(f'court_hours_{i}', 3))
+            court_cost = _safe_float(request.form.get(f'court_cost_{i}', 105))
+            court_hours = _safe_float(request.form.get(f'court_hours_{i}', 3))
             court_start = request.form.get(f'court_start_time_{i}', '06:30')
             court_end = compute_end_time(court_start, court_hours)
 
@@ -3225,7 +3277,7 @@ def api_add_court(session_id):
         session_id=session_id,
         name=data.get('name', f'Court {sess.courts.count() + 1}'),
         court_type=data.get('court_type', 'regular'),
-        cost=float(data.get('cost', 105)),
+        cost=_safe_float(data.get('cost', 105)),
         start_time=data.get('start_time', '6:30 AM'),
         end_time=data.get('end_time', '9:30 AM')
     )
@@ -3667,8 +3719,8 @@ def session_refunds(id):
 @admin_required
 def add_dropout_refund(id):
     sess = Session.query.get_or_404(id)
-    player_id = int(request.form.get('player_id'))
-    refund_amount = float(request.form.get('refund_amount', 0))
+    player_id = _safe_int(request.form.get('player_id'))
+    refund_amount = _safe_float(request.form.get('refund_amount', 0))
     instructions = request.form.get('instructions', '').strip()
 
     # Check if refund already exists
@@ -3706,7 +3758,7 @@ def update_dropout_refund(id):
 
     if action == 'update':
         old_amount = refund.refund_amount
-        new_amount = float(request.form.get('refund_amount', refund.refund_amount))
+        new_amount = _safe_float(request.form.get('refund_amount', refund.refund_amount))
         refund.refund_amount = new_amount
         refund.instructions = request.form.get('instructions', '').strip()
 
@@ -4042,7 +4094,7 @@ def process_dropout():
     session_id       = data.get('session_id')
     dropout_player_id = data.get('dropout_player_id')
     fillin_player_id  = data.get('fillin_player_id')   # may be None
-    refund_amount    = float(data.get('refund_amount', 0))
+    refund_amount    = _safe_float(data.get('refund_amount', 0))
 
     sess = Session.query.get_or_404(session_id)
     sess_date_str = sess.date.strftime('%m/%d')
@@ -4215,7 +4267,7 @@ def update_attendance_additional_cost():
     data = request.get_json()
     player_id = data.get('player_id')
     session_id = data.get('session_id')
-    additional_cost = float(data.get('additional_cost', 0))
+    additional_cost = _safe_float(data.get('additional_cost', 0))
 
     attendance = Attendance.query.filter_by(player_id=player_id, session_id=session_id).first()
 
@@ -4440,7 +4492,7 @@ def bulk_session_payment():
 def update_player_additional_charges():
     data = request.get_json()
     player_id = data.get('player_id')
-    additional_charges = float(data.get('additional_charges', 0))
+    additional_charges = _safe_float(data.get('additional_charges', 0))
 
     player = Player.query.get(player_id)
     if player:
@@ -4556,8 +4608,8 @@ def bulk_payment_api():
 @admin_required
 def add_payment():
     if request.method == 'POST':
-        player_id = int(request.form.get('player_id'))
-        amount = float(request.form.get('amount'))
+        player_id = _safe_int(request.form.get('player_id'))
+        amount = _safe_float(request.form.get('amount'))
         payment_type = request.form.get('payment_type', 'payment')
         method = request.form.get('method')
         date_str = request.form.get('date')
@@ -4739,8 +4791,8 @@ def birdie_bank():
 @admin_required
 def add_birdie_transaction():
     transaction_type = request.form.get('transaction_type')
-    quantity = int(request.form.get('quantity', 0))
-    cost = float(request.form.get('cost', 0))
+    quantity = _safe_int(request.form.get('quantity', 0))
+    cost = _safe_float(request.form.get('cost', 0))
     notes = request.form.get('notes')
     date_str = request.form.get('date')
     session_id = request.form.get('session_id')
@@ -4866,7 +4918,7 @@ def reset_admin_password():
         confirm_password = request.form.get('confirm_password')
 
         # Verify current admin password
-        if current_password != app.config['APP_PASSWORD']:
+        if not hmac.compare_digest(current_password or '', app.config['APP_PASSWORD']):
             flash('Current admin password is incorrect', 'error')
             return redirect(url_for('reset_admin_password'))
 
@@ -4874,8 +4926,9 @@ def reset_admin_password():
             flash('New passwords do not match', 'error')
             return redirect(url_for('reset_admin_password'))
 
-        if len(new_password) < 8:
-            flash('Password must be at least 8 characters', 'error')
+        ok, err = _validate_password_strength(new_password)
+        if not ok:
+            flash(err, 'error')
             return redirect(url_for('reset_admin_password'))
 
         # Update the password in config (runtime only - need env var for persistence)
@@ -4964,7 +5017,7 @@ def api_ezfacility_open_browser():
         if sys.platform == 'darwin':
             subprocess.Popen(['open', url])
         elif sys.platform == 'win32':
-            subprocess.Popen(['start', url], shell=True)
+            subprocess.Popen(['cmd', '/c', 'start', '', url])
         else:
             subprocess.Popen(['xdg-open', url])
         return jsonify({'success': True})
