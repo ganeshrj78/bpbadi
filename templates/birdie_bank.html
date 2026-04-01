@@ -36,7 +36,7 @@
                 <div>
                     <h3 class="text-xs sm:text-sm font-semibold {% if birdie_fund_balance > 0 %}text-green-600{% else %}text-gray-500{% endif %} uppercase tracking-wide mb-1">Fund Balance</h3>
                     <p class="text-2xl sm:text-4xl font-bold {% if birdie_fund_balance > 0 %}text-green-600{% else %}text-gray-800{% endif %}">${{ '%.2f'|format(birdie_fund_balance) }}</p>
-                    <p class="text-xs sm:text-sm text-gray-500 mt-1">birdie cost collected from players</p>
+                    <p class="text-xs sm:text-sm text-gray-500 mt-1">collection − court charges − refunds</p>
                     {% if birdie_session_count > 0 %}
                     <p class="text-[11px] text-gray-400 mt-0.5">across {{ birdie_session_count }} session{{ 's' if birdie_session_count != 1 else '' }}{% if monthly_cost_list %} · {{ monthly_cost_list[0].label }}: ${{ '%.2f'|format(monthly_cost_list[0].cost) }}{% endif %}</p>
                     {% endif %}

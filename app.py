@@ -4728,32 +4728,77 @@ def birdie_bank():
         expense_outstanding += min(exp_total, owed)
     expense_outstanding = round(expense_outstanding, 2)
 
-    # Birdie cost collected from players: birdie_cost * charged_players per session
-    all_sessions_with_birdie = Session.query.filter(Session.birdie_cost > 0).all()
-    birdie_session_ids = [s.id for s in all_sessions_with_birdie]
-    # Count charged players per session
-    charged_counts = {}
-    if birdie_session_ids:
-        from sqlalchemy import func
-        counts = db.session.query(
-            Attendance.session_id, func.count(Attendance.id)
-        ).filter(
-            Attendance.session_id.in_(birdie_session_ids),
-            Attendance.status.in_(['YES', 'FILLIN', 'DROPOUT', 'PENDING_DROPOUT'])
-        ).group_by(Attendance.session_id).all()
-        charged_counts = dict(counts)
+    # Fund balance per session = (Regular + Adhoc + Kids charges) − Court charges − Processed refunds
+    all_fund_sessions = Session.query.all()
+    fund_session_ids = [s.id for s in all_fund_sessions]
 
+    # Batch-load courts
+    fund_courts = Court.query.filter(Court.session_id.in_(fund_session_ids)).all() if fund_session_ids else []
+    court_costs_map = {}   # {sid: {'regular': float, 'adhoc': float, 'total': float}}
+    for c in fund_courts:
+        if c.session_id not in court_costs_map:
+            court_costs_map[c.session_id] = {'regular': 0.0, 'adhoc': 0.0, 'total': 0.0}
+        key = 'adhoc' if c.court_type == 'adhoc' else 'regular'
+        court_costs_map[c.session_id][key] += c.cost
+        court_costs_map[c.session_id]['total'] += c.cost
+
+    # Batch-load attendance counts (regular/adhoc/kid) — include PENDING_DROPOUT
+    fund_att = Attendance.query.filter(
+        Attendance.session_id.in_(fund_session_ids),
+        Attendance.status.in_(['YES', 'DROPOUT', 'PENDING_DROPOUT'])
+    ).all() if fund_session_ids else []
+    att_cat_counts = {}  # {sid: {'regular': int, 'adhoc': int, 'kid': int}}
+    for att in fund_att:
+        sid = att.session_id
+        if sid not in att_cat_counts:
+            att_cat_counts[sid] = {'regular': 0, 'adhoc': 0, 'kid': 0}
+        cat = att.category if att.category in ('adhoc', 'kid') else 'regular'
+        att_cat_counts[sid][cat] += 1
+
+    # Batch-load processed refunds per session
+    processed_refunds_map = {}  # {sid: float}
+    for r in DropoutRefund.query.filter(
+        DropoutRefund.session_id.in_(fund_session_ids),
+        DropoutRefund.status == 'processed'
+    ).all():
+        processed_refunds_map[r.session_id] = processed_refunds_map.get(r.session_id, 0.0) + (r.refund_amount or 0)
+
+    # Compute per-session net contribution and monthly rollup
     monthly_costs = {}
     total_birdie_collected = 0.0
-    for s in all_sessions_with_birdie:
-        count = charged_counts.get(s.id, 0)
-        collected = s.birdie_cost * count
-        total_birdie_collected += collected
-        key = s.date.strftime('%Y-%m')
-        label = s.date.strftime('%b %Y')
-        if key not in monthly_costs:
-            monthly_costs[key] = {'label': label, 'cost': 0.0}
-        monthly_costs[key]['cost'] += collected
+    all_sessions_with_birdie = []  # track sessions that contributed
+
+    for s in all_fund_sessions:
+        sid = s.id
+        courts = court_costs_map.get(sid, {'regular': 0.0, 'adhoc': 0.0, 'total': 0.0})
+        counts = att_cat_counts.get(sid, {'regular': 0, 'adhoc': 0, 'kid': 0})
+        reg_count = counts['regular']
+        adhoc_count = counts['adhoc']
+        kid_count = counts['kid']
+
+        if reg_count == 0 and adhoc_count == 0 and kid_count == 0:
+            continue  # skip empty sessions
+
+        reg_court_cost = courts['regular']
+        court_pool = reg_court_cost + ((s.credits or 0) if s.apply_credits else 0)
+        cost_per_player = round(court_pool / reg_count + (s.birdie_cost or 0), 2) if reg_count > 0 else (s.birdie_cost or 0)
+
+        regular_charges = round(cost_per_player * reg_count, 2)
+        adhoc_charges = round(cost_per_player * adhoc_count, 2)
+        kid_charges = round(11.0 * kid_count, 2)
+        total_collection = regular_charges + adhoc_charges + kid_charges
+        session_refunds = round(processed_refunds_map.get(sid, 0.0), 2)
+        session_net = round(total_collection - courts['total'] - session_refunds, 2)
+
+        if session_net != 0:
+            all_sessions_with_birdie.append(s)
+            total_birdie_collected += session_net
+            key = s.date.strftime('%Y-%m')
+            label = s.date.strftime('%b %Y')
+            if key not in monthly_costs:
+                monthly_costs[key] = {'label': label, 'cost': 0.0}
+            monthly_costs[key]['cost'] = round(monthly_costs[key]['cost'] + session_net, 2)
+
     monthly_cost_list = [v for _, v in sorted(monthly_costs.items(), reverse=True)]
     total_birdie_collected = round(total_birdie_collected, 2)
 
