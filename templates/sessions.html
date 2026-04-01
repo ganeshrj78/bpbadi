@@ -1858,7 +1858,7 @@ function openSessionsDropoutModal(sessionId, playerId, selectEl) {
         fillinInfo.classList.add('hidden');
     }
 
-    const standby = STANDBY_BY_SESSION[sessionId] || [];
+    const standby = (STANDBY_BY_SESSION[sessionId] || []).filter(p => p.id !== playerId);
     const list = document.getElementById('sdropout-standby-list');
     if (standby.length === 0) {
         list.innerHTML = `<div class="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 italic">

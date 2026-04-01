@@ -1134,9 +1134,10 @@ function openDropoutModal() {
     document.getElementById('refund-hint').textContent =
         'Suggested: $' + SUGGESTED_REFUND.toFixed(2) + ' (court cost – birdie)';
 
-    // Build standby list
+    // Build standby list — exclude the player being dropped out
+    const filteredStandby = STANDBY_PLAYERS.filter(p => p.id !== _dropout.playerId);
     const list = document.getElementById('standby-list');
-    if (STANDBY_PLAYERS.length === 0) {
+    if (filteredStandby.length === 0) {
         list.innerHTML = `<div class="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 italic">
             No players on standby. Fill-in will be set to None.
             <input type="hidden" name="fillin" value="none" id="fillin-none" checked>
@@ -1147,7 +1148,7 @@ function openDropoutModal() {
                 <input type="radio" name="fillin" value="" checked class="accent-wimbledon-purple">
                 <span class="text-sm font-medium text-gray-700">None — no fill-in</span>
             </label>`
-        ].concat(STANDBY_PLAYERS.map((p, i) => `
+        ].concat(filteredStandby.map((p, i) => `
             <label class="flex items-center gap-3 p-3 rounded-xl border border-wimbledon-purple/20 cursor-pointer hover:bg-wimbledon-cream/40 transition-colors">
                 <input type="radio" name="fillin" value="${p.id}" class="accent-wimbledon-purple">
                 <div class="flex-1">
