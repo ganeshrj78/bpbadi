@@ -1768,7 +1768,7 @@ def update_player_attendance():
 @csrf.exempt
 @login_required
 def request_player_dropout():
-    """Player requests dropout on a frozen session — sets status to PENDING_DROPOUT for admin approval."""
+    """Player dropout request — blocked on frozen sessions (post-freeze dropouts are treated as playing)."""
     if session.get('user_type') != 'player':
         return jsonify({'error': 'Player access only'}), 403
 
@@ -1788,6 +1788,8 @@ def request_player_dropout():
         return jsonify({'error': 'Session not found'}), 404
     if not sess.voting_frozen:
         return jsonify({'error': 'Dropout requests are only for frozen sessions'}), 400
+    # Post-freeze dropouts are treated as playing — player remains charged, no refund
+    return jsonify({'error': 'Session is frozen. Late dropouts are considered as playing and will be charged.'}), 400
 
     attendance = Attendance.query.filter_by(player_id=target_player_id, session_id=session_id).first()
     if not attendance or attendance.status not in ['YES', 'FILLIN']:
@@ -3909,7 +3911,8 @@ def batch_update_attendance():
                 att.comments = (existing + '\n' + note).strip() if existing else note
 
             # Handle dropout
-            if status == 'DROPOUT' and old_status in ['YES', 'FILLIN']:
+            # Post-freeze dropouts are treated as playing — no refund created, payment_status unchanged
+            if status == 'DROPOUT' and old_status in ['YES', 'FILLIN'] and not sess.voting_frozen:
                 suggested_refund = sess.calculate_suggested_refund()
 
                 if old_status == 'FILLIN' and attendance.payment_status == 'unpaid':
@@ -4035,22 +4038,21 @@ def update_attendance():
         old_status = attendance.status
         attendance.status = status
 
-        # Auto-create refund when dropping out of a frozen session
-        if sess.voting_frozen and status == 'DROPOUT' and old_status == 'YES':
-            # Check if refund already exists
+        # Post-freeze dropouts are treated as playing — no refund created, payment_status unchanged
+        # Only auto-create refund for pre-freeze dropouts (session not yet frozen)
+        if not sess.voting_frozen and status == 'DROPOUT' and old_status in ['YES', 'FILLIN']:
             existing_refund = DropoutRefund.query.filter_by(
                 session_id=session_id, player_id=player_id
             ).first()
             if not existing_refund:
                 suggested_amount = sess.calculate_suggested_refund()
-                refund = DropoutRefund(
+                db.session.add(DropoutRefund(
                     player_id=player_id,
                     session_id=session_id,
                     refund_amount=suggested_amount,
                     suggested_amount=suggested_amount,
                     status='pending'
-                )
-                db.session.add(refund)
+                ))
 
         # Remove refund if reverting from DROPOUT back to YES
         if sess.voting_frozen and status == 'YES' and old_status == 'DROPOUT':
@@ -4160,25 +4162,30 @@ def process_dropout():
                 ))
     else:
         # Normal dropout (YES → DROPOUT or paid FILLIN → DROPOUT)
-        dropout_att.payment_status = 'pending_refund'
         dropout_note = f'Dropout for session {sess_date_str}'
         dropout_note += f', filled by {fillin_name}' if fillin_name else ', no fill-in'
         _append_comment(dropout_att, dropout_note)
 
-        # Create / update refund record
-        existing_refund = DropoutRefund.query.filter_by(
-            session_id=session_id, player_id=dropout_player_id
-        ).first()
-        if existing_refund:
-            existing_refund.refund_amount = refund_amount
+        if sess.voting_frozen:
+            # Post-freeze dropout = treated as playing: player remains charged, no refund
+            dropout_note_suffix = ' (post-freeze, still charged)'
+            dropout_att.comments = (dropout_att.comments or '').rstrip() + dropout_note_suffix
         else:
-            db.session.add(DropoutRefund(
-                player_id=dropout_player_id,
-                session_id=session_id,
-                refund_amount=refund_amount,
-                suggested_amount=refund_amount,
-                status='pending'
-            ))
+            # Pre-freeze dropout: create refund record
+            dropout_att.payment_status = 'pending_refund'
+            existing_refund = DropoutRefund.query.filter_by(
+                session_id=session_id, player_id=dropout_player_id
+            ).first()
+            if existing_refund:
+                existing_refund.refund_amount = refund_amount
+            else:
+                db.session.add(DropoutRefund(
+                    player_id=dropout_player_id,
+                    session_id=session_id,
+                    refund_amount=refund_amount,
+                    suggested_amount=refund_amount,
+                    status='pending'
+                ))
 
     # ── Assign fill-in (standby → fillin) ────────────────────────────────────
     if fillin_player_id:
